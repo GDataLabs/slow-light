@@ -169,6 +169,89 @@ textarea:focus, input[type=text]:focus{outline:none; border-color:rgba(127,212,1
 .reframe:hover{color:var(--ink); border-color:rgba(127,212,193,.4); background:rgba(127,212,193,.06)}
 
 footer.legal{color:#3d4a56; font-size:11.5px; line-height:1.6; margin-top:30px; max-width:64ch}
+
+/* ================= the check-in arrives in daylight =================
+   Warm parchment on the way in; it dissolves into the dark session on
+   Begin, so the darkening is part of the ritual rather than a jolt.  */
+#scr-checkin{
+  background:
+    radial-gradient(130% 90% at 18% -10%, #fdf7ec 0%, #f6ecd9 38%, #ecdcc2 72%, #e3d0b2 100%);
+  backdrop-filter:none;
+  color:#2b261f;
+}
+#scr-checkin h1{color:#a08b68; letter-spacing:.2em}
+#scr-checkin h2{color:#1f1a13; font-weight:300}
+#scr-checkin h3{color:#a1876a}
+#scr-checkin p{color:#5d5344}
+#scr-checkin .small{color:#7d7160}
+#scr-checkin .hair{background:rgba(90,70,40,.16)}
+#scr-checkin .scale{color:#8d8171}
+#scr-checkin .readout{color:#241f17}
+#scr-checkin .state{
+  border-color:rgba(90,70,40,.22); background:rgba(255,252,244,.62); color:#2b261f;
+  box-shadow:0 1px 2px rgba(120,95,55,.06);
+}
+#scr-checkin .state:hover{background:rgba(255,255,250,.95); border-color:rgba(90,70,40,.34)}
+#scr-checkin .state[aria-pressed="true"]{
+  border-color:#3f8b76; background:rgba(63,139,118,.13);
+  box-shadow:0 2px 14px rgba(63,139,118,.16);
+}
+#scr-checkin .state span.d{color:#867a68}
+#scr-checkin .state .sw{box-shadow:0 0 10px currentColor, inset 0 0 0 1px rgba(0,0,0,.10)}
+#scr-checkin .chip{border-color:rgba(90,70,40,.24); color:#6a5f4e; background:rgba(255,252,244,.5)}
+#scr-checkin .chip:hover{color:#2b261f; border-color:rgba(90,70,40,.42)}
+#scr-checkin .chip[aria-pressed="true"]{background:rgba(63,139,118,.16); border-color:#3f8b76; color:#1d5748}
+#scr-checkin .toggle{border-color:rgba(90,70,40,.22); background:rgba(255,252,244,.55)}
+#scr-checkin .toggle:hover{background:rgba(255,255,250,.9)}
+#scr-checkin .toggle b{color:#2b261f}
+#scr-checkin .toggle span{color:#847867}
+#scr-checkin .toggle input{accent-color:#3f8b76}
+#scr-checkin .btn{border-color:#3f8b76; background:#3f8b76; color:#fbf7ef; box-shadow:0 6px 20px rgba(63,139,118,.24)}
+#scr-checkin .btn:hover{background:#356f5f; border-color:#356f5f}
+#scr-checkin input[type=range]::-webkit-slider-runnable-track{background:linear-gradient(90deg,#3f8b76,#d98b5a); height:3px}
+#scr-checkin input[type=range]::-moz-range-track{background:linear-gradient(90deg,#3f8b76,#d98b5a); height:3px}
+#scr-checkin input[type=range]::-webkit-slider-thumb{background:#fffdf8; box-shadow:0 0 0 1px rgba(90,70,40,.3), 0 2px 8px rgba(90,70,40,.28); margin-top:-9.5px}
+#scr-checkin input[type=range]::-moz-range-thumb{background:#fffdf8; box-shadow:0 0 0 1px rgba(90,70,40,.3), 0 2px 8px rgba(90,70,40,.28)}
+#scr-checkin textarea, #scr-checkin input[type=text]{background:rgba(255,253,248,.8); border-color:rgba(90,70,40,.22); color:#2b261f}
+#scr-checkin footer.legal{color:#9c907d}
+#scr-checkin a{color:#2f7d6b}
+.screen.leaving{animation:fadeout 1.5s ease both; pointer-events:none}
+@keyframes fadeout{from{opacity:1} to{opacity:0}}
+
+/* ================= sensing, made visible =================
+   A person who lets a page hear them breathe deserves to see that it
+   worked. Live trace of their breath against the pacer, plus the camera
+   feed itself so there is no mystery about what is being read.        */
+#sensePrev{
+  margin-top:12px; border:1px solid rgba(90,70,40,.22); border-radius:var(--radius);
+  background:rgba(255,252,244,.6); padding:13px 15px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+}
+#sensePrev canvas{width:230px; height:62px; border-radius:9px; background:rgba(38,32,24,.055); flex:none}
+#sensePrev video{width:84px; height:63px; border-radius:9px; object-fit:cover; transform:scaleX(-1); background:#2b261f; flex:none}
+#sensePrev .st{font-size:13px; color:#7d7160; line-height:1.5; min-width:150px; flex:1}
+#sensePrev .st b{display:block; color:#2b261f; font-weight:500; font-size:14px; margin-bottom:1px}
+
+#senseWrap{display:flex; gap:10px; align-items:flex-end; margin-bottom:9px}
+#senseWrap.hide{display:none}
+#trace{
+  width:216px; height:58px; border-radius:9px;
+  background:rgba(6,11,16,.34); border:1px solid rgba(180,210,225,.14); backdrop-filter:blur(6px);
+}
+#camThumb{
+  width:70px; height:53px; border-radius:9px; object-fit:cover; transform:scaleX(-1);
+  border:1px solid rgba(180,210,225,.18); opacity:.72;
+}
+#camThumb.hide{display:none}
+#senseState{
+  font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:rgba(233,238,242,.5);
+  margin-bottom:5px; display:block;
+}
+#senseState b{color:#8fe3cd; font-weight:500; letter-spacing:.1em}
+@media (max-width:600px){
+  #trace{width:150px; height:46px}
+  #camThumb{width:52px; height:39px}
+  #sensePrev canvas{width:180px}
+}
 a{color:var(--accent)}
 .hide{display:none !important}
 @media (max-width:520px){ .card{padding:22px 18px 18px} h2{font-size:26px} }
@@ -200,6 +283,11 @@ a{color:var(--accent)}
       <label class="toggle"><input type="checkbox" id="optCam"><span><b>Camera — watch me breathe <em style="font-style:normal;color:#7a6a4e">(experimental)</em></b><span>Reads the small rise and fall of your chest, and attempts a pulse estimate from skin colour. Video never leaves this page and nothing is recorded.</span></span></label>
       <label class="toggle"><input type="checkbox" id="optSound" checked><span><b>Sound on</b><span>A generative soundscape built live in the browser. Headphones recommended — part of it is a binaural beat that needs two ears.</span></span></label>
     </div>
+    <div id="sensePrev" class="hide">
+      <canvas id="traceA" width="460" height="124"></canvas>
+      <video id="camPrevVid" playsinline muted class="hide"></video>
+      <span class="st" id="sensePrevText"><b>Waking the sensors…</b>Breathe normally for a few seconds.</span>
+    </div>
 
     <hr class="hair">
     <div class="row">
@@ -222,7 +310,14 @@ a{color:var(--accent)}
     <button class="icon" id="btnSkip" title="Next room">▶❘</button>
     <button class="icon" id="btnEnd" title="End session">✕</button>
   </div>
-  <div class="bl"><span id="sync"></span><span id="rateOut">— breaths/min</span><span id="hrOut"></span></div>
+  <div class="bl">
+    <span id="senseState" class="hide"></span>
+    <div id="senseWrap" class="hide">
+      <canvas id="trace" width="432" height="116"></canvas>
+      <video id="camThumb" playsinline muted class="hide"></video>
+    </div>
+    <div><span id="sync"></span><span id="rateOut">— breaths/min</span><span id="hrOut"></span></div>
+  </div>
   <div id="prog"><div id="progIn"></div></div>
 </div>
 
@@ -609,6 +704,21 @@ class Sound {
     gn.gain.exponentialRampToValueAtTime(.0001,t+.85);
     o.connect(gn); gn.connect(this.cueG); o.start(t); o.stop(t+.95);
   }
+  /* distant thunder: a long, soft swell rather than a crack */
+  thunder(vol=.10){
+    if(!this.ready||!this.on||!this.noise) return;
+    const ctx=this.ctx, t=ctx.currentTime;
+    const src=ctx.createBufferSource(); src.buffer=this.noise.buffer; src.loop=true;
+    const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.setValueAtTime(240,t);
+    lp.frequency.exponentialRampToValueAtTime(70, t+3.6);
+    const gn=ctx.createGain();
+    gn.gain.setValueAtTime(.0001,t);
+    gn.gain.exponentialRampToValueAtTime(vol, t+.9);
+    gn.gain.exponentialRampToValueAtTime(.0001, t+4.2);
+    const pan=ctx.createStereoPanner(); pan.pan.value=U.rnd(.8,-.8);
+    src.connect(lp); lp.connect(gn); gn.connect(pan); pan.connect(this.master);
+    src.start(t); src.stop(t+4.4);
+  }
   toggle(){ this.on=!this.on; this.fade(this.on?0.9:0, 1.2); return this.on; }
   stop(){ if(this.ready){ this.fade(0,2.5); setTimeout(()=>{ try{this.ctx.close()}catch(e){} }, 2800); this.ready=false; } }
 }
@@ -718,6 +828,7 @@ class Sensors {
       this.mic.env  = U.approach(this.mic.env,  this.mic.level, .30, dt);
       this.mic.slow = U.approach(this.mic.slow, this.mic.env,   6.0, dt);
       const sig = (this.mic.env - this.mic.slow) * 60;
+      this.micSig = sig;
       this.mic.est.push(sig, dt);
     }
     // ---------- camera ----------
@@ -746,9 +857,20 @@ class Sensors {
       this.cam.motionRaw = motion;
       this.cam.motion = U.approach(this.cam.motion, motion, .28, dt);
       this.cam.motionSlow = U.approach(this.cam.motionSlow||0, this.cam.motion, 6.0, dt);
-      this.cam.est.push((this.cam.motion - this.cam.motionSlow)*900, dt);
+      this.camSig = (this.cam.motion - this.cam.motionSlow)*900;
+      this.cam.est.push(this.camSig, dt);
       this._pulse(g, r, dt);
     }
+    // ---------- one normalised trace, so the person can see themselves ----------
+    let sg=0, nn=0;
+    if(this.mic.active && this.micSig!=null){ sg+=this.micSig; nn++; }
+    if(this.cam.active && this.camSig!=null){ sg+=this.camSig; nn++; }
+    if(nn) sg/=nn;
+    this.sigAmp = Math.max((this.sigAmp||0.002)*Math.exp(-dt/14), Math.abs(sg), 0.002);
+    this.sigNorm = U.clamp(sg/this.sigAmp, -1, 1);
+    // a display-only smoothing: the raw envelope is legible to the estimator
+    // but too hairy to read as a picture of your own breathing
+    this.sigShow = U.approach(this.sigShow||0, this.sigNorm, .34, dt);
     // ---------- fuse ----------
     const a = this.mic.active ? this.mic.est.estimate() : null;
     const b = this.cam.active ? this.cam.est.estimate() : null;
@@ -802,6 +924,19 @@ class Sensors {
       }
     } else this.cam.hrConf = Math.max(0, this.cam.hrConf-.004);
   }
+  stopMic(){
+    if(this.micStream) this.micStream.getTracks().forEach(t=>t.stop());
+    if(this.actx){ try{this.actx.close()}catch(e){} this.actx=null; }
+    this.micStream=null; this.analyser=null; this.mic.active=false;
+    this.mic.est=new PeriodEstimator(20,34);
+  }
+  stopCam(){
+    if(this.camStream) this.camStream.getTracks().forEach(t=>t.stop());
+    if(this.video) this.video.srcObject=null;
+    this.camStream=null; this.cam.active=false; this.prevPix=null; this.hrBuf=[]; this.hrHist=[];
+    this.cam.hr=0; this.cam.hrConf=0;
+    this.cam.est=new PeriodEstimator(20,34);
+  }
   stop(){
     [this.micStream,this.camStream].forEach(s=>{ if(s) s.getTracks().forEach(t=>t.stop()); });
     if(this.actx){ try{this.actx.close()}catch(e){} }
@@ -809,6 +944,78 @@ class Sensors {
     this.mic.active=this.cam.active=false;
   }
 }
+
+/* =====================================================================
+   TRACE — your breath drawn against the pacer's.
+   The whole point of letting a page listen is being able to watch the two
+   lines drift together. Without this the intelligence is invisible, which
+   feels indistinguishable from it not working.
+   ===================================================================== */
+const Trace = {
+  hz:25, N:620, i:0, filled:0, acc:0,
+  you:new Float32Array(620), guide:new Float32Array(620), conf:new Float32Array(620),
+  reset(){ this.i=0; this.filled=0; this.acc=0; },
+  push(dt, you, guide, conf){
+    this.acc += dt; const step=1/this.hz;
+    let n=0;
+    while(this.acc>=step && n<8){
+      this.acc-=step; n++;
+      this.you[this.i]=you; this.guide[this.i]=guide; this.conf[this.i]=conf;
+      this.i=(this.i+1)%this.N; if(this.filled<this.N) this.filled++;
+    }
+  },
+  at(k){ return (this.i - this.filled + k + this.N*2) % this.N; },
+  /* how well the two curves are actually moving together, last ~12 s */
+  corr(){
+    const m=Math.min(this.filled, this.hz*12);
+    if(m<this.hz*5) return 0;
+    let sa=0,sb=0;
+    for(let k=this.filled-m;k<this.filled;k++){ const j=this.at(k); sa+=this.you[j]; sb+=this.guide[j]; }
+    const ma=sa/m, mb=sb/m;
+    let num=0,da=0,db=0;
+    for(let k=this.filled-m;k<this.filled;k++){
+      const j=this.at(k), x=this.you[j]-ma, y=this.guide[j]-mb;
+      num+=x*y; da+=x*x; db+=y*y;
+    }
+    if(da<1e-9||db<1e-9) return 0;
+    return U.clamp(num/Math.sqrt(da*db), -1, 1);
+  },
+  draw(cv, light){
+    if(!cv) return;
+    const c=cv.getContext("2d"), W=cv.width, H=cv.height;
+    c.clearRect(0,0,W,H);
+    const pad=6, gh=H-pad*2;
+    const ink   = light? "rgba(60,50,36,":"rgba(226,238,244,";
+    const guideC= light? "63,139,118":"127,212,193";
+    const youC  = light? "197,116,62":"240,178,122";
+    // the pacer, as a filled swell
+    if(this.filled>2){
+      c.beginPath();
+      const X=k=>W-pad-(W-pad*2)*((this.filled-1-k)/(this.N-1));
+      c.moveTo(X(0), H-pad);
+      for(let k=0;k<this.filled;k++) c.lineTo(X(k), H-pad-gh*(.08+.84*this.guide[this.at(k)]));
+      c.lineTo(X(this.filled-1), H-pad);
+      c.closePath();
+      c.fillStyle=`rgba(${guideC},${light?.16:.13})`; c.fill();
+      c.beginPath();
+      for(let k=0;k<this.filled;k++){
+        const y=H-pad-gh*(.08+.84*this.guide[this.at(k)]);
+        k?c.lineTo(X(k),y):c.moveTo(X(k),y);
+      }
+      c.strokeStyle=`rgba(${guideC},${light?.85:.7})`; c.lineWidth=2.4; c.lineJoin="round"; c.stroke();
+      // and your own breath over the top
+      c.beginPath();
+      for(let k=0;k<this.filled;k++){
+        const y=H/2 - this.you[this.at(k)]*gh*.40;
+        k?c.lineTo(X(k),y):c.moveTo(X(k),y);
+      }
+      c.strokeStyle=`rgba(${youC},.92)`; c.lineWidth=2.2; c.stroke();
+    } else {
+      c.fillStyle=ink+".3)"; c.font="500 22px ui-sans-serif,system-ui,sans-serif";
+      c.textAlign="center"; c.fillText("listening…", W/2, H/2+7);
+    }
+  }
+};
 
 /* =====================================================================
    STAGE / shared drawing context
@@ -874,6 +1081,10 @@ class Weathering extends Room {
     })[this.storm] || {n:.6,len:18,ang:.3,spd:700,haze:.2,hazeCol:"200,210,220",drop:.6};
     this.sunSeed = U.rnd(1);
     this.buildGlints();
+    this.ripples=[]; this.rippleAcc=0;
+    this.flash=0; this.nextFlash=U.rnd(14,5);
+    this.curtains=[0,1,2].map(i=>({u:U.rnd(1), w:U.rnd(.30,.12), sp:U.rnd(.05,.015)*(Math.random()<.5?-1:1), ph:U.rnd(TAU)}));
+    this.buildReeds();
     this.banks=[];
     for(let i=0;i<7;i++) this.banks.push({u:U.rnd(1.3,-.3), v:U.rnd(1,.35), r:U.rnd(.55,.28), sp:U.rnd(.020,.005)*(Math.random()<.5?-1:1), ph:U.rnd(TAU)});
   }
@@ -886,7 +1097,17 @@ class Weathering extends Room {
       this.glints.push({u, f:Math.pow(U.rnd(1),1.35), len:U.rnd(1,.25), ph:U.rnd(TAU), sp:U.rnd(1.6,.5), j:U.rnd(1,-1)});
     }
   }
-  onResize(){ this.buildHills(); this.buildGlints(); }
+  onResize(){ this.buildHills(); this.buildGlints(); this.buildReeds(); }
+  buildReeds(){
+    // foreground silhouettes: cheap parallax, and the scene stops feeling flat
+    this.reeds=[];
+    const n=Math.round(26*G.quality)+8;
+    for(let i=0;i<n;i++){
+      const u=U.rnd(1);
+      if(u>.36 && u<.64) continue;              // keep the pacer's space clear
+      this.reeds.push({u, h:U.rnd(.30,.10), w:U.rnd(4.2,1.4), ph:U.rnd(TAU), sp:U.rnd(1.5,.6), lean:U.rnd(1,-1)});
+    }
+  }
   buildClouds(){
     const w=256,h=128;
     const mk=(inv)=>{
@@ -894,10 +1115,10 @@ class Weathering extends Room {
       const x=c.getContext("2d"), im=x.createImageData(w,h), d=im.data;
       for(let j=0;j<h;j++)for(let i=0;i<w;i++){
         // seamless-ish horizontally by blending the wrap edge
-        let n=U.fbm(i/34, j/26+7.3, 5);
-        const edge=U.smooth(U.clamp(i/26,0,1))*U.smooth(U.clamp((w-i)/26,0,1));
-        const n2=U.fbm((i+w)/34, j/26+7.3, 5);
-        n=U.lerp(n2,n,edge);
+        // wrap by cross-fading the field with a copy shifted one width over:
+        // at i=0 and i=w the value is identical, so the tile joins invisibly
+        const t=i/w;
+        const n=U.lerp(U.fbm(i/34, j/26+7.3, 5), U.fbm((i-w)/34, j/26+7.3, 5), t);
         let a=U.clamp((n-.44)*2.5,0,1);
         a*= U.smooth(U.clamp(1-(j/h)*1.15,0,1))*.9+.1;
         const k=(j*w+i)*4;
@@ -930,7 +1151,7 @@ class Weathering extends Room {
     const c=this.c, cf=this.cfg;
     const horizon = this.horizonY();
     // ---- precipitation ----
-    const want = Math.round(cf.n*260*G.quality*(1-U.smooth(c*1.05)));
+    const want = Math.round(cf.n*340*G.quality*(1-U.smooth(c*1.05)));
     while(this.rain.length<want) this.rain.push(this.mkDrop(true));
     if(this.rain.length>want) this.rain.length=want;
     const windX = U.lerp(1,.12,c)*cf.spd*cf.ang;
@@ -939,13 +1160,44 @@ class Weathering extends Room {
       d.x += windX*dt*d.w;
       if(d.y>horizon+8 || d.x>G.W+60 || d.x<-60){ Object.assign(d,this.mkDrop(false)); }
     }
-    // ---- birds arrive as it warms ----
+    // ---- rain dimpling the water ----
+    const rainNow = U.clamp(cf.n*(1-U.smooth(c*1.05)),0,1);
+    this.rippleAcc += dt*rainNow*26*G.quality;
+    while(this.rippleAcc>1 && this.ripples.length<90){
+      this.rippleAcc--;
+      const f=Math.pow(U.rnd(1),.6);
+      this.ripples.push({x:U.rnd(G.W), f, r:0, a:1, v:U.rnd(38,16)*(.4+f)});
+    }
+    for(let i=this.ripples.length-1;i>=0;i--){
+      const rp=this.ripples[i];
+      rp.r += rp.v*dt; rp.a -= dt*.85;
+      if(rp.a<=0) this.ripples.splice(i,1);
+    }
+    // ---- distant sheet lightning while the storm still holds ----
+    if(!REDUCED && (this.storm==="sleet"||this.storm==="dust") && c<.45){
+      this.nextFlash -= dt;
+      if(this.nextFlash<=0){
+        this.nextFlash = U.rnd(26,11)/Math.max(.25,1-c);
+        this.flash = 1; this.flashX = U.rnd(G.W*.9, G.W*.1);
+        setTimeout(()=>G.snd.thunder(.09*(1-c)), 900+Math.random()*1800);
+      }
+    }
+    this.flash = Math.max(0, this.flash - dt*1.5);
+    // ---- birds arrive as it warms, and they arrive together ----
     this.nextBird-=dt;
-    if(c>.46 && this.nextBird<=0){
-      this.nextBird = U.rnd(16,5)/U.lerp(.4,1.6,c);
+    if(c>.42 && this.nextBird<=0){
+      this.nextBird = U.rnd(20,7)/U.lerp(.4,1.6,c);
       const dir = Math.random()<.5?1:-1;
-      this.birds.push({x: dir>0?-60:G.W+60, y: horizon-U.rnd(240,60), dir, v:U.rnd(70,34), ph:U.rnd(TAU), sc:U.rnd(1.4,.7)});
-      if(Math.random()<.75) G.snd.bird();
+      const n = 1 + ((Math.random()*Math.random()*7)|0);
+      const bx = dir>0?-70:G.W+70, by = horizon-U.rnd(250,70), v=U.rnd(74,40), sc=U.rnd(1.3,.7);
+      for(let k=0;k<n;k++){
+        // a loose V: each bird trails and rises slightly behind the leader
+        this.birds.push({
+          x: bx - dir*k*U.rnd(34,16), y: by - k*U.rnd(15,4)*(k%2?1:-1)*.6,
+          dir, v:v*U.rnd(1.04,.96), ph:U.rnd(TAU), sc:sc*U.rnd(1.05,.82)
+        });
+      }
+      if(Math.random()<.8) G.snd.bird();
     }
     for(let i=this.birds.length-1;i>=0;i--){
       const b2=this.birds[i];
@@ -969,7 +1221,7 @@ class Weathering extends Room {
   }
   draw(ctx){
     const {W,H}=G, c=this.c, st=G.st, cf=this.cfg, b=G.breath;
-    const horizon=this.horizonY();
+    const horizon=this.horizonY(), dtGuess=1/60;
     const sky = st.skyA.map((a,i)=>U.mixHsl(a, st.skyB[i], U.smoother(c)));
     // ---------------- sky ----------------
     vGrad(ctx,0,0,W,horizon+2,[
@@ -999,13 +1251,34 @@ class Weathering extends Room {
       ctx.beginPath(); ctx.arc(sunX,sunY,dr*1.5,0,TAU); ctx.fill();
     }
     ctx.restore();
+    // ---------------- crepuscular rays ----------------
+    // strongest when the cloud is breaking rather than gone: the moment the
+    // light first gets through is the one worth drawing
+    const rayA = U.smooth(U.inv(.18,.55,c)) * (1-U.smooth(U.inv(.86,1,c))*.55) * (.5+.5*warm);
+    if(rayA>.012){
+      ctx.save(); ctx.globalCompositeOperation="screen";
+      ctx.beginPath(); ctx.rect(0,0,W,horizon); ctx.clip();
+      const g=radial(ctx,sunX,sunY,0,H*1.25,[
+        [0,`rgba(255,238,206,${.16*rayA})`],[.45,`rgba(255,226,180,${.07*rayA})`],[1,"rgba(255,220,170,0)"]]);
+      ctx.fillStyle=g;
+      for(let i=0;i<8;i++){
+        const base = -Math.PI/2 + (i/7-.5)*1.85 + Math.sin(G.t*.035+i*1.7)*.024;
+        const wdt  = (0.020 + 0.026*U.hash(i*3.7,1.1)) * (1+.35*Math.sin(G.t*.09+i));
+        ctx.beginPath();
+        ctx.moveTo(sunX, sunY);
+        ctx.lineTo(sunX+Math.cos(base-wdt)*H*1.6, sunY+Math.sin(base-wdt)*H*1.6);
+        ctx.lineTo(sunX+Math.cos(base+wdt)*H*1.6, sunY+Math.sin(base+wdt)*H*1.6);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
     // ---------------- clouds ----------------
     const drift=G.t*U.lerp(26,5,c);
     ctx.save();
     const ch=horizon*U.lerp(1.0,.72,c);
     for(let layer=0; layer<2; layer++){
       const img = layer===0? this.cloudDark : this.cloudLight;
-      const al  = layer===0? U.lerp(.62,.10,U.smoother(c)) : U.lerp(.05,.34,U.smoother(c));
+      const al  = layer===0? U.lerp(.80,.10,U.smoother(c)) : U.lerp(.05,.34,U.smoother(c));
       const spd = layer===0? 1 : .62;
       ctx.globalAlpha=al;
       ctx.globalCompositeOperation = layer===0? "source-over":"screen";
@@ -1013,6 +1286,23 @@ class Weathering extends Room {
       for(let k=0;k<=1;k++) ctx.drawImage(img, -off+k*tw, -ch*(layer?.10:.02), tw, ch*(layer?.72:.9));
     }
     ctx.restore();
+    // ---------------- distant rain curtains ----------------
+    const curt = U.clamp(cf.n*(1-U.smooth(c))*.9,0,1);
+    if(curt>.02){
+      ctx.save(); ctx.globalCompositeOperation= this.storm==="dust"?"source-over":"screen";
+      for(const cu of this.curtains){
+        cu.ph += cu.sp*dtGuess;
+        const x=((cu.u+Math.sin(cu.ph)*.22)%1.4+1.4)%1.4*W - W*.2;
+        const wpx=W*cu.w;
+        const g=ctx.createLinearGradient(x-wpx/2,0,x+wpx/2,0);
+        const col = this.storm==="dust" ? "196,150,102" : "196,220,236";
+        g.addColorStop(0,`rgba(${col},0)`);
+        g.addColorStop(.5,`rgba(${col},${.10*curt})`);
+        g.addColorStop(1,`rgba(${col},0)`);
+        ctx.fillStyle=g; ctx.fillRect(x-wpx/2, horizon-H*.55, wpx, H*.55);
+      }
+      ctx.restore();
+    }
     // ---------------- distant hills ----------------
     this.hills.forEach((pts,k)=>{
       const depth=k/2;                              // 0 = far ridge, 1 = near shore
@@ -1069,6 +1359,18 @@ class Weathering extends Room {
       [.62,`rgba(${(225+25*warm)|0},${(216+22*warm)|0},${(206-16*warm)|0},${hz})`],
       [1,"rgba(220,215,205,0)"]]);
     ctx.restore();
+    // ---------------- rain dimpling the surface ----------------
+    if(this.ripples.length){
+      ctx.save(); ctx.globalCompositeOperation="screen"; ctx.lineWidth=1;
+      for(const rp of this.ripples){
+        const y = horizon + Math.pow(rp.f,1.45)*(H-horizon);
+        const sc = .35+rp.f*1.5;
+        ctx.globalAlpha = rp.a*rp.a*.20;
+        ctx.strokeStyle = "rgba(216,236,248,1)";
+        ctx.beginPath(); ctx.ellipse(rp.x, y, rp.r*sc, rp.r*sc*.26, 0, 0, TAU); ctx.stroke();
+      }
+      ctx.restore();
+    }
     // ---------------- precipitation ----------------
     if(this.rain.length){
       ctx.save();
@@ -1107,6 +1409,15 @@ class Weathering extends Room {
       }
       ctx.restore();
     }
+    // ---------------- sheet lightning, behind the cloud, never a strobe ----------------
+    if(this.flash>0.001){
+      const f=Math.sin(U.clamp(this.flash,0,1)*Math.PI)*.55;
+      ctx.save(); ctx.globalCompositeOperation="screen";
+      ctx.fillStyle=radial(ctx,this.flashX,horizon*.34,0,W*.85,[
+        [0,`rgba(226,240,255,${.20*f})`],[.5,`rgba(200,222,248,${.07*f})`],[1,"rgba(190,215,245,0)"]]);
+      ctx.fillRect(0,0,W,horizon+2);
+      ctx.restore();
+    }
     // ---------------- birds ----------------
     if(this.birds.length){
       ctx.save();
@@ -1130,6 +1441,26 @@ class Weathering extends Room {
         ctx.globalAlpha=.16+.34*tw*warm;
         ctx.fillStyle="rgba(255,232,180,1)";
         ctx.beginPath(); ctx.arc(m.x,m.y,m.r*(.7+tw*.6),0,TAU); ctx.fill();
+      }
+      ctx.restore();
+    }
+    // ---------------- foreground reeds ----------------
+    if(this.reeds && this.reeds.length){
+      ctx.save(); ctx.lineCap="round";
+      const wind=U.lerp(1,.22,c);
+      for(const rd of this.reeds){
+        const x=rd.u*W, base=H+6, hgt=H*rd.h;
+        const sway=Math.sin(G.t*rd.sp*wind + rd.ph)*22*wind + rd.lean*10;
+        ctx.globalAlpha=.30+.28*(1-c);
+        ctx.strokeStyle="#080b0e";
+        let px=x, py=base;
+        for(let n=1;n<=5;n++){
+          const t=n/5;
+          const nx=x+sway*t*t, ny=base-hgt*t;
+          ctx.lineWidth=Math.max(.9, rd.w*(1-t*.82));
+          ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(nx,ny); ctx.stroke();
+          px=nx; py=ny;
+        }
       }
       ctx.restore();
     }
@@ -1171,6 +1502,10 @@ class SlowGarden extends Room {
     this.slow=0; this.still=0; this.speed=0; this.lastEmit=0;
     this.idle=0; this.ghostT=U.rnd(TAU);
     this.hue = G.st.noiseHue*360;
+    this.rings=[]; this.ringAcc=0;
+    this.seeds=[];
+    const sn=Math.round(60*G.quality);
+    for(let i=0;i<sn;i++) this.seeds.push({x:U.rnd(G.W),y:U.rnd(G.H),ph:U.rnd(TAU),r:U.rnd(1.8,.5),v:U.rnd(9,2),lit:0});
     this.makeFx();
     const n=Math.round(26*G.quality);
     for(let i=0;i<n;i++) this.flies.push({x:U.rnd(G.W),y:U.rnd(G.H),ph:U.rnd(TAU),r:U.rnd(2.4,1),v:U.rnd(11,3),alive:1});
@@ -1207,7 +1542,24 @@ class SlowGarden extends Room {
     this.speed = U.approach(this.speed, P.vel, .16, dt);
     const slowT = U.clamp(1 - this.speed/thresh, 0, 1);
     this.slow = U.approach(this.slow, slowT, .22, dt);
-    if(this.slow>.62 && moving) this.still += dt; else this.still = Math.max(0, this.still - dt*2.2);
+    if(this.slow>.55 && moving) this.still += dt; else this.still = Math.max(0, this.still - dt*2.0);
+    // slow movement leaves rings on the surface, like a finger through water
+    if(moving && this.slow>.42){
+      this.ringAcc += dt*this.slow*3.2;
+      while(this.ringAcc>1){ this.ringAcc--; this.rings.push({x:px,y:py,r:6,a:1,v:U.rnd(46,22)*this.slow}); }
+    }
+    for(let i=this.rings.length-1;i>=0;i--){
+      const rg=this.rings[i]; rg.r+=rg.v*dt; rg.a-=dt*.42;
+      if(rg.a<=0) this.rings.splice(i,1);
+    }
+    // drifting seeds that light up when a slow hand passes
+    for(const sd of this.seeds){
+      sd.ph+=dt*.5;
+      sd.y -= sd.v*dt*.5; sd.x += Math.sin(G.t*.3+sd.ph)*6*dt;
+      if(sd.y<-8){ sd.y=G.H+8; sd.x=U.rnd(G.W); }
+      const d=Math.hypot(px-sd.x, py-sd.y);
+      sd.lit = U.approach(sd.lit, (d<150 && this.slow>.5)? 1:0, d<150?.4:1.6, dt);
+    }
 
     // --- emit ---
     if(moving && this.slow>.30){
@@ -1227,7 +1579,7 @@ class SlowGarden extends Room {
       }
     }
     // --- sustained stillness opens a blossom ---
-    if(this.still>1.15 && this.blooms.length<14){
+    if(this.still>0.85 && this.blooms.length<18){
       this.still=0;
       this.blooms.push({x:px,y:py,age:0,life:U.rnd(7,5),n:5+((Math.random()*4)|0),rot:U.rnd(TAU),R:U.rnd(120,58)*(.7+this.slow*.6),h:this.hue+U.rnd(40,-40)});
       G.snd.drop(U.pick([1,1.125,1.25,1.5,1.667]), .055);
@@ -1258,6 +1610,17 @@ class SlowGarden extends Room {
   draw(ctx){
     const {W,H}=G, b=G.breath;
     vGrad(ctx,0,0,W,H,[[0,"#070a10"],[1,"#04060a"]]);
+    // deep colour drifting behind everything, so the field is never empty
+    ctx.save(); ctx.globalCompositeOperation="screen";
+    for(let i=0;i<3;i++){
+      const ph=G.t*.035+i*2.4;
+      const x=W*(.5+.36*Math.sin(ph*1.02+i)), y=H*(.5+.30*Math.cos(ph*.81+i*1.7));
+      const r=Math.min(W,H)*(.42+.10*Math.sin(ph*1.6));
+      ctx.fillStyle=radial(ctx,x,y,0,r,[
+        [0,U.hsl(this.hue+i*46-30,.62,.36,.070+.030*b.level)],[1,U.hsl(this.hue+i*46,.6,.3,0)]]);
+      ctx.beginPath(); ctx.arc(x,y,r,0,TAU); ctx.fill();
+    }
+    ctx.restore();
     const fx=this.fxc;
     fx.setTransform(this.fxs,0,0,this.fxs,0,0);
     fx.clearRect(0,0,G.W,G.H);
@@ -1300,6 +1663,27 @@ class SlowGarden extends Room {
     if(this._canFilter===undefined){ ctx.filter="blur(2px)"; this._canFilter = ctx.filter!=="none"; ctx.filter="none"; }
     if(this._canFilter) ctx.filter="blur(3px)";
     ctx.drawImage(this.fx,0,0,G.W,G.H);
+    ctx.restore();
+    // surface rings from a slow hand
+    if(this.rings.length){
+      ctx.save(); ctx.globalCompositeOperation="lighter";
+      for(const rg of this.rings){
+        ctx.globalAlpha=rg.a*rg.a*.22;
+        ctx.strokeStyle=U.hsl(this.hue+40,.55,.72,1); ctx.lineWidth=1.4;
+        ctx.beginPath(); ctx.arc(rg.x,rg.y,rg.r,0,TAU); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    // seeds
+    ctx.save(); ctx.globalCompositeOperation="lighter";
+    for(const sd of this.seeds){
+      const tw=Math.sin(G.t*.9+sd.ph)*.5+.5;
+      ctx.globalAlpha=.10+.20*tw+.55*sd.lit;
+      const rr=sd.r*(1+sd.lit*1.7);
+      ctx.fillStyle=radial(ctx,sd.x,sd.y,0,rr*4,[
+        [0,U.hsl(this.hue+20+sd.lit*50,.5,.82,1)],[1,U.hsl(this.hue+20,.5,.6,0)]]);
+      ctx.beginPath(); ctx.arc(sd.x,sd.y,rr*4,0,TAU); ctx.fill();
+    }
     ctx.restore();
     // fireflies
     ctx.save(); ctx.globalCompositeOperation="lighter";
@@ -1349,6 +1733,13 @@ class Descent extends Room {
     for(let i=0;i<n;i++) this.motes.push({x:U.rnd(G.W),y:U.rnd(G.H),z:U.rnd(1,.15),r:U.rnd(2.6,.5),ph:U.rnd(TAU)});
     for(let i=0;i<8;i++) this.kelp.push({x:U.rnd(G.W),y:U.rnd(G.H*2.2,G.H*.95),h:U.rnd(520,240),w:U.rnd(30,12),ph:U.rnd(TAU),z:U.rnd(1,.3)});
     for(let i=0;i<5;i++) this.shafts.push({x:U.rnd(G.W),w:U.rnd(190,60),ph:U.rnd(TAU),sp:U.rnd(.16,.05)});
+    this.bubbles=[]; this.jellies=[]; this.school=null; this.nextSchool=U.rnd(16,4);
+    for(let i=0;i<3;i++) this.jellies.push({
+      x:U.rnd(G.W), y:U.rnd(G.H*1.9,G.H*.5), r:U.rnd(40,20), ph:U.rnd(TAU),
+      sp:U.rnd(.5,.22), z:U.rnd(1,.4), hue:U.rnd(210,170)
+    });
+    for(let i=0;i<Math.round(34*G.quality);i++)
+      this.bubbles.push({x:U.rnd(G.W), y:U.rnd(G.H), r:U.rnd(3.4,.9), v:U.rnd(34,12), ph:U.rnd(TAU)});
     this.scroll=0; this.station=0;
     this.stationsAt=[.09,.26,.43,.60,.77];
     this.leafDone=false;
@@ -1368,6 +1759,31 @@ class Descent extends Room {
       k.y -= sink*dt*(.4+k.z*1.5);
       k.ph += dt*.5;
       if(k.y+k.h<-40){ k.y=G.H+U.rnd(500,80); k.x=U.rnd(G.W); }
+    }
+    // ---- bubbles ----
+    for(const bu of this.bubbles){
+      bu.y -= bu.v*dt; bu.x += Math.sin(G.t*1.1+bu.ph)*7*dt; bu.ph+=dt*.8;
+      if(bu.y<-10){ bu.y=G.H+U.rnd(60,10); bu.x=U.rnd(G.W); }
+    }
+    // ---- jellyfish drift up past you ----
+    for(const j of this.jellies){
+      j.ph += dt*j.sp;
+      j.y -= (sink*.5 + 6*(Math.sin(j.ph*TAU)*.5+.5))*dt*(.4+j.z);
+      j.x += Math.sin(G.t*.22+j.ph)*5*dt;
+      if(j.y + j.r*4 < -40){ j.y=G.H+U.rnd(700,120); j.x=U.rnd(G.W); }
+    }
+    // ---- a school passes now and then ----
+    this.nextSchool -= dt;
+    if(!this.school && this.nextSchool<=0){
+      const dir=Math.random()<.5?1:-1;
+      this.school={dir, x:dir>0?-120:G.W+120, y:U.rnd(G.H*.8,G.H*.15), v:U.rnd(120,60), ph:U.rnd(TAU),
+        fish:Array.from({length:10+((Math.random()*16)|0)},()=>({dx:U.rnd(150,-150),dy:U.rnd(46,-46),ph:U.rnd(TAU),s:U.rnd(1.3,.6)}))};
+    }
+    if(this.school){
+      const sc=this.school;
+      sc.x += sc.dir*sc.v*dt; sc.ph += dt*2.4;
+      sc.y += Math.sin(G.t*.4)*7*dt - sink*dt*.4;
+      if(sc.x<-260 || sc.x>G.W+260){ this.school=null; this.nextSchool=U.rnd(26,9); }
     }
     // grounding stations
     if(this.station<this.stationsAt.length && p>=this.stationsAt[this.station] && !App.held){
@@ -1442,6 +1858,53 @@ class Descent extends Room {
           px=nx; py=ny;
         }
       }
+    }
+    ctx.restore();
+    // ---- jellyfish ----
+    ctx.save();
+    for(const j of this.jellies){
+      const pulse=(Math.sin(j.ph*TAU)*.5+.5), r=j.r*(.82+.22*pulse)*(.5+j.z);
+      const a=U.lerp(.10,.30,j.z)*(1-d*.2);
+      ctx.globalCompositeOperation="screen";
+      ctx.globalAlpha=a;
+      ctx.fillStyle=radial(ctx,j.x,j.y,0,r*1.7,[
+        [0,U.hsl(j.hue,.55,.72,.85)],[.55,U.hsl(j.hue+18,.5,.55,.30)],[1,U.hsl(j.hue+20,.5,.5,0)]]);
+      ctx.beginPath(); ctx.ellipse(j.x,j.y,r,r*(.72-.14*pulse),0,0,TAU); ctx.fill();
+      ctx.strokeStyle=U.hsl(j.hue+10,.5,.78,a*1.5); ctx.lineWidth=1.2; ctx.lineCap="round";
+      for(let k=0;k<5;k++){
+        const ox=(k/4-.5)*r*1.25;
+        ctx.beginPath(); ctx.moveTo(j.x+ox, j.y+r*.5);
+        ctx.quadraticCurveTo(j.x+ox+Math.sin(G.t*1.1+k+j.ph*3)*r*.5, j.y+r*1.6,
+                             j.x+ox+Math.sin(G.t*.8+k)*r*.42, j.y+r*(2.4+pulse*.5));
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    // ---- school of fish ----
+    if(this.school){
+      const sc=this.school;
+      ctx.save(); ctx.globalAlpha=.34*(1-d*.35); ctx.fillStyle="#04080d";
+      for(const f of sc.fish){
+        const x=sc.x+f.dx+Math.sin(sc.ph+f.ph)*5, y=sc.y+f.dy+Math.sin(sc.ph*.7+f.ph*1.3)*4;
+        const L=8*f.s, Hh=3.1*f.s;
+        ctx.beginPath();
+        ctx.ellipse(x,y,L,Hh,0,0,TAU); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x-sc.dir*L, y);
+        ctx.lineTo(x-sc.dir*L*1.8, y-Hh*1.1);
+        ctx.lineTo(x-sc.dir*L*1.8, y+Hh*1.1);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+    // ---- bubbles ----
+    ctx.save(); ctx.globalCompositeOperation="screen";
+    for(const bu of this.bubbles){
+      ctx.globalAlpha=.10+.12*(Math.sin(G.t+bu.ph)*.5+.5);
+      ctx.strokeStyle="rgba(200,235,250,1)"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(bu.x,bu.y,bu.r,0,TAU); ctx.stroke();
+      ctx.fillStyle="rgba(220,245,255,.25)";
+      ctx.beginPath(); ctx.arc(bu.x-bu.r*.3,bu.y-bu.r*.3,bu.r*.34,0,TAU); ctx.fill();
     }
     ctx.restore();
     // motes
@@ -1528,6 +1991,41 @@ class Resonance extends Room {
       ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,TAU); ctx.fill();
     }
     ctx.globalAlpha=1;
+    // aurora ribbons, slow enough to be furniture rather than an event
+    for(let i=0;i<2;i++){
+      const ph=G.t*.045+i*2.1;
+      ctx.globalAlpha=.13+.05*Math.sin(ph*1.3);
+      const bx=cx+Math.sin(ph)*W*.26;
+      const g=ctx.createLinearGradient(bx-W*.22,0,bx+W*.22,0);
+      const hh=U.lerp(h2,h1,(Math.sin(ph*.7)*.5+.5));
+      g.addColorStop(0,U.hsl(hh,.6,.5,0));
+      g.addColorStop(.5,U.hsl(hh,.62,.55,.5));
+      g.addColorStop(1,U.hsl(hh,.6,.5,0));
+      ctx.fillStyle=g;
+      ctx.beginPath();
+      ctx.moveTo(bx-W*.22, 0);
+      for(let y=0;y<=H;y+=70){
+        const off=Math.sin(y*.004+ph*1.6+i)*W*.07;
+        ctx.lineTo(bx-W*.22+off, y);
+      }
+      for(let y=H;y>=0;y-=70){
+        const off=Math.sin(y*.004+ph*1.6+i)*W*.07;
+        ctx.lineTo(bx+W*.22+off, y);
+      }
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    // a slow mandala, one turn every few breaths
+    const petals=12, rot=G.t*.018;
+    ctx.lineWidth=1.1;
+    for(let k=0;k<petals;k++){
+      const a=rot + k/petals*TAU;
+      const rr=Math.min(W,H)*(.30+.10*Math.sin(G.t*.12+k*.6))*(0.9+lvl*.22);
+      ctx.strokeStyle=U.hsl(U.lerp(h1,h2,k/petals),.55,.66,.05+.07*lvl);
+      ctx.beginPath();
+      ctx.ellipse(cx+Math.cos(a)*rr*.5, cy+Math.sin(a)*rr*.5, rr*.5, rr*.16, a, 0, TAU);
+      ctx.stroke();
+    }
     // expanding breath rings
     for(const r of this.rings){
       const a=U.clamp(r.a,0,1)*.22;
@@ -1604,6 +2102,8 @@ const App = {
       this.sessionSec=+b.dataset.v;
       [...$("#lenRow").children].forEach(c=>c.setAttribute("aria-pressed", c===b));
     });
+    $("#optMic").addEventListener("change", e=>this.toggleSensor("mic", e.target));
+    $("#optCam").addEventListener("change", e=>this.toggleSensor("cam", e.target));
     $("#suds").addEventListener("input", e=>$("#sudsVal").textContent=e.target.value);
     $("#suds2").addEventListener("input", e=>{ $("#suds2Val").textContent=e.target.value; this._suds2Touched=true; this.updateDelta(); });
     $("#beginBtn").addEventListener("click", ()=>this.begin());
@@ -1617,19 +2117,84 @@ const App = {
     if(params.get("state")) this.stateKey = params.get("state");
   },
 
+  /* Permission is requested on the tick, not on Begin — so you can watch the
+     trace respond to your own breathing before committing to a session.   */
+  async toggleSensor(which, box){
+    const S=G.sensors, prev=$("#sensePrev");
+    if(box.checked){
+      box.disabled=true;
+      const ok = which==="mic" ? await S.startMic() : await S.startCam();
+      box.disabled=false;
+      if(!ok){
+        box.checked=false;
+        this.sensePrevMsg("<b>Permission declined.</b>No problem — the pacer will guide you instead.");
+        prev.classList.remove("hide");
+        setTimeout(()=>{ if(!S.mic.active && !S.cam.active) prev.classList.add("hide"); }, 5200);
+        return;
+      }
+      if(which==="cam"){
+        const v=$("#camPrevVid");
+        v.srcObject=S.camStream; v.muted=true; v.playsInline=true;
+        v.classList.remove("hide"); v.play().catch(()=>{});
+      }
+      prev.classList.remove("hide");
+      Trace.reset();
+      this.startPreview();
+    } else {
+      if(which==="mic") S.stopMic(); else { S.stopCam(); $("#camPrevVid").classList.add("hide"); }
+      if(!S.mic.active && !S.cam.active){ this.stopPreview(); prev.classList.add("hide"); }
+    }
+  },
+  sensePrevMsg(html){ const el=$("#sensePrevText"); if(el) el.innerHTML=html; },
+  startPreview(){
+    if(this._prev) return;
+    this._prev=true; this._prevLast=performance.now(); this._prevT=0;
+    const step=(now)=>{
+      if(!this._prev || this.running) { this._prev=false; return; }
+      const dt=U.clamp((now-this._prevLast)/1000,0,.05); this._prevLast=now;
+      const r=G.sensors.update(dt);
+      // before a session there is no pacer, so show a calm 6/min reference swell
+      this._prevPh=((this._prevPh||0)+dt*(6/60))%1;
+      const ph=this._prevPh, ref = ph<.45 ? U.smoother(ph/.45) : ph<.5 ? 1 : ph<.95 ? 1-U.smoother((ph-.5)/.45) : 0;
+      Trace.push(dt, G.sensors.sigShow||0, ref, r.conf);
+      if((this._prevT+=dt)>.07){
+        this._prevT=0;
+        Trace.draw($("#traceA"), true);
+        const S=G.sensors;
+        let msg;
+        if(r.conf>.34){
+          const corr=Trace.corr();
+          msg = `<b>Got it — about ${r.rate.toFixed(1)} breaths a minute.</b>`
+              + (corr>.4? "You are already tracking the reference swell." : "The session will start at your pace and slow from there.");
+        } else if(Trace.filled > Trace.hz*22){
+          msg = "<b>Still listening.</b>Quiet rooms read best. Even if it never locks on, the session works — it just guides instead.";
+        } else {
+          msg = "<b>Listening…</b>Breathe normally. The orange line is you; the green swell is a slow reference.";
+        }
+        if(S.cam.active && S.cam.hrConf>.55) msg += `<br>Pulse ≈ ${Math.round(S.cam.hr)} bpm (rough).`;
+        this.sensePrevMsg(msg);
+      }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  },
+  stopPreview(){ this._prev=false; },
+
   async begin(){
     const btn=$("#beginBtn"); btn.disabled=true;
     this.suds = +$("#suds").value;
     G.st = STATES[this.stateKey];
     const wantMic=$("#optMic").checked, wantCam=$("#optCam").checked, wantSnd=$("#optSound").checked;
+    this.stopPreview();
     if(wantMic||wantCam){
       btn.textContent="Asking…";
-      const ok=[];
-      if(wantMic && await G.sensors.startMic()) ok.push("breath");
-      if(wantCam && await G.sensors.startCam()) ok.push("motion");
-      btn.textContent = ok.length? "Listening…" : "Begin";
-      if(!ok.length && (wantMic||wantCam)) this.pendingToast="No sensor access — the pacer will guide you instead.";
-      else this.pendingToast="Syncing to you first. Just breathe how you're breathing.";
+      if(wantMic && !G.sensors.mic.active) await G.sensors.startMic();
+      if(wantCam && !G.sensors.cam.active) await G.sensors.startCam();
+      const ok = G.sensors.mic.active || G.sensors.cam.active;
+      btn.textContent = ok? "Listening…" : "Begin";
+      this.pendingToast = ok
+        ? "Reading your breath now — watch the trace, bottom left."
+        : "No sensor access — the pacer will guide you instead.";
     } else {
       this.pendingToast="Follow the light. Don't force it — let it lead by a little.";
     }
@@ -1645,8 +2210,20 @@ const App = {
     this.fracs=[.30,.22,.28,.20];
     this.roomIdx = +(params.get("room")||0);
     this.startedAt = performance.now();
-    $("#scr-checkin").classList.remove("active");
+    const ci=$("#scr-checkin");
+    ci.classList.add("leaving");
+    setTimeout(()=>{ ci.classList.remove("active","leaving"); }, 1500);
     $("#hud").classList.add("on");
+    if(G.sensors.mic.active || G.sensors.cam.active){
+      Trace.reset();
+      $("#senseWrap").classList.remove("hide");
+      $("#senseState").classList.remove("hide");
+      if(G.sensors.cam.active){
+        const v=$("#camThumb");
+        v.srcObject=G.sensors.camStream; v.muted=true; v.playsInline=true;
+        v.classList.remove("hide"); v.play().catch(()=>{});
+      }
+    }
     this.running=true; this.fade=1; this.screen="session";
     this.enterRoom(this.roomIdx);
     setTimeout(()=>this.toast(this.pendingToast), 2200);
@@ -1700,6 +2277,18 @@ const App = {
       $("#sync").classList.toggle("live", live);
       if(live){ this.syncSum+=1; }
       this.syncN++;
+      this.measured = r.rate; this.mConf = r.conf;
+      Trace.push(dt, G.sensors.sigShow||0, G.breath.level, r.conf);
+      if((this._trT=(this._trT||0)+dt) > .07){
+        this._trT=0;
+        Trace.draw($("#trace"), false);
+        const corr=Trace.corr(), pct=Math.round(U.clamp(corr,0,1)*100);
+        let txt;
+        if(r.conf>.34 && corr>.42) txt = `<b>in step · ${pct}%</b> &nbsp;you ${r.rate.toFixed(1)} → guiding ${G.breath.rate.toFixed(1)}`;
+        else if(r.conf>.34)        txt = `reading you · ${r.rate.toFixed(1)}/min &nbsp;→ guiding ${G.breath.rate.toFixed(1)}`;
+        else                       txt = `listening for your breath…`;
+        $("#senseState").innerHTML = txt;
+      }
       if(G.sensors.cam.active && G.sensors.cam.hrConf>.55){
         $("#hrOut").textContent = "   ·   ≈"+Math.round(G.sensors.cam.hr)+" bpm pulse (rough)";
       }
