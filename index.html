@@ -2248,8 +2248,26 @@ const App = {
   togglePause(){
     this.paused=!this.paused;
     $("#btnPause").textContent=this.paused?"▶":"❚❚";
-    G.snd.fade(this.paused?0.25:(G.snd.on?0.9:0), 1.2);
-    this.toast(this.paused?"Paused. The light waits.":"");
+    $("#btnPause").title=this.paused?"Resume":"Pause";
+    // silence, not a duck — a half-volume drone is worse than either state
+    G.snd.fade(this.paused ? 0 : (G.snd.on?0.9:0), this.paused?0.7:1.4);
+    this._pausedDrawn=false;
+    this.toast(this.paused ? "" : "");
+  },
+  /* the frozen frame gets a veil so it reads as held, not crashed */
+  drawPaused(ctx){
+    const {W,H}=G;
+    ctx.fillStyle="rgba(4,7,11,.55)"; ctx.fillRect(0,0,W,H);
+    const fam=getComputedStyle(document.body).fontFamily;
+    ctx.save();
+    ctx.textAlign="center";
+    ctx.fillStyle="rgba(233,242,245,.82)";
+    ctx.font=`300 ${Math.round(Math.min(W,H)*.055)}px ${fam}`;
+    ctx.fillText("Paused", W/2, H*.47);
+    ctx.fillStyle="rgba(210,226,232,.42)";
+    ctx.font=`400 ${Math.round(Math.min(W,H)*.019)}px ${fam}`;
+    ctx.fillText("everything waits — space, or the button, to go on", W/2, H*.47+Math.min(W,H)*.055);
+    ctx.restore();
   },
 
   /* ---------------- main loop ---------------- */
@@ -2267,6 +2285,18 @@ const App = {
       else if(this._avgDt < 1/56 && G.quality < 1.15) G.quality = Math.min(1.15, G.quality*1.06);
     }
     if(!this.running) return;
+
+    // ---- paused: freeze the world, hold the last frame, spend nothing ----
+    if(this.paused){
+      if(!this._pausedDrawn){
+        const c2=G.ctx; c2.setTransform(G.dpr,0,0,G.dpr,0,0);
+        this.room.draw(c2);
+        if(!(this.room instanceof Resonance)) this.drawOrb(c2);
+        this.drawPaused(c2);
+        this._pausedDrawn=true;
+      }
+      return;
+    }
     G.t += dt;
 
     // sensors → the pacer (only nudges, never jerks)
@@ -2299,9 +2329,7 @@ const App = {
     if(G.breath.segment!==prevSeg && (G.breath.segment==="in"||G.breath.segment==="out"))
       G.snd.breathCue(G.breath.segment, G.breath.rate/60);
 
-    if(!this.paused && !this.held){
-      this.elapsed += dt; this.roomElapsed += dt;
-    }
+    if(!this.held){ this.elapsed += dt; this.roomElapsed += dt; }
     const roomDur = this.sessionSec*this.fracs[this.roomIdx];
     const p = U.clamp(this.roomElapsed/roomDur, 0, 1);
     this.room.update(dt, p);
@@ -2451,7 +2479,8 @@ const App = {
   /* ---------------- close ---------------- */
   finish(){
     if(this.screen==="close") return;
-    this.screen="close"; this.running=false;
+    this.screen="close"; this.running=false; this.paused=false;
+    $("#btnPause").textContent="❚❚";
     this.closeCard(); this.toast("");
     $("#hud").classList.remove("on");
     this.fadeOut();
