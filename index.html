@@ -255,22 +255,6 @@ footer.legal{color:#3d4a56; font-size:11.5px; line-height:1.6; margin-top:30px; 
   border-radius:50%;
   cursor:crosshair;
 }
-.axis-lbl{
-  position:absolute;
-  font-size:10.5px;
-  letter-spacing:.14em;
-  text-transform:uppercase;
-  color:rgba(125,113,96,.78);
-  pointer-events:none;
-  font-weight:500;
-  white-space:nowrap;
-  z-index:2;
-  text-shadow:0 1px 2px rgba(255,255,255,.8);
-}
-.axis-lbl.top{ top:9px; left:50%; transform:translateX(-50%); }
-.axis-lbl.bottom{ bottom:9px; left:50%; transform:translateX(-50%); }
-.axis-lbl.left{ left:12px; top:50%; transform:translateY(-50%) rotate(-90deg); transform-origin:center; }
-.axis-lbl.right{ right:12px; top:50%; transform:translateY(-50%) rotate(90deg); transform-origin:center; }
 
 .blend-card{
   width:100%;
@@ -426,10 +410,6 @@ a{color:var(--accent)}
     <div class="emotion-landscape-wrap">
       <div class="wheel-box" id="wheelBox">
         <canvas id="emotionCanvas" width="520" height="520"></canvas>
-        <span class="axis-lbl top">NORTH · Storm & Activation</span>
-        <span class="axis-lbl bottom">SOUTH · Stillness & Heavy</span>
-        <span class="axis-lbl left">WEST · Guarded & Friction</span>
-        <span class="axis-lbl right">EAST · Radiance & Joy</span>
       </div>
 
       <div class="blend-card" id="blendCard">
@@ -1101,30 +1081,39 @@ class EmotionGraph {
     ctx.save();
 
     const badges = [
-      { key: "north", x: cx, y: cy - R * 0.44, sec: this.sectors.north },
-      { key: "east",  x: cx + R * 0.44, y: cy, sec: this.sectors.east },
-      { key: "south", x: cx, y: cy + R * 0.44, sec: this.sectors.south },
-      { key: "west",  x: cx - R * 0.44, y: cy, sec: this.sectors.west }
+      { key: "north", x: cx, y: cy - R * 0.42, tag: "N · Storm", full: "NORTH · Storm & Activation" },
+      { key: "east",  x: cx + R * 0.42, y: cy, tag: "E · Radiance", full: "EAST · Radiance & Joy" },
+      { key: "south", x: cx, y: cy + R * 0.42, tag: "S · Stillness", full: "SOUTH · Stillness & Heavy" },
+      { key: "west",  x: cx - R * 0.42, y: cy, tag: "W · Guarded", full: "WEST · Guarded & Friction" }
     ];
 
     for(const b of badges){
-      const sec = b.sec;
-      const bloom = sec.bloom;
+      const sec = this.sectors[b.key];
+      const bloom = sec ? sec.bloom : 0;
       const isSecHovered = this.hoverSector === b.key;
 
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      // Sector Title (e.g. "NORTH")
-      ctx.font = `600 ${Math.round(11 + bloom * 1.5)}px ${fam}`;
-      ctx.fillStyle = isSecHovered ? "#1b5446" : `rgba(75, 60, 42, ${0.65 + bloom * 0.35})`;
-      ctx.letterSpacing && (ctx.letterSpacing = "2px");
-      ctx.fillText(sec.title, b.x, b.y - 7);
+      // Subtle single cardinal label
+      const text = isSecHovered ? b.full : b.tag;
+      ctx.font = `${isSecHovered ? "600" : "500"} ${Math.round(10 + bloom * 1)}px ${fam}`;
+      ctx.letterSpacing && (ctx.letterSpacing = isSecHovered ? "1.5px" : "1.2px");
 
-      // Sector Descriptor / Subtitle
-      ctx.font = `400 ${Math.round(9.5 + bloom * 1)}px ${fam}`;
-      ctx.fillStyle = `rgba(115, 98, 76, ${0.55 + bloom * 0.45})`;
-      ctx.fillText(isSecHovered ? sec.label : sec.hint, b.x, b.y + 8);
+      // Soft pill backdrop on hover
+      if(bloom > 0.15){
+        const tw = ctx.measureText(text).width + 14;
+        ctx.fillStyle = `rgba(255, 252, 244, ${0.45 + bloom * 0.40})`;
+        ctx.beginPath();
+        ctx.roundRect(b.x - tw * 0.5, b.y - 9, tw, 18, 9);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(90, 70, 40, ${0.10 + bloom * 0.15})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = isSecHovered ? "#1b5446" : `rgba(105, 88, 68, ${0.42 + bloom * 0.48})`;
+      ctx.fillText(text, b.x, b.y);
     }
     ctx.restore();
   }
