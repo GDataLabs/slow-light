@@ -426,10 +426,10 @@ a{color:var(--accent)}
     <div class="emotion-landscape-wrap">
       <div class="wheel-box" id="wheelBox">
         <canvas id="emotionCanvas" width="520" height="520"></canvas>
-        <span class="axis-lbl top">High Energy / Storm</span>
-        <span class="axis-lbl bottom">Low Energy / Settling</span>
-        <span class="axis-lbl left">Guarded / Heavy</span>
-        <span class="axis-lbl right">Open / Radiance</span>
+        <span class="axis-lbl top">NORTH · Storm & Activation</span>
+        <span class="axis-lbl bottom">SOUTH · Stillness & Heavy</span>
+        <span class="axis-lbl left">WEST · Guarded & Friction</span>
+        <span class="axis-lbl right">EAST · Radiance & Joy</span>
       </div>
 
       <div class="blend-card" id="blendCard">
@@ -600,108 +600,160 @@ const TAU = Math.PI*2;
 const REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ------------------------- emotional palettes -------------------------
-   Each arriving state is a different journey: the iso principle says start
-   at the person's arousal and travel with them, so both the weather and the
-   sound begin somewhere that matches the feeling.                        */
+   Organized across four cardinal sectors (North, East, South, West)
+   North: Storm & Activation (high arousal, urgent)
+   East:  Radiance & Joy (high/mid arousal, open)
+   South: Stillness & Heaviness (low arousal, weighted)
+   West:  Guarded & Friction (high/mid arousal, braced)                   */
 const STATES = {
-  wired:{
-    key:"wired", label:"Wired / anxious", desc:"racing, buzzing, can't land", swatch:"#67d4e8",
-    x:-0.34, y:-0.78, arousal:.92, storm:"sleet",
-    skyA:[[196,.55,.16],[192,.42,.30],[186,.30,.46]],       // storm sky bands (top→bottom)
-    skyB:[[205,.42,.26],[30,.44,.62],[36,.55,.78]],          // calm sky bands
-    water:[[194,.40,.14],[196,.28,.30]], waterB:[[212,.30,.16],[28,.30,.42]],
-    root:174.6, mode:[0,3,5,7,10], noiseHue:.55
-  },
+  // --- NORTH: Storm & Activation (Top) ---
   tense:{
-    key:"tense", label:"Angry / tense", desc:"hot, clenched, pushing", swatch:"#e8836a",
-    x:-0.58, y:-0.66, arousal:.95, storm:"dust",
+    key:"tense", label:"Angry / tense", desc:"hot, clenched, pushing", swatch:"#e8836a", sector:"north",
+    x:-0.28, y:-0.72, arousal:.95, storm:"dust",
     skyA:[[14,.55,.20],[20,.62,.34],[30,.55,.44]],
     skyB:[[262,.32,.20],[18,.50,.50],[36,.62,.72]],
     water:[[16,.40,.14],[26,.34,.28]], waterB:[[250,.24,.14],[24,.34,.38]],
     root:146.8, mode:[0,2,5,7,9], noiseHue:.08
   },
-  fearful:{
-    key:"fearful", label:"Scared", desc:"braced, watchful, unsafe", swatch:"#8f9ee0",
-    x:-0.56, y:-0.08, arousal:.88, storm:"fog",
-    skyA:[[236,.34,.13],[230,.26,.24],[222,.18,.34]],
-    skyB:[[238,.36,.16],[214,.30,.40],[42,.42,.72]],
-    water:[[232,.30,.10],[228,.20,.22]], waterB:[[232,.28,.12],[210,.24,.34]],
-    root:130.8, mode:[0,3,5,7,10], noiseHue:.66
+  wired:{
+    key:"wired", label:"Wired / anxious", desc:"racing, buzzing, can't land", swatch:"#67d4e8", sector:"north",
+    x:0.00, y:-0.82, arousal:.92, storm:"sleet",
+    skyA:[[196,.55,.16],[192,.42,.30],[186,.30,.46]],
+    skyB:[[205,.42,.26],[30,.44,.62],[36,.55,.78]],
+    water:[[194,.40,.14],[196,.28,.30]], waterB:[[212,.30,.16],[28,.30,.42]],
+    root:174.6, mode:[0,3,5,7,10], noiseHue:.55
   },
-  heavy:{
-    key:"heavy", label:"Heavy / low", desc:"weighted, slow, grey", swatch:"#9aa8b2",
-    x:-0.48, y:+0.62, arousal:.42, storm:"drizzle",
-    skyA:[[210,.10,.18],[208,.08,.30],[206,.06,.42]],
-    skyB:[[220,.22,.22],[36,.38,.56],[44,.60,.80]],
-    water:[[208,.10,.13],[206,.07,.26]], waterB:[[216,.18,.14],[38,.26,.40]],
-    root:110.0, mode:[0,3,5,7,10], noiseHue:.5
-  },
-  numb:{
-    key:"numb", label:"Numb / foggy", desc:"far away, flat, unreal", swatch:"#cfd6da",
-    x:-0.20, y:+0.22, arousal:.50, storm:"whiteout",
-    skyA:[[212,.07,.30],[206,.05,.41],[200,.04,.50]],
-    skyB:[[286,.20,.26],[338,.28,.54],[40,.50,.80]],
-    water:[[200,.04,.24],[200,.03,.36]], waterB:[[310,.14,.18],[36,.24,.44]],
-    root:123.5, mode:[0,2,4,7,9], noiseHue:.42
-  },
-  /* ---- added Aug 2026 from client feedback: more specific arrivals ---- */
   overwhelmed:{
-    key:"overwhelmed", label:"Overwhelmed", desc:"too much, all at once, nowhere to put it down", swatch:"#b7a3e3",
-    x:-0.05, y:-0.74, arousal:.90, storm:"sleet",
+    key:"overwhelmed", label:"Overwhelmed", desc:"too much, all at once, nowhere to put it down", swatch:"#b7a3e3", sector:"north",
+    x:0.28, y:-0.72, arousal:.90, storm:"sleet",
     skyA:[[250,.36,.15],[244,.30,.27],[236,.24,.40]],
     skyB:[[240,.30,.22],[26,.40,.58],[38,.52,.78]],
     water:[[246,.30,.12],[240,.22,.26]], waterB:[[236,.24,.14],[30,.30,.42]],
     root:155.6, mode:[0,3,5,7,10], noiseHue:.62
   },
-  frustrated:{
-    key:"frustrated", label:"Frustrated", desc:"stuck, thwarted, gritted teeth", swatch:"#e0a060",
-    x:-0.76, y:-0.34, arousal:.80, storm:"dust",
-    skyA:[[24,.42,.18],[28,.46,.30],[34,.44,.42]],
-    skyB:[[250,.26,.20],[22,.46,.52],[40,.58,.74]],
-    water:[[22,.34,.13],[28,.30,.26]], waterB:[[244,.22,.14],[28,.32,.40]],
-    root:138.6, mode:[0,2,5,7,9], noiseHue:.1
-  },
-  sad:{
-    key:"sad", label:"Sad", desc:"tender, tearful, missing something", swatch:"#7fa6c9",
-    x:-0.72, y:+0.26, arousal:.38, storm:"drizzle",
-    skyA:[[212,.20,.17],[210,.16,.29],[206,.12,.41]],
-    skyB:[[218,.26,.22],[30,.40,.56],[42,.58,.80]],
-    water:[[210,.18,.12],[208,.14,.26]], waterB:[[214,.20,.14],[34,.28,.40]],
-    root:116.5, mode:[0,3,5,7,10], noiseHue:.54
-  },
-  hopeful:{
-    key:"hopeful", label:"Hopeful", desc:"something's lifting, want to keep it", swatch:"#9fd8a8",
-    x:+0.56, y:+0.46, arousal:.34, storm:"haze",
-    skyA:[[150,.18,.20],[140,.22,.36],[60,.30,.50]],
-    skyB:[[200,.34,.26],[44,.46,.62],[50,.60,.82]],
-    water:[[160,.16,.14],[150,.16,.30]], waterB:[[200,.28,.16],[46,.32,.44]],
-    root:164.8, mode:[0,2,4,7,9], noiseHue:.38
+
+  // --- EAST: Radiance & Joy (Right) ---
+  excited:{
+    key:"excited", label:"Excited", desc:"buzzing in a good way, can't sit still", swatch:"#ff9f80", sector:"east",
+    x:0.72, y:-0.28, arousal:.72, storm:"breeze",
+    skyA:[[16,.40,.22],[24,.42,.38],[40,.44,.52]],
+    skyB:[[212,.38,.28],[28,.50,.62],[44,.62,.82]],
+    water:[[18,.30,.15],[26,.28,.30]], waterB:[[208,.30,.18],[32,.34,.44]],
+    root:164.8, mode:[0,2,4,7,9], noiseHue:.06
   },
   joyful:{
-    key:"joyful", label:"Joyful", desc:"warm, open, full — and happy to slow down", swatch:"#f4c56a",
-    x:+0.74, y:-0.16, arousal:.40, storm:"haze",
+    key:"joyful", label:"Joyful", desc:"warm, open, full — and happy to slow down", swatch:"#f4c56a", sector:"east",
+    x:0.82, y:0.00, arousal:.40, storm:"haze",
     skyA:[[36,.34,.24],[40,.40,.42],[48,.46,.56]],
     skyB:[[210,.36,.28],[36,.52,.64],[48,.66,.84]],
     water:[[34,.26,.16],[40,.28,.32]], waterB:[[206,.30,.18],[42,.36,.46]],
     root:174.6, mode:[0,2,4,7,9], noiseHue:.14
   },
-  excited:{
-    key:"excited", label:"Excited", desc:"buzzing in a good way, can't sit still", swatch:"#ff9f80",
-    x:+0.58, y:-0.64, arousal:.72, storm:"breeze",
-    skyA:[[16,.40,.22],[24,.42,.38],[40,.44,.52]],
-    skyB:[[212,.38,.28],[28,.50,.62],[44,.62,.82]],
-    water:[[18,.30,.15],[26,.28,.30]], waterB:[[208,.30,.18],[32,.34,.44]],
-    root:164.8, mode:[0,2,4,7,9], noiseHue:.06
+  hopeful:{
+    key:"hopeful", label:"Hopeful", desc:"something's lifting, want to keep it", swatch:"#9fd8a8", sector:"east",
+    x:0.72, y:0.28, arousal:.34, storm:"haze",
+    skyA:[[150,.18,.20],[140,.22,.36],[60,.30,.50]],
+    skyB:[[200,.34,.26],[44,.46,.62],[50,.60,.82]],
+    water:[[160,.16,.14],[150,.16,.30]], waterB:[[200,.28,.16],[46,.32,.44]],
+    root:164.8, mode:[0,2,4,7,9], noiseHue:.38
+  },
+
+  // --- SOUTH: Stillness & Heaviness (Bottom) ---
+  numb:{
+    key:"numb", label:"Numb / foggy", desc:"far away, flat, unreal", swatch:"#cfd6da", sector:"south",
+    x:0.28, y:0.72, arousal:.50, storm:"whiteout",
+    skyA:[[212,.07,.30],[206,.05,.41],[200,.04,.50]],
+    skyB:[[286,.20,.26],[338,.28,.54],[40,.50,.80]],
+    water:[[200,.04,.24],[200,.03,.36]], waterB:[[310,.14,.18],[36,.24,.44]],
+    root:123.5, mode:[0,2,4,7,9], noiseHue:.42
+  },
+  heavy:{
+    key:"heavy", label:"Heavy / low", desc:"weighted, slow, grey", swatch:"#9aa8b2", sector:"south",
+    x:0.00, y:0.82, arousal:.42, storm:"drizzle",
+    skyA:[[210,.10,.18],[208,.08,.30],[206,.06,.42]],
+    skyB:[[220,.22,.22],[36,.38,.56],[44,.60,.80]],
+    water:[[208,.10,.13],[206,.07,.26]], waterB:[[216,.18,.14],[38,.26,.40]],
+    root:110.0, mode:[0,3,5,7,10], noiseHue:.5
+  },
+  sad:{
+    key:"sad", label:"Sad", desc:"tender, tearful, missing something", swatch:"#7fa6c9", sector:"south",
+    x:-0.28, y:0.72, arousal:.38, storm:"drizzle",
+    skyA:[[212,.20,.17],[210,.16,.29],[206,.12,.41]],
+    skyB:[[218,.26,.22],[30,.40,.56],[42,.58,.80]],
+    water:[[210,.18,.12],[208,.14,.26]], waterB:[[214,.20,.14],[34,.28,.40]],
+    root:116.5, mode:[0,3,5,7,10], noiseHue:.54
+  },
+
+  // --- WEST: Guarded & Friction (Left) ---
+  frustrated:{
+    key:"frustrated", label:"Frustrated", desc:"stuck, thwarted, gritted teeth", swatch:"#e0a060", sector:"west",
+    x:-0.76, y:-0.22, arousal:.80, storm:"dust",
+    skyA:[[24,.42,.18],[28,.46,.30],[34,.44,.42]],
+    skyB:[[250,.26,.20],[22,.46,.52],[40,.58,.74]],
+    water:[[22,.34,.13],[28,.30,.26]], waterB:[[244,.22,.14],[28,.32,.40]],
+    root:138.6, mode:[0,2,5,7,9], noiseHue:.1
+  },
+  fearful:{
+    key:"fearful", label:"Scared", desc:"braced, watchful, unsafe", swatch:"#8f9ee0", sector:"west",
+    x:-0.76, y:0.22, arousal:.88, storm:"fog",
+    skyA:[[236,.34,.13],[230,.26,.24],[222,.18,.34]],
+    skyB:[[238,.36,.16],[214,.30,.40],[42,.42,.72]],
+    water:[[232,.30,.10],[228,.20,.22]], waterB:[[232,.28,.12],[210,.24,.34]],
+    root:130.8, mode:[0,3,5,7,10], noiseHue:.66
   }
 };
-const STATE_ORDER = ["wired","overwhelmed","tense","frustrated","fearful","sad","heavy","numb","hopeful","joyful","excited"];
+const STATE_ORDER = ["tense","wired","overwhelmed","excited","joyful","hopeful","numb","heavy","sad","frustrated","fearful"];
 const STATE_EDGES = [
-  ["tense","wired"], ["wired","overwhelmed"], ["overwhelmed","excited"],
-  ["tense","frustrated"], ["frustrated","fearful"], ["fearful","wired"],
-  ["fearful","sad"], ["sad","heavy"], ["heavy","numb"],
-  ["numb","fearful"], ["numb","overwhelmed"], ["numb","hopeful"],
-  ["excited","joyful"], ["joyful","hopeful"], ["hopeful","heavy"]
+  ["tense","wired"], ["wired","overwhelmed"],
+  ["excited","joyful"], ["joyful","hopeful"],
+  ["sad","heavy"], ["heavy","numb"],
+  ["frustrated","fearful"],
+  // cross-sector harmonic bridges
+  ["overwhelmed","excited"], ["hopeful","numb"], ["sad","fearful"], ["tense","frustrated"]
 ];
+
+const SECTORS = {
+  north: {
+    key: "north",
+    title: "NORTH",
+    label: "Storm & Activation",
+    hint: "racing · hot · urgent",
+    color: "#67d4e8",
+    bg: "rgba(103, 212, 232, 0.28)",
+    accent: "rgba(232, 131, 106, 0.85)",
+    states: ["tense", "wired", "overwhelmed"]
+  },
+  east: {
+    key: "east",
+    title: "EAST",
+    label: "Radiance & Joy",
+    hint: "warm · open · bright",
+    color: "#f4c56a",
+    bg: "rgba(244, 197, 106, 0.30)",
+    accent: "rgba(255, 159, 128, 0.85)",
+    states: ["excited", "joyful", "hopeful"]
+  },
+  south: {
+    key: "south",
+    title: "SOUTH",
+    label: "Stillness & Heaviness",
+    hint: "weighted · grey · flat",
+    color: "#7fa6c9",
+    bg: "rgba(127, 166, 201, 0.30)",
+    accent: "rgba(154, 168, 178, 0.85)",
+    states: ["sad", "heavy", "numb"]
+  },
+  west: {
+    key: "west",
+    title: "WEST",
+    label: "Guarded & Friction",
+    hint: "braced · stuck · guarded",
+    color: "#e0a060",
+    bg: "rgba(224, 160, 96, 0.28)",
+    accent: "rgba(143, 158, 224, 0.85)",
+    states: ["frustrated", "fearful"]
+  }
+};
 
 /* Arrival line on the check-in and the closing title are one sentence-pair:
    the close echoes the promise made on the first page, in the same image. */
@@ -720,9 +772,9 @@ const STATE_LINES = {
 };
 
 /* =====================================================================
-   EMOTION GRAPH & CONSTELLATION WHEEL
-   Interactive 2D circumplex representation of emotional affect.
-   Supports multi-feeling selection, magnetic hover, and blended synthesis.
+   EMOTION GRAPH & 4-SECTOR CARDINAL CONSTELLATION WHEEL
+   Organized into North, East, South, and West sectors.
+   Hovering over a sector illuminates its color and blooms its emotions.
    ===================================================================== */
 class EmotionGraph {
   constructor(canvas, onToggle, onHover){
@@ -731,18 +783,31 @@ class EmotionGraph {
     this.onToggle = onToggle;
     this.onHover = onHover;
     this.hoverKey = null;
+    this.hoverSector = null;
     this.nodes = {};
+    this.sectors = {};
     this.motes = [];
     this.active = true;
     this.t = 0;
     this.lastTime = performance.now();
     this.pointer = { x: -999, y: -999 };
 
+    this.initSectors();
     this.initNodes();
     this.initMotes();
     this.bindEvents();
     this.resize();
     this.startLoop();
+  }
+
+  initSectors(){
+    for(const k in SECTORS){
+      this.sectors[k] = {
+        ...SECTORS[k],
+        bloom: 0,
+        targetBloom: 0
+      };
+    }
   }
 
   initNodes(){
@@ -754,8 +819,10 @@ class EmotionGraph {
         y: s.y,
         px: 0,
         py: 0,
-        scale: 1,
-        targetScale: 1,
+        scale: 0.8,
+        bloom: 0.2,
+        alpha: 0.35,
+        targetScale: 0.8,
         pulse: Math.random() * Math.PI * 2,
         swatch: s.swatch,
         label: s.label.split(" / ")[0],
@@ -766,12 +833,12 @@ class EmotionGraph {
 
   initMotes(){
     this.motes = [];
-    for(let i = 0; i < 22; i++){
+    for(let i = 0; i < 24; i++){
       const edge = STATE_EDGES[i % STATE_EDGES.length];
       this.motes.push({
         edge,
         t: Math.random(),
-        speed: 0.12 + Math.random() * 0.18,
+        speed: 0.10 + Math.random() * 0.16,
         size: 1.2 + Math.random() * 1.5,
         alpha: 0.3 + Math.random() * 0.5
       });
@@ -821,6 +888,7 @@ class EmotionGraph {
     const onLeave = () => {
       this.pointer.x = -999;
       this.pointer.y = -999;
+      this.hoverSector = null;
       this.setHover(null);
     };
 
@@ -862,7 +930,7 @@ class EmotionGraph {
 
   hitTest(x, y){
     let best = null;
-    let minD = 38; // hit detection radius
+    let minD = 40; // hit detection radius
     for(const k in this.nodes){
       const n = this.nodes[k];
       const d = Math.hypot(n.px - x, n.py - y);
@@ -875,7 +943,27 @@ class EmotionGraph {
   }
 
   checkHover(){
-    const hit = this.hitTest(this.pointer.x, this.pointer.y);
+    const px = this.pointer.x, py = this.pointer.y;
+    const dx = px - this.cx, dy = py - this.cy;
+    const dist = Math.hypot(dx, dy);
+
+    // Determine cardinal sector from cursor angle
+    if(px > 0 && py > 0 && dist < this.R * 1.15){
+      const ang = Math.atan2(dy, dx); // [-PI..PI]
+      if(ang >= -Math.PI * 0.75 && ang < -Math.PI * 0.25){
+        this.hoverSector = "north";
+      } else if(ang >= -Math.PI * 0.25 && ang < Math.PI * 0.25){
+        this.hoverSector = "east";
+      } else if(ang >= Math.PI * 0.25 && ang < Math.PI * 0.75){
+        this.hoverSector = "south";
+      } else {
+        this.hoverSector = "west";
+      }
+    } else {
+      this.hoverSector = null;
+    }
+
+    const hit = this.hitTest(px, py);
     this.setHover(hit ? hit.key : null);
   }
 
@@ -900,15 +988,33 @@ class EmotionGraph {
 
   update(dt){
     this.t += dt;
+
+    // 1. Sector Bloom interpolation
+    for(const k in this.sectors){
+      const sec = this.sectors[k];
+      const isSecHovered = this.hoverSector === k;
+      sec.targetBloom = isSecHovered ? 1.0 : 0.0;
+      sec.bloom = U.approach(sec.bloom, sec.targetBloom, 0.16, dt);
+    }
+
+    // 2. Node Bloom, Scale, and Pulse
     for(const k in this.nodes){
       const n = this.nodes[k];
       const isSelected = App.selectedStates && App.selectedStates.has(k);
       const isHovered = this.hoverKey === k;
-      n.targetScale = isHovered ? 1.35 : isSelected ? 1.18 : 1.0;
-      n.scale = U.approach(n.scale, n.targetScale, 0.15, dt);
+      const sec = this.sectors[n.state.sector];
+      const isSecActive = this.hoverSector === n.state.sector || isHovered;
+
+      const targetBloom = isSelected ? 1.0 : isSecActive ? 1.0 : 0.25;
+      n.bloom = U.approach(n.bloom, targetBloom, 0.16, dt);
+      
+      const targetScale = isHovered ? 1.35 : isSelected ? 1.20 : (0.75 + 0.35 * n.bloom);
+      n.scale = U.approach(n.scale, targetScale, 0.14, dt);
+      n.alpha = isSelected ? 1.0 : (0.35 + 0.65 * n.bloom);
       n.pulse += dt * (isSelected ? 2.8 : 1.2);
     }
 
+    // 3. Filament Motes
     for(const m of this.motes){
       m.t = (m.t + m.speed * dt) % 1.0;
     }
@@ -919,34 +1025,43 @@ class EmotionGraph {
     const { W, H, cx, cy, R } = this;
     ctx.clearRect(0, 0, W, H);
 
-    // 1. Radiant color wheel backdrop
-    this.drawGradientWheel(ctx, cx, cy, R);
+    // 1. Draw 4 Cardinal Sector Color Quadrants
+    this.drawSectorBackdrops(ctx, cx, cy, R);
 
-    // 2. Compass concentric guides
+    // 2. Draw Compass Guides & Center Hub
     this.drawCompassGuides(ctx, cx, cy, R);
 
-    // 3. Selected polygon mesh fill
+    // 3. Draw Cardinal Sector Badges
+    this.drawSectorBadges(ctx, cx, cy, R);
+
+    // 4. Draw Selected Polygon Mesh
     this.drawSelectedPolygon(ctx);
 
-    // 4. Filaments and motes
+    // 5. Draw Constellation Filaments & Motes
     this.drawFilaments(ctx);
 
-    // 5. Emotion nodes and typography
+    // 6. Draw Specific Emotion Nodes (Bloomed on hover)
     this.drawNodes(ctx);
   }
 
-  drawGradientWheel(ctx, cx, cy, R){
+  drawSectorBackdrops(ctx, cx, cy, R){
     ctx.save();
-    const quads = [
-      { x: cx - R * 0.55, y: cy - R * 0.55, col: "rgba(232, 131, 106, 0.18)", r: R * 0.78 }, // Top-Left: Fiery Amber / Storm
-      { x: cx + R * 0.55, y: cy - R * 0.55, col: "rgba(255, 159, 128, 0.18)", r: R * 0.78 }, // Top-Right: Warm Coral / Bright
-      { x: cx + R * 0.55, y: cy + R * 0.55, col: "rgba(159, 216, 168, 0.18)", r: R * 0.78 }, // Bottom-Right: Soft Sage / Growth
-      { x: cx - R * 0.55, y: cy + R * 0.55, col: "rgba(127, 166, 201, 0.20)", r: R * 0.78 }  // Bottom-Left: Slate / Rain Mist
+    // 4 cardinal sector glow fields
+    const sectors = [
+      { key: "north", x: cx, y: cy - R * 0.60, r: R * 0.85, col: "rgba(103, 212, 232, 0.25)", bloomCol: "rgba(103, 212, 232, 0.42)" },
+      { key: "east",  x: cx + R * 0.60, y: cy, r: R * 0.85, col: "rgba(244, 197, 106, 0.26)", bloomCol: "rgba(244, 197, 106, 0.45)" },
+      { key: "south", x: cx, y: cy + R * 0.60, r: R * 0.85, col: "rgba(127, 166, 201, 0.26)", bloomCol: "rgba(127, 166, 201, 0.45)" },
+      { key: "west",  x: cx - R * 0.60, y: cy, r: R * 0.85, col: "rgba(224, 160, 96, 0.25)",  bloomCol: "rgba(224, 160, 96, 0.42)" }
     ];
-    for(const q of quads){
-      const g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, q.r);
-      g.addColorStop(0, q.col);
+
+    for(const s of sectors){
+      const secData = this.sectors[s.key];
+      const bloom = secData ? secData.bloom : 0;
+      const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * (1 + bloom * 0.15));
+      g.addColorStop(0, bloom > 0.05 ? s.bloomCol : s.col);
+      g.addColorStop(0.7, `rgba(250, 244, 230, ${0.12 + bloom * 0.15})`);
       g.addColorStop(1, "rgba(255, 255, 255, 0)");
+
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, this.W, this.H);
     }
@@ -955,21 +1070,62 @@ class EmotionGraph {
 
   drawCompassGuides(ctx, cx, cy, R){
     ctx.save();
-    ctx.strokeStyle = "rgba(120, 95, 55, 0.10)";
+    ctx.strokeStyle = "rgba(120, 95, 55, 0.12)";
     ctx.lineWidth = 1;
 
-    [0.38, 0.72, 1.0].forEach(frac => {
+    // Concentric rings
+    [0.42, 0.76, 1.0].forEach(frac => {
       ctx.beginPath();
       ctx.arc(cx, cy, R * frac, 0, TAU);
       ctx.stroke();
     });
 
+    // Crosshair cardinal dividers
     ctx.setLineDash([3, 5]);
     ctx.beginPath();
-    ctx.moveTo(cx - R * 0.96, cy); ctx.lineTo(cx + R * 0.96, cy);
-    ctx.moveTo(cx, cy - R * 0.96); ctx.lineTo(cx, cy + R * 0.96);
+    ctx.moveTo(cx - R * 0.98, cy); ctx.lineTo(cx + R * 0.98, cy);
+    ctx.moveTo(cx, cy - R * 0.98); ctx.lineTo(cx, cy + R * 0.98);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    // Center focal nucleus
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, TAU);
+    ctx.fillStyle = "rgba(120, 95, 55, 0.22)";
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawSectorBadges(ctx, cx, cy, R){
+    const fam = getComputedStyle(document.body).fontFamily;
+    ctx.save();
+
+    const badges = [
+      { key: "north", x: cx, y: cy - R * 0.44, sec: this.sectors.north },
+      { key: "east",  x: cx + R * 0.44, y: cy, sec: this.sectors.east },
+      { key: "south", x: cx, y: cy + R * 0.44, sec: this.sectors.south },
+      { key: "west",  x: cx - R * 0.44, y: cy, sec: this.sectors.west }
+    ];
+
+    for(const b of badges){
+      const sec = b.sec;
+      const bloom = sec.bloom;
+      const isSecHovered = this.hoverSector === b.key;
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      // Sector Title (e.g. "NORTH")
+      ctx.font = `600 ${Math.round(11 + bloom * 1.5)}px ${fam}`;
+      ctx.fillStyle = isSecHovered ? "#1b5446" : `rgba(75, 60, 42, ${0.65 + bloom * 0.35})`;
+      ctx.letterSpacing && (ctx.letterSpacing = "2px");
+      ctx.fillText(sec.title, b.x, b.y - 7);
+
+      // Sector Descriptor / Subtitle
+      ctx.font = `400 ${Math.round(9.5 + bloom * 1)}px ${fam}`;
+      ctx.fillStyle = `rgba(115, 98, 76, ${0.55 + bloom * 0.45})`;
+      ctx.fillText(isSecHovered ? sec.label : sec.hint, b.x, b.y + 8);
+    }
     ctx.restore();
   }
 
@@ -989,10 +1145,10 @@ class EmotionGraph {
     for(let i = 1; i < sorted.length; i++) ctx.lineTo(sorted[i].px, sorted[i].py);
     ctx.closePath();
 
-    ctx.fillStyle = "rgba(63, 139, 118, 0.13)";
+    ctx.fillStyle = "rgba(63, 139, 118, 0.14)";
     ctx.fill();
-    ctx.strokeStyle = "rgba(63, 139, 118, 0.48)";
-    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = "rgba(63, 139, 118, 0.55)";
+    ctx.lineWidth = 2.0;
     ctx.stroke();
     ctx.restore();
   }
@@ -1004,20 +1160,21 @@ class EmotionGraph {
       if(!n1 || !n2) continue;
 
       const isBothSelected = App.selectedStates && App.selectedStates.has(k1) && App.selectedStates.has(k2);
-      const isEitherHovered = this.hoverKey === k1 || this.hoverKey === k2;
+      const isSecHovered = (this.hoverSector === n1.state.sector && this.hoverSector === n2.state.sector);
+      const isNodeHovered = this.hoverKey === k1 || this.hoverKey === k2;
 
       ctx.beginPath();
       ctx.moveTo(n1.px, n1.py);
       ctx.lineTo(n2.px, n2.py);
 
       if(isBothSelected){
-        ctx.strokeStyle = "rgba(63, 139, 118, 0.65)";
-        ctx.lineWidth = 2.2;
-      } else if(isEitherHovered){
-        ctx.strokeStyle = "rgba(140, 115, 75, 0.32)";
-        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = "rgba(63, 139, 118, 0.75)";
+        ctx.lineWidth = 2.4;
+      } else if(isNodeHovered || isSecHovered){
+        ctx.strokeStyle = "rgba(140, 115, 75, 0.38)";
+        ctx.lineWidth = 1.6;
       } else {
-        ctx.strokeStyle = "rgba(140, 115, 75, 0.14)";
+        ctx.strokeStyle = "rgba(140, 115, 75, 0.12)";
         ctx.lineWidth = 1.0;
       }
       ctx.stroke();
@@ -1029,7 +1186,8 @@ class EmotionGraph {
       if(!n1 || !n2) continue;
       const x = U.lerp(n1.px, n2.px, m.t);
       const y = U.lerp(n1.py, n2.py, m.t);
-      ctx.fillStyle = `rgba(180, 150, 100, ${m.alpha * 0.65})`;
+      const isVisible = (this.hoverSector === n1.state.sector || this.hoverSector === n2.state.sector);
+      ctx.fillStyle = `rgba(180, 150, 100, ${m.alpha * (isVisible ? 0.75 : 0.35)})`;
       ctx.beginPath();
       ctx.arc(x, y, m.size, 0, TAU);
       ctx.fill();
@@ -1045,62 +1203,67 @@ class EmotionGraph {
       const n = this.nodes[k];
       const isSelected = App.selectedStates && App.selectedStates.has(k);
       const isHovered = this.hoverKey === k;
+      const isSecHovered = this.hoverSector === n.state.sector;
       const baseR = (isSelected ? 16 : 12) * n.scale;
+
+      ctx.globalAlpha = n.alpha;
 
       // 1. Outer Beacon Halo if selected or hovered
       if(isSelected){
         const pulseR = baseR + Math.sin(n.pulse) * 4 + 6;
         ctx.beginPath();
         ctx.arc(n.px, n.py, pulseR, 0, TAU);
-        ctx.fillStyle = `rgba(63, 139, 118, ${0.14 + 0.08 * Math.sin(n.pulse)})`;
+        ctx.fillStyle = `rgba(63, 139, 118, ${0.16 + 0.08 * Math.sin(n.pulse)})`;
         ctx.fill();
 
         ctx.beginPath();
         ctx.arc(n.px, n.py, baseR + 3, 0, TAU);
-        ctx.strokeStyle = "rgba(63, 139, 118, 0.78)";
-        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = "rgba(63, 139, 118, 0.85)";
+        ctx.lineWidth = 2.0;
         ctx.stroke();
       } else if(isHovered){
         ctx.beginPath();
         ctx.arc(n.px, n.py, baseR + 5, 0, TAU);
-        ctx.fillStyle = "rgba(160, 130, 80, 0.16)";
+        ctx.fillStyle = "rgba(160, 130, 80, 0.22)";
         ctx.fill();
       }
 
       // 2. Node Core Disc
       ctx.beginPath();
       ctx.arc(n.px, n.py, baseR, 0, TAU);
-      ctx.fillStyle = isSelected ? n.swatch : "rgba(255, 252, 246, 0.95)";
+      ctx.fillStyle = isSelected ? n.swatch : isSecHovered ? "rgba(255, 252, 246, 0.98)" : "rgba(255, 252, 246, 0.85)";
       ctx.fill();
-      ctx.strokeStyle = isSelected ? "#fff" : "rgba(90, 70, 40, 0.35)";
-      ctx.lineWidth = isSelected ? 2.0 : 1.2;
+      ctx.strokeStyle = isSelected ? "#fff" : "rgba(90, 70, 40, 0.38)";
+      ctx.lineWidth = isSelected ? 2.2 : 1.2;
       ctx.stroke();
 
-      // 3. Inner Swatch or Core Indicator
+      // 3. Inner Swatch Dot
       if(!isSelected){
         ctx.beginPath();
-        ctx.arc(n.px, n.py, 4.5 * n.scale, 0, TAU);
+        ctx.arc(n.px, n.py, (isSecHovered ? 5.0 : 3.8) * n.scale, 0, TAU);
         ctx.fillStyle = n.swatch;
         ctx.fill();
       } else {
         ctx.beginPath();
-        ctx.arc(n.px, n.py, 3.5, 0, TAU);
+        ctx.arc(n.px, n.py, 3.8, 0, TAU);
         ctx.fillStyle = "#fff";
         ctx.fill();
       }
 
-      // 4. Label Typography
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = `${isSelected ? "600" : isHovered ? "500" : "400"} ${Math.round(11 * (isHovered || isSelected ? 1.05 : 1))}px ${fam}`;
-      
-      const labelY = n.py + (n.y > 0.4 ? -(baseR + 10) : (baseR + 12));
-      
-      ctx.fillStyle = "rgba(255, 253, 248, 0.85)";
-      ctx.fillText(n.label, n.px + 1, labelY + 1);
+      // 4. Label Typography (Visible on bloom/hover or if selected)
+      if(isSelected || isSecHovered || isHovered || n.bloom > 0.45){
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = `${isSelected ? "600" : isHovered ? "500" : "400"} ${Math.round(11 * (isHovered || isSelected ? 1.08 : 1))}px ${fam}`;
+        
+        const labelY = n.py + (n.y > 0.4 ? -(baseR + 11) : (baseR + 13));
+        
+        ctx.fillStyle = "rgba(255, 253, 248, 0.92)";
+        ctx.fillText(n.label, n.px + 1, labelY + 1);
 
-      ctx.fillStyle = isSelected ? "#1d5748" : isHovered ? "#1f1a13" : "rgba(50, 42, 30, 0.82)";
-      ctx.fillText(n.label, n.px, labelY);
+        ctx.fillStyle = isSelected ? "#1d5748" : isHovered ? "#1f1a13" : "rgba(50, 42, 30, 0.88)";
+        ctx.fillText(n.label, n.px, labelY);
+      }
     }
     ctx.restore();
   }
