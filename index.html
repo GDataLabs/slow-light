@@ -244,9 +244,14 @@ footer.legal{color:#3d4a56; font-size:11.5px; line-height:1.6; margin-top:30px; 
   touch-action:none;
   user-select:none;
   -webkit-user-select:none;
-  box-shadow:0 12px 40px rgba(110,85,45,.09), inset 0 0 0 1px rgba(90,70,40,.18);
+  --tint:#e9dcc4;
+  box-shadow:0 12px 40px rgba(110,85,45,.09), 0 0 0 10px color-mix(in srgb, var(--tint) 14%, transparent), inset 0 0 0 1px rgba(90,70,40,.18);
   background:radial-gradient(circle at 50% 50%, rgba(255,253,248,.96) 0%, rgba(248,239,222,.85) 68%, rgba(236,220,196,.92) 100%);
   overflow:hidden;
+  transition:box-shadow 1.2s ease;
+}
+@supports not (color: color-mix(in srgb, red 10%, blue)){
+  .wheel-box{ box-shadow:0 12px 40px rgba(110,85,45,.09), inset 0 0 0 1px rgba(90,70,40,.18); }
 }
 #emotionCanvas{
   width:100%;
@@ -306,6 +311,19 @@ footer.legal{color:#3d4a56; font-size:11.5px; line-height:1.6; margin-top:30px; 
   transition:opacity .2s;
 }
 .tag-badge .rem-btn:hover{ opacity:1; }
+.tag-badge .tag-name{ color:#2b261f; }
+.tag-badge .tag-int{
+  cursor:pointer; border:0; background:rgba(255,252,244,.7); color:#5d5344;
+  font:inherit; font-size:11px; padding:2px 8px 2px 6px; border-radius:999px;
+  display:inline-flex; align-items:center; gap:6px; line-height:1.2;
+  transition:background .2s;
+}
+.tag-badge .tag-int:hover{ background:#fff; color:#2b261f; }
+.tag-badge .tag-int .bar{
+  display:inline-block; width:30px; height:4px; border-radius:2px; background:rgba(90,70,40,.14); overflow:hidden;
+}
+.tag-badge .tag-int .bar b{ display:block; height:100%; border-radius:2px; transition:width .25s; }
+#emotionCanvas:focus-visible{ outline:2px solid #3f8b76; outline-offset:-2px; }
 
 .blend-desc{
   font-size:13.5px;
@@ -340,6 +358,8 @@ footer.legal{color:#3d4a56; font-size:11.5px; line-height:1.6; margin-top:30px; 
 .btn.small.primary:hover{
   background:#356f5f;
 }
+.linkish{ border:0; background:none; color:#8a7b68; font:inherit; font-size:12px; cursor:pointer; margin-top:6px; text-decoration:underline dotted; }
+.linkish:hover{ color:#3f8b76; }
 .quick-chip-row{
   display:flex;
   gap:6px;
@@ -405,25 +425,26 @@ a{color:var(--accent)}
   <div class="wrap">
     <h1>Slow&nbsp;Light</h1>
     <h2>How are you arriving?</h2>
-    <p>Name it first. Putting a feeling into words measurably lowers its charge — the session starts by meeting you where you are, not where you'd like to be.</p>
+    <p id="arriveLede">Touch the part of the wheel that feels closest.</p>
 
     <div class="emotion-landscape-wrap">
       <div class="wheel-box" id="wheelBox">
         <canvas id="emotionCanvas" width="520" height="520"></canvas>
       </div>
 
-      <div class="blend-card" id="blendCard">
+      <div class="blend-card hide" id="blendCard">
         <div class="selected-tags" id="selectedTags"></div>
-        <div class="blend-desc" id="blendDesc">Glide across the wheel or tap nodes to map where you are.</div>
+        <div class="blend-desc" id="blendDesc">Glide across the wheel, or tap whatever is closest to true. Nothing to get right.</div>
         <div class="blend-footer">
-          <span class="tiny" id="blendHint">Combine feelings or pick one.</span>
+          <span class="tiny" id="blendHint">Tap to light a feeling. Light several if several are here.</span>
           <div class="blend-actions">
             <button class="btn ghost small" id="clearFeelingsBtn">Clear all</button>
             <button class="btn small primary" id="confirmFeelingsBtn">Confirm</button>
           </div>
         </div>
       </div>
-      <div class="quick-chip-row" id="quickChips" title="Quick select list"></div>
+      <button class="linkish" id="listToggle" type="button">Prefer a list?</button>
+      <div class="quick-chip-row hide" id="quickChips" title="Quick select list"></div>
     </div>
 
     <h3>How much is it gripping you right now?</h3>
@@ -574,6 +595,24 @@ const U = {
   col:(c,a=1)=>`rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`,
   scale:(c,k)=>[U.clamp(c[0]*k,0,255),U.clamp(c[1]*k,0,255),U.clamp(c[2]*k,0,255)],
   mixRgb:(a,b,t)=>[U.lerp(a[0],b[0],t),U.lerp(a[1],b[1],t),U.lerp(a[2],b[2],t)],
+  // RGB -> HSL (0..360, 0..1, 0..1). Used to blend several feelings' palettes
+  // in RGB space and hand the result back to the rooms in the HSL they expect.
+  r2h:(r,g,b)=>{
+    r/=255; g/=255; b/=255;
+    const mx=Math.max(r,g,b), mn=Math.min(r,g,b), l=(mx+mn)/2;
+    if(mx===mn) return [0,0,l];
+    const d=mx-mn, s = l>.5 ? d/(2-mx-mn) : d/(mx+mn);
+    let h;
+    if(mx===r) h=(g-b)/d+(g<b?6:0); else if(mx===g) h=(b-r)/d+2; else h=(r-g)/d+4;
+    return [h*60, s, l];
+  },
+  // weighted blend of several HSL stops -> one HSL stop (mixed in RGB)
+  blendHsl:(stops, weights)=>{
+    let r=0,g=0,b=0,n=0;
+    stops.forEach((st,i)=>{ const w=weights[i]; const c=U.h2r(st[0],st[1],st[2]); r+=c[0]*w; g+=c[1]*w; b+=c[2]*w; n+=w; });
+    if(n<=0) return stops[0];
+    return U.r2h(r/n,g/n,b/n);
+  },
   fmtTime:s=>{s=Math.max(0,Math.round(s)); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")}
 };
 const TAU = Math.PI*2;
@@ -680,9 +719,19 @@ const STATES = {
     skyB:[[238,.36,.16],[214,.30,.40],[42,.42,.72]],
     water:[[232,.30,.10],[228,.20,.22]], waterB:[[232,.28,.12],[210,.24,.34]],
     root:130.8, mode:[0,3,5,7,10], noiseHue:.66
+  },
+
+  // --- CENTRE: Neutral (nothing pulling hard either way) ---
+  neutral:{
+    key:"neutral", label:"Neutral / okay", desc:"nothing much, just here", swatch:"#d9cdb4", sector:"centre",
+    x:0, y:0, arousal:.30, storm:"haze",
+    skyA:[[40,.14,.30],[42,.18,.46],[46,.22,.58]],
+    skyB:[[208,.28,.30],[38,.44,.64],[46,.58,.84]],
+    water:[[40,.10,.20],[42,.12,.34]], waterB:[[206,.24,.18],[40,.30,.44]],
+    root:146.8, mode:[0,2,4,7,9], noiseHue:.2
   }
 };
-const STATE_ORDER = ["tense","wired","overwhelmed","excited","joyful","hopeful","numb","heavy","sad","frustrated","fearful"];
+const STATE_ORDER = ["tense","wired","overwhelmed","excited","joyful","hopeful","numb","heavy","sad","frustrated","fearful","neutral"];
 const STATE_EDGES = [
   ["tense","wired"], ["wired","overwhelmed"],
   ["excited","joyful"], ["joyful","hopeful"],
@@ -748,33 +797,87 @@ const STATE_LINES = {
   numb:       ["We'll start in white-out, and let colour come back slowly.", "Some colour came back, slowly, the way it does."],
   hopeful:    ["We'll start in early light, and give it room to grow.", "The light grew. You gave it room."],
   joyful:     ["We'll start in warm light, and let it settle into something you can keep.", "The warm light settled. It's yours to keep."],
-  excited:    ["We'll start in a bright breeze, and let it ease without losing the brightness.", "The breeze eased. The brightness stayed."]
+  excited:    ["We'll start in a bright breeze, and let it ease without losing the brightness.", "The breeze eased. The brightness stayed."],
+  neutral:    ["We'll start in still air, and simply let it deepen.", "The still air deepened. Nothing needed fixing, and you slowed anyway."]
 };
 
+/* The weather image each feeling arrives as. When several feelings are chosen
+   the arrival line and closing title are composed from these, dominant first,
+   so a blend still reads as one sentence rather than a list.               */
+const STATE_WEATHER = {
+  wired:      { in:"sleet",          out:"the sleet" },
+  overwhelmed:{ in:"hard rain",      out:"the rain" },
+  tense:      { in:"hot wind",       out:"the hot wind" },
+  frustrated: { in:"blowing dust",   out:"the dust" },
+  fearful:    { in:"fog",            out:"the fog" },
+  sad:        { in:"soft rain",      out:"the soft rain" },
+  heavy:      { in:"grey drizzle",   out:"the grey" },
+  numb:       { in:"white-out",      out:"the white" },
+  hopeful:    { in:"early light",    out:"the early light" },
+  joyful:     { in:"warm light",     out:"the warm light" },
+  excited:    { in:"a bright breeze",out:"the breeze" },
+  neutral:    { in:"still air",      out:"the still air" }
+};
+const BLEND_LINES = {
+  // [arrival template, close template]; {a} = dominant weather, {b} = the rest
+  mixed:  ["We'll start in {a}, with {b} underneath, and let all of it ease together.",
+           "{A} eased, and {b} with it. It was weather, not you."],
+  // every chosen feeling is from the bright side of the wheel
+  bright: ["We'll start in {a} and {b}, and let them settle into something you can keep.",
+           "{A} and {b} settled. They're yours to keep."]
+};
+
+/* How much of a feeling is present. Set by dragging a lit point toward the
+   rim (more) or the centre (less), by clicking its badge, or with + / − keys. */
+const INTENSITY_WORDS = [
+  [0.22, "a trace"],
+  [0.45, "a little"],
+  [0.70, "some"],
+  [0.90, "a lot"],
+  [1.01, "all of it"]
+];
+const intensityWord = w => (INTENSITY_WORDS.find(([lim]) => w < lim) || INTENSITY_WORDS[4])[1];
+const INTENSITY_DEFAULT = 0.62;
+const NODE_T_MIN = 0.52, NODE_T_MAX = 0.96;   // radial range a lit point can be dragged through
+
 /* =====================================================================
-   EMOTION GRAPH & 4-SECTOR CARDINAL CONSTELLATION WHEEL
-   Organized into North, East, South, and West sectors.
-   Hovering over a sector illuminates its color and blooms its emotions.
+   EMOTION GRAPH — the arrival constellation
+   A 2-D affect wheel (valence × arousal) in four cardinal sectors.
+     · Tap a point to light it. Several can be lit at once.
+     · Drag a lit point toward the rim for more of that feeling, toward
+       the centre for less — intensity is a position, not a number.
+     · The hub breathes slowly in the blended colour of whatever is lit,
+       a small preview of the weather the session will open in.
+     · Keyboard: Tab to the wheel, arrows move, Enter/Space lights,
+       + / − change intensity, Delete clears.
    ===================================================================== */
 class EmotionGraph {
-  constructor(canvas, onToggle, onHover){
+  constructor(canvas, onToggle, onHover, onWeight){
     this.cv = canvas;
     this.ctx = canvas.getContext("2d");
     this.onToggle = onToggle;
     this.onHover = onHover;
+    this.onWeight = onWeight;
     this.hoverKey = null;
-    this.hoverSector = null;
+    this.hoverSector = null;       // sector under a fine pointer
+    this.openSector = null;        // sector opened by a tap (touch / click on empty space)
+    this.focusKey = null;          // keyboard focus
+    this.drag = null;              // {key, startX, startY, moved, t0}
     this.nodes = {};
     this.sectors = {};
     this.motes = [];
     this.active = true;
     this.t = 0;
+    this.hubPhase = 0;
+    this.hubCol = [236, 222, 198]; // warm parchment when nothing is lit
+    this.hubColB = [248, 240, 224];
+    this.hubAmt = 0;               // 0 = nothing lit, 1 = lit
     this.lastTime = performance.now();
     this.pointer = { x: -999, y: -999 };
+    this.coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
 
     this.initSectors();
     this.initNodes();
-    this.initMotes();
     this.bindEvents();
     this.resize();
     this.startLoop();
@@ -782,46 +885,39 @@ class EmotionGraph {
 
   initSectors(){
     for(const k in SECTORS){
-      this.sectors[k] = {
-        ...SECTORS[k],
-        bloom: 0,
-        targetBloom: 0
-      };
+      this.sectors[k] = { ...SECTORS[k], bloom: 0, targetBloom: 0 };
     }
   }
 
   initNodes(){
     for(const k of STATE_ORDER){
       const s = STATES[k];
+      const r0 = Math.hypot(s.x, s.y);
+      const centre = r0 < 1e-6;
       this.nodes[k] = {
-        key: k,
-        x: s.x,
-        y: s.y,
-        px: 0,
-        py: 0,
-        scale: 0.8,
-        bloom: 0.2,
-        alpha: 0.35,
-        targetScale: 0.8,
+        key: k, centre,
+        x: s.x, y: s.y,
+        ux: centre ? 0 : s.x / r0, uy: centre ? 1 : s.y / r0,   // unit radial direction (centre: label reads below)
+        home: r0,                     // resting radius (unlit)
+        t: r0,                        // current radius (lit points move along the radial)
+        px: 0, py: 0,
+        scale: 0.8, bloom: 0.2, alpha: 0.35,
         pulse: Math.random() * Math.PI * 2,
         swatch: s.swatch,
+        rgb: EmotionGraph.hex(s.swatch),
         label: s.label.split(" / ")[0],
         state: s
       };
     }
   }
 
+  static hex(h){ const n=parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+
   initMotes(){
     this.motes = [];
     for(let i = 0; i < 24; i++){
       const edge = STATE_EDGES[i % STATE_EDGES.length];
-      this.motes.push({
-        edge,
-        t: Math.random(),
-        speed: 0.10 + Math.random() * 0.16,
-        size: 1.2 + Math.random() * 1.5,
-        alpha: 0.3 + Math.random() * 0.5
-      });
+      this.motes.push({ edge, t: Math.random(), speed: 0.10 + Math.random() * 0.16, size: 1.2 + Math.random() * 1.5, alpha: 0.3 + Math.random() * 0.5 });
     }
   }
 
@@ -835,116 +931,172 @@ class EmotionGraph {
     this.cv.width = Math.round(this.W * dpr);
     this.cv.height = Math.round(this.H * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
     this.cx = this.W * 0.5;
     this.cy = this.H * 0.5;
     this.R = Math.min(this.W, this.H) * 0.38;
+    this.layout();
+  }
 
+  layout(){
     for(const k in this.nodes){
       const n = this.nodes[k];
-      n.px = this.cx + n.x * this.R;
-      n.py = this.cy + n.y * this.R;
+      n.px = this.cx + (n.centre ? 0 : n.ux * n.t * this.R);
+      n.py = this.cy + (n.centre ? 0 : n.uy * n.t * this.R);
+    }
+  }
+
+  /* --- intensity <-> radius --- */
+  weightToT(w){ return U.lerp(NODE_T_MIN, NODE_T_MAX, U.clamp(w, 0, 1)); }
+  tToWeight(t){ return U.clamp(U.inv(NODE_T_MIN, NODE_T_MAX, t), 0, 1); }
+  isLit(k){ return !!(App.selectedStates && App.selectedStates.has(k)); }
+  weightOf(k){ return (App.weights && App.weights[k] != null) ? App.weights[k] : INTENSITY_DEFAULT; }
+
+  /* Called by App whenever selection/weights change so positions follow. */
+  sync(){
+    for(const k in this.nodes){
+      const n = this.nodes[k];
+      n.targetT = n.centre ? 0 : this.isLit(k) ? this.weightToT(this.weightOf(k)) : n.home;
     }
   }
 
   bindEvents(){
+    const cv = this.cv;
     const getPos = (e) => {
-      const rect = this.cv.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      return {
-        x: clientX - rect.left,
-        y: clientY - rect.top
-      };
+      const rect = cv.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     };
 
-    const onMove = (e) => {
+    cv.addEventListener("pointerdown", (e) => {
+      if(e.button != null && e.button !== 0) return;
       const pos = getPos(e);
-      this.pointer.x = pos.x;
-      this.pointer.y = pos.y;
+      this.pointer.x = pos.x; this.pointer.y = pos.y;
       this.checkHover();
-    };
-
-    const onLeave = () => {
-      this.pointer.x = -999;
-      this.pointer.y = -999;
-      this.hoverSector = null;
-      this.setHover(null);
-    };
-
-    const onTap = (e) => {
-      const pos = getPos(e);
       const hit = this.hitTest(pos.x, pos.y);
-      if(hit && this.onToggle){
-        this.onToggle(hit.key);
+      if(!hit){
+        // tap on open space: open that region (tap again, or outside, to fold it)
+        const sec = this.sectorAt(pos.x, pos.y);
+        this.openSector = (sec && sec !== this.openSector) ? sec : null;
+        if(navigator.vibrate && sec) try{ navigator.vibrate(6); }catch(err){}
+        return;
       }
-    };
+      this.drag = { key: hit.key, startX: pos.x, startY: pos.y, moved: false, wasLit: this.isLit(hit.key), t0: hit.t, fixed: !!hit.centre };
+      try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+      e.preventDefault();
+    });
 
-    this.cv.addEventListener("mousemove", onMove);
-    this.cv.addEventListener("mouseleave", onLeave);
-    this.cv.addEventListener("click", onTap);
-
-    this.cv.addEventListener("touchstart", (e) => {
+    cv.addEventListener("pointermove", (e) => {
       const pos = getPos(e);
-      this.pointer.x = pos.x;
-      this.pointer.y = pos.y;
-      this.checkHover();
-    }, { passive: true });
-
-    this.cv.addEventListener("touchmove", onMove, { passive: true });
-    this.cv.addEventListener("touchend", (e) => {
-      if(e.changedTouches && e.changedTouches[0]){
-        const rect = this.cv.getBoundingClientRect();
-        const x = e.changedTouches[0].clientX - rect.left;
-        const y = e.changedTouches[0].clientY - rect.top;
-        const hit = this.hitTest(x, y);
-        if(hit && this.onToggle){
-          this.onToggle(hit.key);
+      this.pointer.x = pos.x; this.pointer.y = pos.y;
+      if(this.drag){
+        const d = this.drag, n = this.nodes[d.key];
+        if(!d.fixed && !d.moved && Math.hypot(pos.x - d.startX, pos.y - d.startY) > (this.coarse ? 9 : 5)){
+          d.moved = true;
+          if(!d.wasLit && this.onToggle) this.onToggle(d.key, { silentWeight: true });
         }
+        if(d.moved){
+          this.hoverSector = null;           // keep the sector wash and badge out of the way while dragging
+          // project the pointer onto this node's radial line
+          const t = ((pos.x - this.cx) * n.ux + (pos.y - this.cy) * n.uy) / this.R;
+          const tt = U.clamp(t, NODE_T_MIN, NODE_T_MAX);
+          n.t = tt; n.targetT = tt;
+          if(this.onWeight) this.onWeight(d.key, this.tToWeight(tt), true);
+        }
+        return;
       }
-      onLeave();
-    }, { passive: true });
+      this.checkHover();
+    });
+
+    const endDrag = (e) => {
+      if(!this.drag) return;
+      const d = this.drag; this.drag = null;
+      try{ cv.releasePointerCapture(e.pointerId); }catch(err){}
+      if(!d.moved){
+        if(this.onToggle) this.onToggle(d.key);
+      } else {
+        if(this.onWeight) this.onWeight(d.key, this.tToWeight(this.nodes[d.key].t), false);
+      }
+      if(e.pointerType !== "mouse"){ this.pointer.x = -999; this.pointer.y = -999; this.setHover(null); }
+    };
+    cv.addEventListener("pointerup", endDrag);
+    cv.addEventListener("pointercancel", endDrag);
+    cv.addEventListener("pointerleave", (e) => {
+      if(this.drag) return;
+      this.pointer.x = -999; this.pointer.y = -999;
+      this.hoverSector = null; this.setHover(null);
+    });
+
+    // keyboard
+    // keyboard focus only — a tap also focuses the canvas, and must not open a region
+    cv.addEventListener("focus", () => {
+      let kb=false; try{ kb = cv.matches(":focus-visible"); }catch(e){}
+      if(!kb) return;
+      if(!this.focusKey) this.focusKey = Array.from(App.selectedStates || [])[0] || STATE_ORDER[0];
+      this.announce();
+    });
+    cv.addEventListener("blur", () => { this.focusKey = null; });
+    cv.addEventListener("keydown", (e) => {
+      if(!this.focusKey) this.focusKey = Array.from(App.selectedStates || [])[0] || STATE_ORDER[0];
+      const k = this.focusKey;
+      const i = STATE_ORDER.indexOf(k);
+      let handled = true;
+      switch(e.key){
+        case "ArrowRight": case "ArrowDown": this.focusKey = STATE_ORDER[(i + 1) % STATE_ORDER.length]; break;
+        case "ArrowLeft": case "ArrowUp": this.focusKey = STATE_ORDER[(i - 1 + STATE_ORDER.length) % STATE_ORDER.length]; break;
+        case "Home": this.focusKey = STATE_ORDER[0]; break;
+        case "End": this.focusKey = STATE_ORDER[STATE_ORDER.length - 1]; break;
+        case "Enter": case " ": if(this.onToggle) this.onToggle(k); break;
+        case "+": case "=": if(this.isLit(k) && this.onWeight) this.onWeight(k, U.clamp(this.weightOf(k) + 0.2, 0, 1), false); break;
+        case "-": case "_": if(this.isLit(k) && this.onWeight) this.onWeight(k, U.clamp(this.weightOf(k) - 0.2, 0, 1), false); break;
+        case "Delete": case "Backspace": if(this.isLit(k) && this.onToggle) this.onToggle(k); break;
+        default: handled = false;
+      }
+      if(handled){ e.preventDefault(); this.announce(); }
+    });
 
     window.addEventListener("resize", () => this.resize());
   }
 
+  announce(){
+    const k = this.focusKey; if(!k) return;
+    const s = STATES[k];
+    const lit = this.isLit(k);
+    this.cv.setAttribute("aria-label", `${s.label}: ${s.desc}. ${lit ? "Lit, " + intensityWord(this.weightOf(k)) + ". Press + or − to change, Enter to unlight." : "Not lit. Press Enter to light."} Arrow keys move between feelings.`);
+  }
+
   hitTest(x, y){
     let best = null;
-    let minD = 40; // hit detection radius
+    let minD = this.coarse ? 34 : 26;
     for(const k in this.nodes){
       const n = this.nodes[k];
       const d = Math.hypot(n.px - x, n.py - y);
-      if(d < minD){
-        minD = d;
-        best = n;
-      }
+      if(d < minD){ minD = d; best = n; }
     }
     return best;
   }
 
+  sectorAt(px, py){
+    const dx = px - this.cx, dy = py - this.cy;
+    if(!(px > 0 && py > 0) || Math.hypot(dx, dy) > this.R * 1.15) return null;
+    if(Math.hypot(dx, dy) < this.R * 0.22) return "centre";
+    const ang = Math.atan2(dy, dx);
+    if(ang >= -Math.PI * 0.75 && ang < -Math.PI * 0.25) return "north";
+    if(ang >= -Math.PI * 0.25 && ang < Math.PI * 0.25) return "east";
+    if(ang >= Math.PI * 0.25 && ang < Math.PI * 0.75) return "south";
+    return "west";
+  }
+  /* the region whose feelings are currently shown */
+  activeSector(){
+    if(this.drag && this.drag.moved) return null;
+    if(this.focusKey) return STATES[this.focusKey].sector;
+    return this.hoverSector || this.openSector;
+  }
+
   checkHover(){
     const px = this.pointer.x, py = this.pointer.y;
-    const dx = px - this.cx, dy = py - this.cy;
-    const dist = Math.hypot(dx, dy);
-
-    // Determine cardinal sector from cursor angle
-    if(px > 0 && py > 0 && dist < this.R * 1.15){
-      const ang = Math.atan2(dy, dx); // [-PI..PI]
-      if(ang >= -Math.PI * 0.75 && ang < -Math.PI * 0.25){
-        this.hoverSector = "north";
-      } else if(ang >= -Math.PI * 0.25 && ang < Math.PI * 0.25){
-        this.hoverSector = "east";
-      } else if(ang >= Math.PI * 0.25 && ang < Math.PI * 0.75){
-        this.hoverSector = "south";
-      } else {
-        this.hoverSector = "west";
-      }
-    } else {
-      this.hoverSector = null;
-    }
-
+    this.hoverSector = this.coarse ? null : this.sectorAt(px, py);
     const hit = this.hitTest(px, py);
     this.setHover(hit ? hit.key : null);
+    this.cv.style.cursor = hit ? (this.isLit(hit.key) ? "grab" : "pointer") : "crosshair";
   }
 
   setHover(key){
@@ -968,72 +1120,73 @@ class EmotionGraph {
 
   update(dt){
     this.t += dt;
+    const motion = REDUCED ? 0 : 1;
 
-    // 1. Sector Bloom interpolation
+    const act = this.activeSector();
     for(const k in this.sectors){
       const sec = this.sectors[k];
-      const isSecHovered = this.hoverSector === k;
-      sec.targetBloom = isSecHovered ? 1.0 : 0.0;
+      sec.targetBloom = act === k ? 1.0 : 0.0;
       sec.bloom = U.approach(sec.bloom, sec.targetBloom, 0.16, dt);
     }
 
-    // 2. Node Bloom, Scale, and Pulse
+    let litN = 0;
     for(const k in this.nodes){
       const n = this.nodes[k];
-      const isSelected = App.selectedStates && App.selectedStates.has(k);
-      const isHovered = this.hoverKey === k;
-      const sec = this.sectors[n.state.sector];
-      const isSecActive = this.hoverSector === n.state.sector || isHovered;
+      const isSelected = this.isLit(k);
+      const isHovered = this.hoverKey === k || this.focusKey === k;
+      const isSecActive = act === n.state.sector || isHovered;
+      if(isSelected) litN++;
 
-      const targetBloom = isSelected ? 1.0 : isSecActive ? 1.0 : 0.25;
-      n.bloom = U.approach(n.bloom, targetBloom, 0.16, dt);
-      
-      const targetScale = isHovered ? 1.35 : isSelected ? 1.20 : (0.75 + 0.35 * n.bloom);
-      n.scale = U.approach(n.scale, targetScale, 0.14, dt);
-      n.alpha = isSelected ? 1.0 : (0.35 + 0.65 * n.bloom);
-      n.pulse += dt * (isSelected ? 2.8 : 1.2);
-    }
+      if(n.targetT == null) n.targetT = n.centre ? 0 : isSelected ? this.weightToT(this.weightOf(k)) : n.home;
+      const dragging = this.drag && this.drag.key === k && this.drag.moved;
+      n.t = dragging ? n.targetT : U.approach(n.t, n.targetT, 0.18, dt);
 
-    // 3. Filament Motes
-    for(const m of this.motes){
-      m.t = (m.t + m.speed * dt) % 1.0;
+      // unlit points in a folded region are only faint starlight
+      const targetBloom = isSelected ? 1.0 : isSecActive ? 1.0 : 0.0;
+      n.bloom = U.approach(n.bloom, targetBloom, 0.22, dt);
+      const w = this.weightOf(k);
+      const targetScale = isHovered ? 1.35 : isSelected ? (1.0 + 0.45 * w) : (0.35 + 0.65 * n.bloom);
+      n.scale = U.approach(n.scale, targetScale, 0.16, dt);
+      n.alpha = isSelected ? 1.0 : n.centre ? 0.9 : (0.28 + 0.72 * n.bloom);
+      n.pulse += dt * (isSelected ? 2.2 : 1.2) * motion;
     }
+    this.layout();
+
+    // hub: blended colour of what is lit, breathing at a slow, settled pace
+    const blend = App.getBlendedState ? App.getBlendedState() : null;
+    const want = litN ? 1 : 0;
+    this.hubAmt = U.approach(this.hubAmt, want, 0.5, dt);
+    if(blend && litN){
+      const a = U.h2r(blend.skyA[1][0], Math.min(.6, blend.skyA[1][1] + .1), U.clamp(blend.skyA[1][2] + .30, .45, .72));
+      const b = U.h2r(blend.skyB[2][0], blend.skyB[2][1], Math.max(.78, blend.skyB[2][2]));
+      this.hubCol = U.mixRgb(this.hubCol, a, 1 - Math.exp(-dt / 0.6));
+      this.hubColB = U.mixRgb(this.hubColB, b, 1 - Math.exp(-dt / 0.6));
+      this.hubRate = U.lerp(6.5, 8.5, blend.arousal);   // slightly quicker when arriving hot, never fast
+    }
+    this.hubPhase = (this.hubPhase + dt * ((this.hubRate || 6.5) / 60) * motion) % 1;
+
   }
 
   draw(){
     const ctx = this.ctx;
     const { W, H, cx, cy, R } = this;
     ctx.clearRect(0, 0, W, H);
-
-    // 1. Draw 4 Cardinal Sector Color Quadrants
     this.drawSectorBackdrops(ctx, cx, cy, R);
-
-    // 2. Draw Compass Guides & Center Hub
+    this.drawHub(ctx, cx, cy, R);
     this.drawCompassGuides(ctx, cx, cy, R);
-
-    // 3. Draw Cardinal Sector Badges
     this.drawSectorBadges(ctx, cx, cy, R);
-
-    // 4. Draw Selected Polygon Mesh
-    this.drawSelectedPolygon(ctx);
-
-    // 5. Draw Constellation Filaments & Motes
-    this.drawFilaments(ctx);
-
-    // 6. Draw Specific Emotion Nodes (Bloomed on hover)
+    this.drawDragGuide(ctx);
     this.drawNodes(ctx);
   }
 
   drawSectorBackdrops(ctx, cx, cy, R){
     ctx.save();
-    // 4 cardinal sector glow fields
     const sectors = [
       { key: "north", x: cx, y: cy - R * 0.60, r: R * 0.85, col: "rgba(103, 212, 232, 0.25)", bloomCol: "rgba(103, 212, 232, 0.42)" },
       { key: "east",  x: cx + R * 0.60, y: cy, r: R * 0.85, col: "rgba(244, 197, 106, 0.26)", bloomCol: "rgba(244, 197, 106, 0.45)" },
       { key: "south", x: cx, y: cy + R * 0.60, r: R * 0.85, col: "rgba(127, 166, 201, 0.26)", bloomCol: "rgba(127, 166, 201, 0.45)" },
       { key: "west",  x: cx - R * 0.60, y: cy, r: R * 0.85, col: "rgba(224, 160, 96, 0.25)",  bloomCol: "rgba(224, 160, 96, 0.42)" }
     ];
-
     for(const s of sectors){
       const secData = this.sectors[s.key];
       const bloom = secData ? secData.bloom : 0;
@@ -1041,10 +1194,32 @@ class EmotionGraph {
       g.addColorStop(0, bloom > 0.05 ? s.bloomCol : s.col);
       g.addColorStop(0.7, `rgba(250, 244, 230, ${0.12 + bloom * 0.15})`);
       g.addColorStop(1, "rgba(255, 255, 255, 0)");
-
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, this.W, this.H);
     }
+    ctx.restore();
+  }
+
+  /* The centre breathes in the colour of the chosen weather: in for ~40% of
+     the cycle, a soft hold, a longer out — the same shape the session uses. */
+  drawHub(ctx, cx, cy, R){
+    const ph = this.hubPhase;
+    const lvl = ph < .38 ? U.smoother(ph / .38) : ph < .50 ? 1 : ph < .92 ? 1 - U.smoother((ph - .5) / .42) : 0;
+    const amt = this.hubAmt;
+    const r = R * (0.13 + 0.06 * lvl) * (0.6 + 0.4 * amt);
+    const a = this.hubCol, b = this.hubColB;
+    ctx.save();
+    // outer haze
+    const g0 = ctx.createRadialGradient(cx, cy, r * 0.2, cx, cy, r * 2.1);
+    g0.addColorStop(0, U.col(a, (0.22 + 0.08 * lvl) * amt + 0.05));
+    g0.addColorStop(1, U.col(a, 0));
+    ctx.fillStyle = g0; ctx.beginPath(); ctx.arc(cx, cy, r * 2.4, 0, TAU); ctx.fill();
+    // body — a soft light rather than a disc
+    const g = ctx.createRadialGradient(cx - r * .2, cy - r * .25, 0, cx, cy, r);
+    g.addColorStop(0, U.col(b, 0.95));
+    g.addColorStop(0.6, U.col(U.mixRgb(a, b, .5), 0.55 + .2 * amt));
+    g.addColorStop(1, U.col(a, 0.0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
     ctx.restore();
   }
 
@@ -1052,68 +1227,51 @@ class EmotionGraph {
     ctx.save();
     ctx.strokeStyle = "rgba(120, 95, 55, 0.12)";
     ctx.lineWidth = 1;
-
-    // Concentric rings
-    [0.42, 0.76, 1.0].forEach(frac => {
-      ctx.beginPath();
-      ctx.arc(cx, cy, R * frac, 0, TAU);
-      ctx.stroke();
-    });
-
-    // Crosshair cardinal dividers
-    ctx.setLineDash([3, 5]);
+    [0.76, 1.0].forEach(frac => { ctx.beginPath(); ctx.arc(cx, cy, R * frac, 0, TAU); ctx.stroke(); });
+    ctx.strokeStyle = "rgba(120, 95, 55, 0.07)";
+    ctx.setLineDash([2, 7]);
     ctx.beginPath();
     ctx.moveTo(cx - R * 0.98, cy); ctx.lineTo(cx + R * 0.98, cy);
     ctx.moveTo(cx, cy - R * 0.98); ctx.lineTo(cx, cy + R * 0.98);
     ctx.stroke();
     ctx.setLineDash([]);
-
-    // Center focal nucleus
-    ctx.beginPath();
-    ctx.arc(cx, cy, 4, 0, TAU);
-    ctx.fillStyle = "rgba(120, 95, 55, 0.22)";
-    ctx.fill();
     ctx.restore();
   }
 
+  /* One word per region. That is all the wheel says until you reach into it. */
   drawSectorBadges(ctx, cx, cy, R){
     const fam = getComputedStyle(document.body).fontFamily;
-    ctx.save();
-
-    const badges = [
-      { key: "north", x: cx, y: cy - R * 0.42, tag: "N · Storm", full: "NORTH · Storm & Activation" },
-      { key: "east",  x: cx + R * 0.42, y: cy, tag: "E · Radiance", full: "EAST · Radiance & Joy" },
-      { key: "south", x: cx, y: cy + R * 0.42, tag: "S · Stillness", full: "SOUTH · Stillness & Heavy" },
-      { key: "west",  x: cx - R * 0.42, y: cy, tag: "W · Guarded", full: "WEST · Guarded & Friction" }
+    const act = this.activeSector();
+    const words = [
+      { key: "north", x: cx,            y: cy - R * 0.50, word: "Storm",     sub: "racing · hot · urgent" },
+      { key: "east",  x: cx + R * 0.50, y: cy,            word: "Radiance",  sub: "warm · open · bright" },
+      { key: "south", x: cx,            y: cy + R * 0.50, word: "Stillness", sub: "weighted · grey · flat" },
+      { key: "west",  x: cx - R * 0.50, y: cy,            word: "Guarded",   sub: "braced · stuck · wary" }
     ];
-
-    for(const b of badges){
+    ctx.save();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for(const b of words){
       const sec = this.sectors[b.key];
       const bloom = sec ? sec.bloom : 0;
-      const isSecHovered = this.hoverSector === b.key;
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      // Subtle single cardinal label
-      const text = isSecHovered ? b.full : b.tag;
-      ctx.font = `${isSecHovered ? "600" : "500"} ${Math.round(10 + bloom * 1)}px ${fam}`;
-      ctx.letterSpacing && (ctx.letterSpacing = isSecHovered ? "1.5px" : "1.2px");
-
-      // Soft pill backdrop on hover
-      if(bloom > 0.15){
-        const tw = ctx.measureText(text).width + 14;
-        ctx.fillStyle = `rgba(255, 252, 244, ${0.45 + bloom * 0.40})`;
-        ctx.beginPath();
-        ctx.roundRect(b.x - tw * 0.5, b.y - 9, tw, 18, 9);
-        ctx.fill();
-        ctx.strokeStyle = `rgba(90, 70, 40, ${0.10 + bloom * 0.15})`;
-        ctx.lineWidth = 1;
-        ctx.stroke();
+      const isAct = act === b.key;
+      const col = EmotionGraph.hex(SECTORS[b.key].color);
+      // when a region is open its word settles inward, leaving the rim to the feelings
+      const k = 1 - 0.28 * bloom;
+      const x = cx + (b.x - cx) * k, y = cy + (b.y - cy) * k;
+      const dim = act && !isAct ? 0.45 : 1;
+      ctx.font = `300 ${Math.round(17 - 3 * bloom)}px ${fam}`;
+      ctx.letterSpacing && (ctx.letterSpacing = "2.5px");
+      ctx.fillStyle = `rgba(255, 253, 248, ${0.75 * dim})`;
+      ctx.fillText(b.word.toUpperCase(), x + 1, y + 1);
+      const ink = U.mixRgb([96, 80, 58], U.scale(col, .62), bloom);
+      ctx.fillStyle = U.col(ink, (0.62 + 0.38 * bloom) * dim);
+      ctx.fillText(b.word.toUpperCase(), x, y);
+      if(bloom > 0.3){
+        ctx.font = `400 10px ${fam}`;
+        ctx.letterSpacing && (ctx.letterSpacing = "1px");
+        ctx.fillStyle = `rgba(90, 76, 56, ${(bloom - .3) / .7 * 0.8})`;
+        ctx.fillText(b.sub, x, y + 15);
       }
-
-      ctx.fillStyle = isSecHovered ? "#1b5446" : `rgba(105, 88, 68, ${0.42 + bloom * 0.48})`;
-      ctx.fillText(text, b.x, b.y);
     }
     ctx.restore();
   }
@@ -1121,23 +1279,22 @@ class EmotionGraph {
   drawSelectedPolygon(ctx){
     const selected = Array.from(App.selectedStates || []).map(k => this.nodes[k]).filter(Boolean);
     if(selected.length < 2) return;
-
     ctx.save();
-    const avgX = selected.reduce((sum, n) => sum + n.px, 0) / selected.length;
-    const avgY = selected.reduce((sum, n) => sum + n.py, 0) / selected.length;
-    const sorted = selected.slice().sort((a, b) => {
-      return Math.atan2(a.py - avgY, a.px - avgX) - Math.atan2(b.py - avgY, b.px - avgX);
-    });
-
+    const avgX = selected.reduce((s, n) => s + n.px, 0) / selected.length;
+    const avgY = selected.reduce((s, n) => s + n.py, 0) / selected.length;
+    const sorted = selected.slice().sort((a, b) => Math.atan2(a.py - avgY, a.px - avgX) - Math.atan2(b.py - avgY, b.px - avgX));
     ctx.beginPath();
     ctx.moveTo(sorted[0].px, sorted[0].py);
     for(let i = 1; i < sorted.length; i++) ctx.lineTo(sorted[i].px, sorted[i].py);
     ctx.closePath();
-
-    ctx.fillStyle = "rgba(63, 139, 118, 0.14)";
+    // fill is the blend of the lit colours, so the mesh reads as "these, together"
+    let r=0,g=0,b=0,n=0;
+    for(const nd of selected){ const w = this.weightOf(nd.key) + .15; r += nd.rgb[0]*w; g += nd.rgb[1]*w; b += nd.rgb[2]*w; n += w; }
+    const mix = [r/n, g/n, b/n];
+    ctx.fillStyle = U.col(mix, 0.16);
     ctx.fill();
-    ctx.strokeStyle = "rgba(63, 139, 118, 0.55)";
-    ctx.lineWidth = 2.0;
+    ctx.strokeStyle = U.col(U.scale(mix, .75), 0.55);
+    ctx.lineWidth = 1.6;
     ctx.stroke();
     ctx.restore();
   }
@@ -1147,116 +1304,152 @@ class EmotionGraph {
     for(const [k1, k2] of STATE_EDGES){
       const n1 = this.nodes[k1], n2 = this.nodes[k2];
       if(!n1 || !n2) continue;
-
-      const isBothSelected = App.selectedStates && App.selectedStates.has(k1) && App.selectedStates.has(k2);
-      const isSecHovered = (this.hoverSector === n1.state.sector && this.hoverSector === n2.state.sector);
+      const isBothSelected = this.isLit(k1) && this.isLit(k2);
+      const act = this.activeSector();
+      const isSecHovered = (act === n1.state.sector && act === n2.state.sector);
       const isNodeHovered = this.hoverKey === k1 || this.hoverKey === k2;
-
-      ctx.beginPath();
-      ctx.moveTo(n1.px, n1.py);
-      ctx.lineTo(n2.px, n2.py);
-
-      if(isBothSelected){
-        ctx.strokeStyle = "rgba(63, 139, 118, 0.75)";
-        ctx.lineWidth = 2.4;
-      } else if(isNodeHovered || isSecHovered){
-        ctx.strokeStyle = "rgba(140, 115, 75, 0.38)";
-        ctx.lineWidth = 1.6;
-      } else {
-        ctx.strokeStyle = "rgba(140, 115, 75, 0.12)";
-        ctx.lineWidth = 1.0;
-      }
+      ctx.beginPath(); ctx.moveTo(n1.px, n1.py); ctx.lineTo(n2.px, n2.py);
+      if(isBothSelected){ ctx.strokeStyle = "rgba(63, 139, 118, 0.55)"; ctx.lineWidth = 2.0; }
+      else if(isNodeHovered || isSecHovered){ ctx.strokeStyle = "rgba(140, 115, 75, 0.30)"; ctx.lineWidth = 1.4; }
+      else { ctx.strokeStyle = "rgba(140, 115, 75, 0.05)"; ctx.lineWidth = 1.0; }
       ctx.stroke();
     }
-
-    // Motes traveling along filaments
     for(const m of this.motes){
       const n1 = this.nodes[m.edge[0]], n2 = this.nodes[m.edge[1]];
       if(!n1 || !n2) continue;
-      const x = U.lerp(n1.px, n2.px, m.t);
-      const y = U.lerp(n1.py, n2.py, m.t);
-      const isVisible = (this.hoverSector === n1.state.sector || this.hoverSector === n2.state.sector);
-      ctx.fillStyle = `rgba(180, 150, 100, ${m.alpha * (isVisible ? 0.75 : 0.35)})`;
-      ctx.beginPath();
-      ctx.arc(x, y, m.size, 0, TAU);
-      ctx.fill();
+      const x = U.lerp(n1.px, n2.px, m.t), y = U.lerp(n1.py, n2.py, m.t);
+      const act = this.activeSector();
+      const isVisible = (act === n1.state.sector || act === n2.state.sector);
+      ctx.fillStyle = `rgba(180, 150, 100, ${m.alpha * (isVisible ? 0.7 : 0.18)})`;
+      ctx.beginPath(); ctx.arc(x, y, m.size, 0, TAU); ctx.fill();
     }
+    ctx.restore();
+  }
+
+  /* While a lit point is being dragged, show the radial it moves along and
+     the words at each end, so the gesture explains itself. */
+  drawDragGuide(ctx){
+    const d = this.drag; if(!d || !d.moved) return;
+    const n = this.nodes[d.key];
+    const fam = getComputedStyle(document.body).fontFamily;
+    const { cx, cy, R } = this;
+    const x0 = cx + n.ux * NODE_T_MIN * R, y0 = cy + n.uy * NODE_T_MIN * R;
+    const x1 = cx + n.ux * NODE_T_MAX * R, y1 = cy + n.uy * NODE_T_MAX * R;
+    ctx.save();
+    ctx.strokeStyle = U.col(n.rgb, 0.55); ctx.lineWidth = 2; ctx.setLineDash([2, 5]);
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = U.col(n.rgb, 0.9);
+    [[x0, y0], [x1, y1]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill(); });
+    ctx.font = `500 10px ${fam}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(60, 50, 36, 0.85)";
+    const off = 13;
+    ctx.fillText("less", x0 - n.ux * off, y0 - n.uy * off);
+    ctx.fillText("more", x1 + n.ux * off, y1 + n.uy * off);
     ctx.restore();
   }
 
   drawNodes(ctx){
     const fam = getComputedStyle(document.body).fontFamily;
     ctx.save();
-
     for(const k of STATE_ORDER){
       const n = this.nodes[k];
-      const isSelected = App.selectedStates && App.selectedStates.has(k);
+      const isSelected = this.isLit(k);
       const isHovered = this.hoverKey === k;
-      const isSecHovered = this.hoverSector === n.state.sector;
-      const baseR = (isSelected ? 16 : 12) * n.scale;
-
+      const isFocused = this.focusKey === k;
+      const isSecHovered = this.activeSector() === n.state.sector;
+      const w = this.weightOf(k);
+      const showLabel = n.centre ? (isSelected || isHovered || isFocused) : (isSelected || isHovered || isFocused || n.bloom > 0.12);
+      const baseR = n.centre ? (isSelected ? 15 : 11 + 3 * n.bloom) : (isSelected ? 13 + 5 * w : 12) * n.scale;
+      const c = n.rgb;
       ctx.globalAlpha = n.alpha;
 
-      // 1. Outer Beacon Halo if selected or hovered
       if(isSelected){
-        const pulseR = baseR + Math.sin(n.pulse) * 4 + 6;
-        ctx.beginPath();
-        ctx.arc(n.px, n.py, pulseR, 0, TAU);
-        ctx.fillStyle = `rgba(63, 139, 118, ${0.16 + 0.08 * Math.sin(n.pulse)})`;
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.arc(n.px, n.py, baseR + 3, 0, TAU);
-        ctx.strokeStyle = "rgba(63, 139, 118, 0.85)";
-        ctx.lineWidth = 2.0;
-        ctx.stroke();
-      } else if(isHovered){
-        ctx.beginPath();
-        ctx.arc(n.px, n.py, baseR + 5, 0, TAU);
-        ctx.fillStyle = "rgba(160, 130, 80, 0.22)";
-        ctx.fill();
+        // glow that grows with intensity
+        const pulseR = baseR + Math.sin(n.pulse) * (2 + 3 * w) + 8 + 10 * w;
+        const g = ctx.createRadialGradient(n.px, n.py, baseR * .5, n.px, n.py, pulseR);
+        g.addColorStop(0, U.col(c, 0.35 + 0.25 * w));
+        g.addColorStop(1, U.col(c, 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(n.px, n.py, pulseR, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(n.px, n.py, baseR + 3, 0, TAU);
+        ctx.strokeStyle = U.col(U.scale(c, .72), 0.9); ctx.lineWidth = 1.6; ctx.stroke();
+      } else if(isHovered || isFocused){
+        ctx.beginPath(); ctx.arc(n.px, n.py, baseR + 5, 0, TAU);
+        ctx.fillStyle = U.col(c, 0.22); ctx.fill();
+      }
+      if(isFocused){
+        ctx.beginPath(); ctx.arc(n.px, n.py, baseR + 7, 0, TAU);
+        ctx.strokeStyle = "rgba(29, 87, 72, 0.9)"; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]);
       }
 
-      // 2. Node Core Disc
-      ctx.beginPath();
-      ctx.arc(n.px, n.py, baseR, 0, TAU);
-      ctx.fillStyle = isSelected ? n.swatch : isSecHovered ? "rgba(255, 252, 246, 0.98)" : "rgba(255, 252, 246, 0.85)";
+      // core disc
+      ctx.beginPath(); ctx.arc(n.px, n.py, baseR, 0, TAU);
+      if(isSelected){
+        const g = ctx.createRadialGradient(n.px - baseR * .3, n.py - baseR * .3, 1, n.px, n.py, baseR);
+        g.addColorStop(0, U.col(U.mixRgb(c, [255,255,255], .55), 1));
+        g.addColorStop(1, U.col(c, 1));
+        ctx.fillStyle = g;
+      } else {
+        ctx.fillStyle = n.centre ? `rgba(226, 214, 190, ${0.75 + 0.2 * n.bloom})` : `rgba(255, 252, 246, ${0.55 + 0.43 * n.bloom})`;
+      }
       ctx.fill();
-      ctx.strokeStyle = isSelected ? "#fff" : "rgba(90, 70, 40, 0.38)";
-      ctx.lineWidth = isSelected ? 2.2 : 1.2;
+      ctx.strokeStyle = isSelected ? "rgba(255,255,255,.9)" : `rgba(90, 70, 40, ${0.12 + 0.26 * n.bloom})`;
+      ctx.lineWidth = isSelected ? 2.0 : 1.2;
       ctx.stroke();
 
-      // 3. Inner Swatch Dot
-      if(!isSelected){
-        ctx.beginPath();
-        ctx.arc(n.px, n.py, (isSecHovered ? 5.0 : 3.8) * n.scale, 0, TAU);
-        ctx.fillStyle = n.swatch;
-        ctx.fill();
-      } else {
-        ctx.beginPath();
-        ctx.arc(n.px, n.py, 3.8, 0, TAU);
-        ctx.fillStyle = "#fff";
-        ctx.fill();
+      if(!isSelected && !n.centre){
+        ctx.beginPath(); ctx.arc(n.px, n.py, (isSecHovered ? 5.0 : 3.8) * n.scale, 0, TAU);
+        ctx.fillStyle = n.swatch; ctx.fill();
       }
 
-      // 4. Label Typography (Visible on bloom/hover or if selected)
-      if(isSelected || isSecHovered || isHovered || n.bloom > 0.45){
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.font = `${isSelected ? "600" : isHovered ? "500" : "400"} ${Math.round(11 * (isHovered || isSelected ? 1.08 : 1))}px ${fam}`;
-        
-        const labelY = n.py + (n.y > 0.4 ? -(baseR + 11) : (baseR + 13));
-        
-        ctx.fillStyle = "rgba(255, 253, 248, 0.92)";
-        ctx.fillText(n.label, n.px + 1, labelY + 1);
-
-        ctx.fillStyle = isSelected ? "#1d5748" : isHovered ? "#1f1a13" : "rgba(50, 42, 30, 0.88)";
-        ctx.fillText(n.label, n.px, labelY);
+      // label — always readable, brighter when lit or near
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = `${isSelected ? "600" : isHovered ? "500" : "400"} ${Math.round(11 * (isHovered || isSelected ? 1.08 : 1))}px ${fam}`;
+      // labels sit radially outside the node, away from the hub, so the
+      // east/west points read to the side and the north/south ones above/below
+      if(!showLabel) continue;
+      ctx.globalAlpha = isSelected || isHovered ? 1 : U.clamp((n.bloom - .12) / .5, 0, 1);
+      const side = n.ux > 0.3 ? 1 : n.ux < -0.3 ? -1 : 0;
+      const off = baseR + (side ? 9 : 12);
+      const lx = n.px + n.ux * off, ly = n.py + n.uy * off + (side ? -2 : 0);
+      ctx.textAlign = side > 0 ? "left" : side < 0 ? "right" : "center";
+      ctx.fillStyle = "rgba(255, 253, 248, 0.92)";
+      ctx.fillText(n.label, lx + 1, ly + 1);
+      ctx.fillStyle = isSelected ? "#1f1a13" : isHovered ? "#1f1a13" : "rgba(50, 42, 30, 0.88)";
+      ctx.fillText(n.label, lx, ly);
+      if(isSelected && !n.centre){
+        ctx.font = `400 9.5px ${fam}`;
+        ctx.fillStyle = "rgba(70, 60, 44, 0.85)";
+        ctx.fillText(intensityWord(w), lx, ly + (side ? 12 : (n.uy > 0 ? 12 : -12)));
       }
     }
     ctx.restore();
   }
 }
+
+/* A single soft tone per feeling, sounded when it is lit. Lives on its own
+   tiny AudioContext because the session soundscape only wakes on Begin. */
+const Chime = {
+  ctx:null,
+  play(state, weight=INTENSITY_DEFAULT){
+    try{
+      if(!$("#optSound") || !$("#optSound").checked) return;
+      if(!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)();
+      if(this.ctx.state==="suspended") this.ctx.resume();
+      const ctx=this.ctx, t=ctx.currentTime, f0=state.root*2;
+      [[1,1],[2,.35],[3,.12]].forEach(([mul,amp],i)=>{
+        const o=ctx.createOscillator(), g=ctx.createGain();
+        o.type="sine"; o.frequency.value=f0*mul;
+        const dur=2.6/(1+i*.8), v=(.05+.05*weight)*amp;
+        g.gain.setValueAtTime(.0001,t);
+        g.gain.exponentialRampToValueAtTime(v,t+.03);
+        g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+        o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+dur+.05);
+      });
+    }catch(e){}
+  },
+  close(){ try{ if(this.ctx){ this.ctx.close(); this.ctx=null; } }catch(e){} }
+};
 
 /* =====================================================================
    BREATH — the shared spine. Everything visual and sonic reads from here.
@@ -2877,91 +3070,145 @@ const App = {
   rooms:[], room:null, thought:"", anchor:"", syncPct:0, syncN:0, syncSum:0,
 
   /* ---------------- check-in & state blending ---------------- */
-  toggleState(k){
+  weights:{},            // key -> 0..1, how much of each lit feeling is present
+
+  toggleState(k, opts={}){
     if(!STATES[k]) return;
     if(this.selectedStates.has(k)){
       this.selectedStates.delete(k);
+      delete this.weights[k];
     } else {
       this.selectedStates.add(k);
-      if(G.snd && G.snd.ready && G.snd.on){
-        G.snd.drop(1.2, 0.04);
-      }
+      if(this.weights[k] == null) this.weights[k] = INTENSITY_DEFAULT;
+      if(!opts.silentWeight) Chime.play(STATES[k], this.weights[k]);
       if(navigator.vibrate) try{ navigator.vibrate(15); }catch(e){}
     }
+    if(this.emotionGraph) this.emotionGraph.sync();
     this.updateCheckinView();
+  },
+
+  setWeight(k, w, live){
+    if(!this.selectedStates.has(k)) return;
+    const prev = this.weights[k];
+    this.weights[k] = U.clamp(w, 0, 1);
+    if(this.emotionGraph && !live) this.emotionGraph.sync();
+    if(!live && intensityWord(prev) !== intensityWord(this.weights[k])){
+      if(navigator.vibrate) try{ navigator.vibrate(8); }catch(e){}
+    }
+    this.updateCheckinView(live);
+  },
+
+  cycleWeight(k){
+    if(!this.selectedStates.has(k)) return;
+    const w = this.weights[k] ?? INTENSITY_DEFAULT;
+    const steps = [0.12, 0.35, 0.62, 0.82, 1.0];
+    const i = steps.findIndex(s => s > w + 0.04);
+    this.setWeight(k, i < 0 ? steps[0] : steps[i], false);
   },
 
   clearStates(){
     this.selectedStates.clear();
+    this.weights = {};
+    if(this.emotionGraph) this.emotionGraph.sync();
     this.updateCheckinView();
   },
 
+  /* Ordered by how much is present, then by arousal (the hotter one leads). */
+  orderedKeys(){
+    return Array.from(this.selectedStates).sort((a, b) => {
+      const wa = this.weights[a] ?? INTENSITY_DEFAULT, wb = this.weights[b] ?? INTENSITY_DEFAULT;
+      if(Math.abs(wa - wb) > 0.04) return wb - wa;
+      return STATES[b].arousal - STATES[a].arousal;
+    });
+  },
+
   getBlendedState(){
-    const keys = Array.from(this.selectedStates);
+    const keys = this.orderedKeys();
     if(keys.length === 0) return STATES.wired;
-    if(keys.length === 1) return STATES[keys[0]];
+    const ws = keys.map(k => 0.15 + 0.85 * (this.weights[k] ?? INTENSITY_DEFAULT));
+    if(keys.length === 1) return { ...STATES[keys[0]], keys, weights: ws, labelFull: STATES[keys[0]].label };
 
     const items = keys.map(k => STATES[k]);
-    const n = items.length;
+    const n = items.length, wsum = ws.reduce((a, b) => a + b, 0);
+    const wavg = f => items.reduce((s, it, i) => s + f(it) * ws[i], 0) / wsum;
 
-    const maxA = Math.max(...items.map(s => s.arousal));
-    const avgA = items.reduce((sum, s) => sum + s.arousal, 0) / n;
-    const arousal = avgA * 0.6 + maxA * 0.4;
+    // Arousal: weighted mean pulled toward the strongest lit feeling, so a
+    // trace of "wired" under a lot of "heavy" still reads mostly heavy.
+    const avgA = wavg(s => s.arousal);
+    const maxA = Math.max(...items.map((s, i) => s.arousal * (0.55 + 0.45 * this.weights[keys[i]])));
+    const arousal = U.clamp(avgA * 0.65 + maxA * 0.35, 0, 1);
 
-    const dominant = items.slice().sort((a, b) => b.arousal - a.arousal)[0];
+    const dominant = items[0];
     const storm = dominant.storm;
-
     const label = items.map(s => s.label.split(" / ")[0]).join(" & ");
+    const labelFull = items.map((s, i) => s.label.split(" / ")[0].toLowerCase() + (keys[i] === "neutral" ? "" : " (" + intensityWord(this.weights[keys[i]]) + ")")).join(", ").replace(/, ([^,]*)$/, " and $1");
     const desc = items.map(s => s.desc).join(" · ");
     const swatch = dominant.swatch;
-    const root = items.reduce((sum, s) => sum + s.root, 0) / n;
-    const noiseHue = items.reduce((sum, s) => sum + s.noiseHue, 0) / n;
+    const root = wavg(s => s.root);
+    const noiseHue = wavg(s => s.noiseHue);
+    const pal = key => items[0][key].map((_, si) => U.blendHsl(items.map(it => it[key][si]), ws));
 
     return {
-      key: dominant.key,
-      keys,
-      label,
-      desc,
-      swatch,
-      arousal,
-      storm,
-      skyA: items[0].skyA,
-      skyB: dominant.skyB,
-      water: items[0].water,
-      waterB: dominant.waterB,
-      root,
-      mode: dominant.mode,
-      noiseHue
+      key: dominant.key, keys, weights: ws, label, labelFull, desc, swatch, arousal, storm,
+      skyA: pal("skyA"), skyB: pal("skyB"), water: pal("water"), waterB: pal("waterB"),
+      root, mode: dominant.mode, noiseHue
     };
   },
 
-  updateCheckinView(){
-    const keys = Array.from(this.selectedStates);
+  /* One sentence for a blend, built from each feeling's weather image. */
+  blendLine(keys, which){
+    if(keys.length === 1) return STATE_LINES[keys[0]][which];
+    const bright = keys.every(k => STATES[k].sector === "east");
+    const tpl = BLEND_LINES[bright ? "bright" : "mixed"][which];
+    const w = keys.map(k => STATE_WEATHER[k]);
+    const a = which === 0 ? w[0].in : w[0].out;
+    const rest = w.slice(1).map(x => which === 0 ? x.in : x.out);
+    const b = rest.length === 1 ? rest[0] : rest.slice(0, -1).join(", ") + " and " + rest[rest.length - 1];
+    const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+    return tpl.replace("{A}", cap(a)).replace("{a}", a).replace("{b}", b);
+  },
+
+  updateCheckinView(live){
+    const keys = this.orderedKeys();
     const tagsEl = $("#selectedTags");
     const descEl = $("#blendDesc");
     const beginBtn = $("#beginBtn");
     const chipBox = $("#quickChips");
+    const wheelBox = $("#wheelBox");
 
-    // 1. Badges
+    const card = $("#blendCard"), lede = $("#arriveLede");
+    if(card) card.classList.toggle("hide", keys.length === 0);
+    if(lede && !live) lede.textContent = keys.length === 0
+      ? "Touch the part of the wheel that feels closest."
+      : "Name it first — putting a feeling into words lowers its charge. Pull a lit point toward the rim if there's a lot of it.";
+
+    // 1. Badges — one per lit feeling, with how much of it is present
     if(tagsEl){
       if(keys.length === 0){
-        tagsEl.innerHTML = `<span class="tiny" style="color:#8a7b68">No feelings selected. Tap nodes on the wheel above.</span>`;
+        tagsEl.innerHTML = `<span class="tiny" style="color:#8a7b68">Nothing lit yet. Tap a point on the wheel — more than one is fine.</span>`;
       } else {
-        tagsEl.innerHTML = keys.map(k => {
-          const s = STATES[k];
-          return `<span class="tag-badge" style="border-color:${s.swatch}88">
-            <span class="sw-dot" style="background:${s.swatch};color:${s.swatch}"></span>
-            ${s.label.split(" / ")[0]}
-            <button class="rem-btn" data-rem="${k}" aria-label="Remove ${s.label}" title="Remove">✕</button>
-          </span>`;
-        }).join("");
+        const sig = keys.map(k => k + ":" + intensityWord(this.weights[k])).join("|");
+        if(tagsEl.dataset.sig !== sig){
+          tagsEl.dataset.sig = sig;
+          tagsEl.innerHTML = keys.map(k => {
+            const s = STATES[k], w = this.weights[k] ?? INTENSITY_DEFAULT;
+            return `<span class="tag-badge" style="border-color:${s.swatch}aa; background:${s.swatch}22">
+              <span class="sw-dot" style="background:${s.swatch};color:${s.swatch}"></span>
+              <span class="tag-name">${s.label.split(" / ")[0]}</span>
+              ${k === "neutral" ? "" : `<button class="tag-int" data-cyc="${k}" title="Change how much of this is present" aria-label="${s.label}: ${intensityWord(w)}. Click to change.">
+                <i class="bar"><b style="width:${Math.round(w*100)}%;background:${s.swatch}"></b></i>${intensityWord(w)}
+              </button>`}
+              <button class="rem-btn" data-rem="${k}" aria-label="Remove ${s.label}" title="Remove">✕</button>
+            </span>`;
+          }).join("");
+        }
       }
     }
 
-    // 2. Visceral Description & Compound Promise
-    if(descEl){
+    // 2. Description
+    if(descEl && !live){
       if(keys.length === 0){
-        descEl.innerHTML = "Glide across the wheel or tap nodes to locate what is present for you right now.";
+        descEl.innerHTML = "Glide across the wheel, or tap whatever is closest to true. Nothing to get right.";
       } else if(keys.length === 1){
         const s = STATES[keys[0]];
         descEl.innerHTML = `<b>${s.label}</b> — ${s.desc}.`;
@@ -2970,49 +3217,59 @@ const App = {
         descEl.innerHTML = `<b>${items.map(s => s.label.split(" / ")[0]).join(" + ")}</b> — ${items.map(s => s.desc).join("; ")}.`;
       }
     }
+    const hintEl = $("#blendHint");
+    if(hintEl && !live){
+      hintEl.textContent = keys.length === 1 ? "Outward for more of it, inward for less. Light others if they're here too."
+        : "Outward for more, inward for less. The strongest one leads.";
+    }
 
-    // 3. SUDS default and Begin button
+    // 3. Wheel tint, SUDS suggestion and Begin line
     if(keys.length > 0){
       const blended = this.getBlendedState();
-      this.stateKey = blended.keys ? blended.keys[0] : blended.key;
-      $("#suds").value = Math.round(U.lerp(4, 9, blended.arousal));
-      $("#sudsVal").textContent = $("#suds").value;
-
-      if(keys.length === 1){
-        $("#beginHint").textContent = STATE_LINES[keys[0]][0];
-      } else {
-        $("#beginHint").textContent = `We'll start with ${keys.map(k => STATES[k].label.split(" / ")[0].toLowerCase()).join(" & ")} and de-escalate together.`;
+      this.stateKey = keys[0];
+      if(wheelBox) wheelBox.style.setProperty("--tint", blended.swatch);
+      if(!this._sudsTouched){
+        $("#suds").value = Math.round(U.lerp(4, 9, blended.arousal));
+        $("#sudsVal").textContent = $("#suds").value;
       }
+      if(!live) $("#beginHint").textContent = this.blendLine(keys, 0);
       if(beginBtn){ beginBtn.disabled = false; beginBtn.textContent = "Begin"; }
     } else {
-      $("#beginHint").textContent = "Select at least one feeling on the wheel.";
+      if(wheelBox) wheelBox.style.removeProperty("--tint");
+      $("#beginHint").textContent = "Light at least one feeling on the wheel.";
       if(beginBtn){ beginBtn.disabled = true; beginBtn.textContent = "Pick a feeling"; }
     }
 
     // 4. Quick chips state
-    if(chipBox){
-      [...chipBox.children].forEach(c => {
-        const k = c.dataset.k;
-        c.setAttribute("aria-pressed", this.selectedStates.has(k));
-      });
+    if(chipBox && !live){
+      [...chipBox.children].forEach(c => c.setAttribute("aria-pressed", this.selectedStates.has(c.dataset.k)));
     }
   },
 
   initCheckin(){
-    this.selectedStates = new Set([this.stateKey || "wired"]);
+    // Nothing is lit at first: the wheel asks, it doesn't assume.
+    this.selectedStates = new Set();
+    this.weights = {};
 
     // Initialize EmotionGraph on canvas
     const cv = $("#emotionCanvas");
     if(cv){
+      cv.setAttribute("tabindex", "0");
+      cv.setAttribute("role", "application");
+      cv.setAttribute("aria-label", "Feeling wheel. Use arrow keys to move between feelings, Enter to light one, plus and minus to change how much of it is present.");
       this.emotionGraph = new EmotionGraph(
         cv,
-        (key) => this.toggleState(key),
+        (key, opts) => this.toggleState(key, opts),
         (hoverKey) => {
-          if(hoverKey && this.selectedStates.size === 0){
+          const el = $("#blendDesc");
+          if(hoverKey){
             const s = STATES[hoverKey];
-            $("#blendDesc").innerHTML = `<b>${s.label}</b> — ${s.desc}.`;
+            el.innerHTML = `<b>${s.label}</b> — ${s.desc}.`;
+          } else {
+            this.updateCheckinView();
           }
-        }
+        },
+        (key, w, live) => this.setWeight(key, w, live)
       );
     }
 
@@ -3030,6 +3287,12 @@ const App = {
       });
     }
 
+    const lt = $("#listToggle");
+    if(lt) lt.addEventListener("click", () => {
+      const open = chipBox.classList.toggle("hide");
+      lt.textContent = open ? "Prefer a list?" : "Hide the list";
+    });
+
     // Clear and Confirm buttons
     const clearBtn = $("#clearFeelingsBtn");
     if(clearBtn) clearBtn.addEventListener("click", () => this.clearStates());
@@ -3039,7 +3302,7 @@ const App = {
       if(this.selectedStates.size === 0){
         this.toggleState("wired");
       }
-      this.toast("Arrival feelings mapped. Ready to begin.");
+      this.toast("Noted. That's where we'll start.");
       const sudsEl = $("#suds");
       if(sudsEl) sudsEl.focus();
     });
@@ -3048,6 +3311,8 @@ const App = {
     const tagsEl = $("#selectedTags");
     if(tagsEl){
       tagsEl.addEventListener("click", e => {
+        const cyc = e.target.closest("[data-cyc]");
+        if(cyc){ this.cycleWeight(cyc.dataset.cyc); return; }
         const rem = e.target.closest("[data-rem]");
         if(!rem) return;
         this.toggleState(rem.dataset.rem);
@@ -3063,7 +3328,7 @@ const App = {
     });
     $("#optMic").addEventListener("change", e=>this.toggleSensor("mic", e.target));
     $("#optCam").addEventListener("change", e=>this.toggleSensor("cam", e.target));
-    $("#suds").addEventListener("input", e=>$("#sudsVal").textContent=e.target.value);
+    $("#suds").addEventListener("input", e=>{ $("#sudsVal").textContent=e.target.value; this._sudsTouched=true; });
     $("#suds2").addEventListener("input", e=>{ $("#suds2Val").textContent=e.target.value; this._suds2Touched=true; this.updateDelta(); });
     $("#beginBtn").addEventListener("click", ()=>this.begin());
     $("#againBtn").addEventListener("click", ()=>location.reload());
@@ -3076,6 +3341,8 @@ const App = {
     if(params.get("state") && STATES[params.get("state")]) {
       this.stateKey = params.get("state");
       this.selectedStates = new Set([this.stateKey]);
+      this.weights = {}; this.weights[this.stateKey] = INTENSITY_DEFAULT;
+      if(this.emotionGraph) this.emotionGraph.sync();
     }
     if(params.get("simple")) $("#optSimple").checked = true;
 
@@ -3166,6 +3433,7 @@ const App = {
     const wantMic=$("#optMic").checked, wantCam=$("#optCam").checked, wantSnd=$("#optSound").checked;
     this.simple = $("#optSimple").checked;
     this.stopPreview();
+    Chime.close();
     if(this.emotionGraph) this.emotionGraph.active = false;
 
     if(wantMic||wantCam){
@@ -3523,14 +3791,10 @@ const App = {
     
     // Title reflects single or blended state
     const keys = G.st.keys || [this.stateKey];
-    if(keys.length === 1){
-      $("#closeTitle").textContent = STATE_LINES[keys[0]][1];
-    } else {
-      $("#closeTitle").textContent = "You brought it down. The storm moved, and the ground held.";
-    }
+    $("#closeTitle").textContent = this.blendLine(keys, 1);
 
     // the report repeats the check-in's own words, so before/after read as one pair
-    const arrivedLabel = G.st.label ? G.st.label.toLowerCase() : STATES[this.stateKey].label.toLowerCase();
+    const arrivedLabel = G.st.labelFull ? G.st.labelFull.toLowerCase() : STATES[this.stateKey].label.toLowerCase();
     const arrivedEl=$("#arrivedAs"); if(arrivedEl) arrivedEl.innerHTML = `You arrived <b>${arrivedLabel}</b>, at <b>${this.suds} / 10</b>.`;
     this.buildReframes();
     this.buildGoals();
@@ -3563,7 +3827,8 @@ const App = {
       sad:["Sadness is something passing through me, not something I have to hurry.","I can be tender with this. It doesn't need fixing today."],
       hopeful:["I can protect this feeling without gripping it.","Small and real is how things actually grow."],
       joyful:["I'm allowed to be this open. I don't have to earn it.","Slow doesn't take the joy away. It lets me feel it."],
-      excited:["I can be lit up and still be steady.","The energy is mine. It can wait for me to decide where it goes."]
+      excited:["I can be lit up and still be steady.","The energy is mine. It can wait for me to decide where it goes."],
+      neutral:["Okay is allowed to be enough.","I don't need a crisis to deserve a pause."]
     };
     
     const keys = G.st.keys || [this.stateKey];
@@ -3616,7 +3881,7 @@ const App = {
     const b=G.breath;
     const txt=[
       "Slow Light — session notes",
-      "Arrived as: "+STATES[this.stateKey].label+"  ·  grip "+this.suds+"/10",
+      "Arrived as: "+((G.st&&G.st.labelFull)||STATES[this.stateKey].label)+"  ·  grip "+this.suds+"/10",
       "Left at: "+$("#suds2").value+"/10",
       "Breathing: "+b.startRate.toFixed(1)+" → "+b.rate.toFixed(1)+" breaths/min over "+b.cycles+" cycles",
       this.thought? "Thought set down: "+this.thought : "",
