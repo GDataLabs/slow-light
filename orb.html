@@ -24,11 +24,20 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block}
 #caption{
   position:fixed; left:50%; bottom:clamp(120px, 22vh, 220px); transform:translateX(-50%);
   width:min(92vw, 640px); text-align:center; pointer-events:none; z-index:5;
-  font-family:var(--font-display); font-weight:350; font-size:clamp(20px,3.4vw,28px);
-  line-height:1.45; color:rgba(233,242,245,.94); text-shadow:0 2px 26px rgba(0,0,0,.75);
-  opacity:0; transition:opacity 1.1s ease;
+  font-family:var(--font-display); font-weight:340; font-size:clamp(20px,3.4vw,28px);
+  letter-spacing:.015em; line-height:1.5; color:rgba(236,244,246,.95);
+  text-shadow:0 0 30px rgba(159,232,216,.28), 0 0 8px rgba(159,232,216,.14), 0 2px 26px rgba(0,0,0,.75);
 }
-#caption.on{opacity:1}
+/* each word condenses out of smoke: blurred, drifting, translucent → still */
+#caption .w{
+  display:inline-block; opacity:0; filter:blur(12px);
+  transform:translateY(10px) scale(1.06);
+  transition:opacity 1.5s ease, filter 1.5s ease, transform 1.5s ease;
+}
+#caption.on .w{opacity:1; filter:blur(0); transform:none}
+@media (prefers-reduced-motion: reduce){
+  #caption .w{filter:none; transform:none; transition:opacity .8s ease}
+}
 #subcap{
   position:fixed; left:50%; bottom:clamp(96px,18.5vh,190px); transform:translateX(-50%);
   width:min(92vw,560px); text-align:center; pointer-events:none; z-index:5;
@@ -92,6 +101,30 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block}
 .panel a{color:var(--accent)}
 #helpVeil .note{border-color:rgba(127,212,193,.35); background:rgba(127,212,193,.07); color:#d7efe7}
 #helpVeil .note a{color:#aef0dd}
+
+/* ---------- voice settings ---------- */
+#gearBtn{
+  position:fixed; top:calc(14px + env(safe-area-inset-top)); right:16px; z-index:21;
+  width:42px; height:42px; border-radius:50%; border:1px solid rgba(160,190,215,.22);
+  background:rgba(10,18,26,.6); color:rgba(233,242,245,.55); font-size:17px; cursor:pointer;
+  backdrop-filter:blur(8px); transition:all .3s;
+}
+#gearBtn:hover{color:var(--ink); border-color:rgba(127,212,193,.5)}
+.field{display:flex; flex-direction:column; gap:5px; margin:0 0 14px}
+.field label{font-size:12.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint)}
+.field input[type=password], .field input[type=text], .field select{
+  background:rgba(10,18,26,.75); border:1px solid rgba(160,190,215,.25); border-radius:12px;
+  color:var(--ink); padding:12px 15px; font-family:inherit; font-size:15px;
+}
+.field input:focus, .field select:focus{outline:none; border-color:rgba(127,212,193,.55)}
+.vchoice{display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px}
+.vchoice button{
+  border:1px solid rgba(160,190,215,.25); background:rgba(10,18,26,.6); color:var(--ink-dim);
+  border-radius:999px; padding:10px 20px; font-family:inherit; font-size:14.5px; cursor:pointer; transition:all .3s;
+}
+.vchoice button[aria-pressed="true"]{border-color:rgba(127,212,193,.6); background:rgba(127,212,193,.14); color:#c9f2e6}
+#voxStatus{font-size:13.5px; color:var(--ink-faint); min-height:20px; margin:4px 0 10px}
+#voxStatus.ok{color:#9fd8a8} #voxStatus.bad{color:#f0b27a}
 </style>
 </head>
 <body>
@@ -125,7 +158,48 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block}
     </div>
     <p><button class="obtn primary" id="beginBtn" style="font-size:17px; padding:15px 34px">I understand — begin</button>
        <a class="obtn" href="index.html" style="text-decoration:none; margin-left:6px">Back to Slow Light</a></p>
-    <p class="tiny">Voice is optional; the mic is used only if you tap it, only while it pulses, and audio is processed by your browser's own speech service. Motion here is slow and there is no strobing. Your device's reduce-motion setting is respected.</p>
+    <p class="tiny">Voice is optional; the mic is used only if you tap it, only while it pulses, and audio is processed by your browser's own speech service. If you switch the orb's voice to ElevenLabs in settings (⚙, top right), only the orb's own lines are sent there to be spoken — nothing you say or type ever is. Motion here is slow and there is no strobing. Your device's reduce-motion setting is respected.</p>
+  </div>
+</div>
+
+<button id="gearBtn" title="Voice settings" aria-label="Voice settings">⚙</button>
+
+<!-- ---------- voice settings overlay ---------- -->
+<div class="veil hide" id="voxVeil">
+  <div class="panel">
+    <h2>The orb's voice</h2>
+    <p>The built-in browser voice works everywhere but varies by device. If you have an ElevenLabs account, the orb can borrow one of its voices instead.</p>
+    <div class="vchoice" role="radiogroup" aria-label="Voice engine">
+      <button id="vBrowser" aria-pressed="true">Browser voice</button>
+      <button id="vEleven" aria-pressed="false">ElevenLabs</button>
+    </div>
+    <div id="elFields" style="display:none">
+      <div class="field">
+        <label for="elKey">ElevenLabs API key</label>
+        <input type="password" id="elKey" autocomplete="off" placeholder="sk_…">
+      </div>
+      <div class="field">
+        <label for="elVoice">Voice</label>
+        <select id="elVoice">
+          <option value="EXAVITQu4vr4xnSDxMaL">Sarah — soft, low, steady</option>
+          <option value="pFZP5JQG7iQjIQuC4Bku">Lily — warm, velvety</option>
+          <option value="XrExE9yKIg1WjnnlVkGX">Matilda — warm, friendly</option>
+          <option value="JBFqnCBsd6RMkjVDRZzb">George — warm, unhurried</option>
+          <option value="custom">A voice of my own (paste its ID)</option>
+        </select>
+      </div>
+      <div class="field" id="elCustomWrap" style="display:none">
+        <label for="elCustom">Voice ID</label>
+        <input type="text" id="elCustom" autocomplete="off" placeholder="e.g. 21m00Tcm4TlvDq8ikWAM">
+      </div>
+      <p class="tiny">The key stays in this browser only — it is never shown to anyone or sent anywhere except directly to ElevenLabs. Only the orb's own lines are sent there to be spoken; nothing you say or type ever is. Spoken lines are cached on this device so repeat lines don't spend credits. If ElevenLabs can't be reached, the orb falls back to the browser voice mid-session rather than going silent.</p>
+    </div>
+    <div id="voxStatus"></div>
+    <p style="margin-top:6px">
+      <button class="obtn primary" id="voxSave">Save</button>
+      <button class="obtn" id="voxTest">Hear a line</button>
+      <button class="obtn" id="voxClose">Close</button>
+    </p>
   </div>
 </div>
 
@@ -191,20 +265,110 @@ function readMood(text){
 }
 
 /* ------------------------- speech ---------------------------------- */
-const Voice = {
-  on:true, v:null,
+/* Two engines behind one door: the browser's own voice (default), or an
+   ElevenLabs voice the person configures in ⚙ — key kept only in this
+   browser, only the orb's lines ever sent, replies cached on-device.   */
+const VoiceCfg = {
+  load(){ try{ return JSON.parse(localStorage.getItem("slowlight.voice")||"null")||{engine:"browser"}; }catch(e){ return {engine:"browser"}; } },
+  save(c){ try{ localStorage.setItem("slowlight.voice", JSON.stringify(c)); }catch(e){} }
+};
+
+/* tiny on-device audio cache so repeated lines cost no credits */
+const TTSCache = {
+  mem:new Map(), db:null,
   init(){
-    if(!("speechSynthesis" in window)){ this.on=false; return; }
+    try{
+      const req=indexedDB.open("slowlight-tts",1);
+      req.onupgradeneeded=()=>req.result.createObjectStore("clips");
+      req.onsuccess=()=>{ this.db=req.result; };
+    }catch(e){}
+  },
+  get(key){
+    if(this.mem.has(key)) return Promise.resolve(this.mem.get(key));
+    return new Promise(res=>{
+      if(!this.db) return res(null);
+      try{
+        const r=this.db.transaction("clips").objectStore("clips").get(key);
+        r.onsuccess=()=>res(r.result||null); r.onerror=()=>res(null);
+      }catch(e){ res(null); }
+    });
+  },
+  put(key, blob){
+    this.mem.set(key, blob);
+    try{ this.db && this.db.transaction("clips","readwrite").objectStore("clips").put(blob, key); }catch(e){}
+  }
+};
+TTSCache.init();
+
+const Eleven = {
+  audio:null, useSpeed:true,
+  key(cfg){ return (cfg.key||"").trim(); },
+  voiceId(cfg){ return (cfg.voice==="custom"? cfg.customVoice : cfg.voice)||""; },
+  async hash(s){
+    try{
+      const b=await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+      return [...new Uint8Array(b)].slice(0,16).map(x=>x.toString(16).padStart(2,"0")).join("");
+    }catch(e){ let h=0; for(const ch of s) h=(h*31+ch.charCodeAt(0))|0; return "h"+(h>>>0).toString(16); }
+  },
+  async fetchClip(cfg, text){
+    const vid=this.voiceId(cfg);
+    const url=`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(vid)}?output_format=mp3_44100_128`;
+    const body=(withSpeed)=>{
+      const vs={stability:.55, similarity_boost:.8, style:.2};
+      if(withSpeed) vs.speed=.87;                      // unhurried; retried without if the model refuses it
+      return JSON.stringify({text, model_id:"eleven_turbo_v2_5", voice_settings:vs});
+    };
+    let r=await fetch(url,{method:"POST",headers:{"xi-api-key":this.key(cfg),"Content-Type":"application/json"},body:body(this.useSpeed)});
+    if(!r.ok && this.useSpeed && (r.status===400||r.status===422)){
+      this.useSpeed=false;
+      r=await fetch(url,{method:"POST",headers:{"xi-api-key":this.key(cfg),"Content-Type":"application/json"},body:body(false)});
+    }
+    if(!r.ok) throw new Error("elevenlabs "+r.status);
+    return await r.blob();
+  },
+  async say(cfg, text){
+    const k=await this.hash(this.voiceId(cfg)+"|"+(this.useSpeed?"s":"n")+"|"+text);
+    let blob=await TTSCache.get(k);
+    if(!blob){ blob=await this.fetchClip(cfg, text); TTSCache.put(k, blob); }
+    await this.play(blob);
+  },
+  play(blob){
+    return new Promise(res=>{
+      try{
+        this.stop();
+        const url=URL.createObjectURL(blob);
+        const a=this.audio=new Audio(url);
+        a.onended=()=>{ URL.revokeObjectURL(url); res(); };
+        a.onerror=()=>{ URL.revokeObjectURL(url); res(); };
+        a.play().catch(()=>res());
+        setTimeout(res, 45000);                         // never hang the flow
+      }catch(e){ res(); }
+    });
+  },
+  stop(){ try{ if(this.audio){ this.audio.pause(); this.audio=null; } }catch(e){} }
+};
+
+const Voice = {
+  on:true, v:null, cfg:VoiceCfg.load(), elFailed:false,
+  init(){
+    if(!("speechSynthesis" in window)){ this.on = this.cfg.engine==="eleven"; }
     const load=()=>{
       const vs=speechSynthesis.getVoices();
       this.v = vs.find(v=>/samantha|serena|moira|karen|google uk english female|google us english/i.test(v.name))
             || vs.find(v=>v.lang.startsWith("en")) || vs[0] || null;
     };
-    load(); speechSynthesis.onvoiceschanged=load;
+    if("speechSynthesis" in window){ load(); speechSynthesis.onvoiceschanged=load; }
   },
-  say(text){
+  async say(text){
+    if(this.cfg.engine==="eleven" && Eleven.key(this.cfg) && Eleven.voiceId(this.cfg) && !this.elFailed){
+      try{ await Eleven.say(this.cfg, text); return; }
+      catch(e){ this.elFailed=true; /* fall through to browser voice, never silence */ }
+    }
+    await this.browserSay(text);
+  },
+  browserSay(text){
     return new Promise(res=>{
-      if(!this.on || !("speechSynthesis" in window)){ setTimeout(res, Math.max(1400, text.length*55)); return; }
+      if(!("speechSynthesis" in window)){ setTimeout(res, Math.max(1400, text.length*55)); return; }
       try{
         speechSynthesis.cancel();
         const u=new SpeechSynthesisUtterance(text);
@@ -216,7 +380,7 @@ const Voice = {
       }catch(e){ setTimeout(res, Math.max(1400, text.length*55)); }
     });
   },
-  stop(){ try{ speechSynthesis.cancel(); }catch(e){} }
+  stop(){ try{ speechSynthesis.cancel(); }catch(e){} Eleven.stop(); }
 };
 
 const Ears = {
@@ -253,24 +417,44 @@ function initWorld(){
   const camera=new THREE.PerspectiveCamera(58, innerWidth/innerHeight, .1, 400);
   camera.position.set(0, 0, 7.5);
 
-  /* the orb */
+  /* the orb — drawn by a shader, not by geometry, so its edge is a soft
+     gradient at any size and any zoom: a bright breathing centre easing
+     into a haze, with no visible facets. */
   const orbGroup=new THREE.Group();
-  const core=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(1, 4),
-    new THREE.MeshStandardMaterial({color:0x9fe8d8, emissive:0x7fd4c1, emissiveIntensity:1.35, roughness:.32, metalness:.05, transparent:true, opacity:.96})
-  );
-  const shell=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(1.18, 3),
-    new THREE.MeshBasicMaterial({color:0x7fd4c1, transparent:true, opacity:.10, blending:THREE.AdditiveBlending, depthWrite:false})
-  );
-  const glowTex=(()=>{ const c=document.createElement("canvas"); c.width=c.height=256; const g=c.getContext("2d");
-    const gr=g.createRadialGradient(128,128,0,128,128,128);
-    gr.addColorStop(0,"rgba(190,255,236,.85)"); gr.addColorStop(.35,"rgba(127,212,193,.32)"); gr.addColorStop(1,"rgba(127,212,193,0)");
-    g.fillStyle=gr; g.fillRect(0,0,256,256); return new THREE.CanvasTexture(c); })();
-  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, transparent:true, opacity:.9, blending:THREE.AdditiveBlending, depthWrite:false}));
-  glow.scale.set(6,6,1);
+  const orbMat=new THREE.ShaderMaterial({
+    uniforms:{ uColor:{value:new THREE.Color(0x7fd4c1)}, uIntensity:{value:1.3} },
+    vertexShader:`
+      varying vec3 vN; varying vec3 vV;
+      void main(){
+        vN=normalize(normalMatrix*normal);
+        vec4 mv=modelViewMatrix*vec4(position,1.0);
+        vV=normalize(-mv.xyz);
+        gl_Position=projectionMatrix*mv;
+      }`,
+    fragmentShader:`
+      uniform vec3 uColor; uniform float uIntensity;
+      varying vec3 vN; varying vec3 vV;
+      void main(){
+        float f=max(dot(normalize(vN),normalize(vV)),0.0);   // 1 centre → 0 rim
+        float body=smoothstep(0.12,0.55,f);                  // soft, wide falloff at the rim
+        float heart=pow(f,3.0);                              // luminous centre
+        vec3 col=mix(uColor, vec3(1.0,1.0,0.98), heart*0.7)*uIntensity;
+        gl_FragColor=vec4(col, body*0.97);
+      }`,
+    transparent:true, depthWrite:false
+  });
+  const core=new THREE.Mesh(new THREE.SphereGeometry(1, 96, 96), orbMat);
+  const glowTex=(()=>{ const c=document.createElement("canvas"); c.width=c.height=512; const g=c.getContext("2d");
+    const gr=g.createRadialGradient(256,256,0,256,256,256);
+    gr.addColorStop(0,"rgba(190,255,236,.8)"); gr.addColorStop(.28,"rgba(127,212,193,.34)");
+    gr.addColorStop(.62,"rgba(127,212,193,.09)"); gr.addColorStop(1,"rgba(127,212,193,0)");
+    g.fillStyle=gr; g.fillRect(0,0,512,512); return new THREE.CanvasTexture(c); })();
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, transparent:true, opacity:.85, blending:THREE.AdditiveBlending, depthWrite:false}));
+  glow.scale.set(7,7,1);
+  const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, transparent:true, opacity:.28, blending:THREE.AdditiveBlending, depthWrite:false}));
+  halo.scale.set(13,13,1);
   const light=new THREE.PointLight(0x9fe8d8, 1.6, 60, 1.8);
-  orbGroup.add(core, shell, glow, light);
+  orbGroup.add(core, glow, halo, light);
   scene.add(orbGroup);
   scene.add(new THREE.AmbientLight(0x33465a, .5));
 
@@ -279,10 +463,10 @@ function initWorld(){
   const N=REDUCED? 300 : 900, pos=new Float32Array(N*3);
   for(let i=0;i<N;i++){ pos[i*3]=(R()-.5)*160; pos[i*3+1]=(R()-.5)*90; pos[i*3+2]=-20-R()*160; }
   starGeo.setAttribute("position", new THREE.BufferAttribute(pos,3));
-  const stars=new THREE.Points(starGeo, new THREE.PointsMaterial({color:0x8fb8c9, size:.24, transparent:true, opacity:.6, depthWrite:false}));
+  const stars=new THREE.Points(starGeo, new THREE.PointsMaterial({color:0x8fb8c9, size:.24, transparent:true, opacity:.55, depthWrite:false, blending:THREE.AdditiveBlending}));
   scene.add(stars);
 
-  T={renderer, scene, camera, orbGroup, core, shell, glow, light, stars, sceneObjs:[], drift:[], glows:[], t:0,
+  T={renderer, scene, camera, orbGroup, core, orbMat, glow, halo, light, stars, sceneObjs:[], drift:[], glows:[], t:0,
      orbTarget:new THREE.Vector3(0,0,0), camTarget:new THREE.Vector3(0,0,7.5), hue:new THREE.Color(0x7fd4c1)};
   const resize=()=>{ renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); };
   addEventListener("resize", resize); resize();
@@ -305,10 +489,12 @@ function tick(){
   breathPhase=(breathPhase+dt/10)%1;
   const b=.5-.5*Math.cos(breathPhase*Math.PI*2);
   const s=lerp(.86,1.14,b);
-  T.core.scale.setScalar(s); T.shell.scale.setScalar(s*1.02);
-  T.glow.scale.setScalar(6*lerp(.9,1.18,b));
+  T.core.scale.setScalar(s);
+  T.glow.scale.setScalar(7*lerp(.9,1.18,b));
+  T.halo.scale.setScalar(13*lerp(.94,1.1,b));
+  T.halo.material.opacity=lerp(.2,.34,b);
   T.light.intensity=lerp(1.15,2.0,b);
-  T.core.material.emissiveIntensity=lerp(1.0,1.7,b);
+  T.orbMat.uniforms.uIntensity.value=lerp(1.05,1.55,b);
   if(!REDUCED){
     T.orbGroup.position.y=T.orbTarget.y+Math.sin(T.t*.5)*.14;
     T.orbGroup.position.x=lerp(T.orbGroup.position.x,T.orbTarget.x,.02);
@@ -337,7 +523,7 @@ function tintOrb(hex){
   // clamp saturation/lightness into calm range
   const hsl={}; c.getHSL(hsl);
   c.setHSL(hsl.h, clamp(hsl.s,.25,.55), clamp(hsl.l,.55,.72));
-  T.core.material.emissive=c; T.glow.material.color=c; T.light.color=c; T.shell.material.color=c;
+  T.orbMat.uniforms.uColor.value=c; T.glow.material.color=c; T.halo.material.color=c; T.light.color=c;
 }
 
 /* ----------------------- scene presets ----------------------------- */
@@ -459,9 +645,15 @@ const SCENES={ underwater:{build:buildUnderwater, name:"deep water", line:"Somew
 /* ----------------------- dialogue engine --------------------------- */
 const Cap={
   async show(text, sub){
-    const c=$("#caption"); c.classList.remove("on");
-    await new Promise(r=>setTimeout(r,350));
-    c.textContent=text; c.classList.add("on");
+    const c=$("#caption");
+    // let the last line dissolve back into smoke before the next condenses
+    if(c.classList.contains("on")){ c.classList.remove("on"); await new Promise(r=>setTimeout(r,650)); }
+    c.setAttribute("aria-label", text);
+    c.innerHTML = text.split(/\s+/).map((w,i)=>
+      `<span class="w" style="transition-delay:${Math.min(i*110,1400)}ms">${w.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</span>`
+    ).join(" ");
+    void c.offsetWidth;                       // reflow so the stagger starts clean
+    c.classList.add("on");
     const sc=$("#subcap");
     if(sub){ sc.textContent=sub; sc.classList.add("on"); } else sc.classList.remove("on");
     await Voice.say(text);
@@ -711,6 +903,54 @@ function showExit(){
     <a class="obtn" style="text-decoration:none" href="history.html">How it's been going</a>`;
   document.body.appendChild(bar);
 }
+
+/* ----------------------- voice settings ---------------------------- */
+(function(){
+  const veil=$("#voxVeil"), status=$("#voxStatus");
+  const setEngineUI=engine=>{
+    $("#vBrowser").setAttribute("aria-pressed", engine==="browser");
+    $("#vEleven").setAttribute("aria-pressed", engine==="eleven");
+    $("#elFields").style.display = engine==="eleven"? "" : "none";
+  };
+  const formCfg=()=>({
+    engine: $("#vEleven").getAttribute("aria-pressed")==="true"? "eleven":"browser",
+    key: $("#elKey").value.trim(),
+    voice: $("#elVoice").value,
+    customVoice: $("#elCustom").value.trim()
+  });
+  const paint=()=>{
+    const c=Voice.cfg;
+    setEngineUI(c.engine||"browser");
+    $("#elKey").value=c.key||"";
+    $("#elVoice").value=c.voice||"EXAVITQu4vr4xnSDxMaL";
+    $("#elCustom").value=c.customVoice||"";
+    $("#elCustomWrap").style.display = $("#elVoice").value==="custom"? "":"none";
+    status.textContent=""; status.className="";
+  };
+  $("#gearBtn").addEventListener("click",()=>{ paint(); veil.classList.remove("hide"); });
+  $("#voxClose").addEventListener("click",()=>veil.classList.add("hide"));
+  $("#vBrowser").addEventListener("click",()=>setEngineUI("browser"));
+  $("#vEleven").addEventListener("click",()=>setEngineUI("eleven"));
+  $("#elVoice").addEventListener("change",()=>{ $("#elCustomWrap").style.display = $("#elVoice").value==="custom"? "":"none"; });
+  $("#voxSave").addEventListener("click",()=>{
+    const c=formCfg();
+    if(c.engine==="eleven" && !c.key){ status.textContent="Add your ElevenLabs API key first (it stays in this browser)."; status.className="bad"; return; }
+    Voice.cfg=c; Voice.elFailed=false; Eleven.useSpeed=true; VoiceCfg.save(c);
+    status.textContent="Saved. The orb will use this voice from its next line."; status.className="ok";
+  });
+  $("#voxTest").addEventListener("click",async ()=>{
+    const c=formCfg();
+    status.textContent="Listening for it…"; status.className="";
+    if(c.engine==="eleven"){
+      if(!c.key || !Eleven.voiceId(c)){ status.textContent="Add a key and a voice first."; status.className="bad"; return; }
+      try{ await Eleven.say(c, "Hello. This is how I would sound. Take one slow breath with me."); status.textContent="That's the ElevenLabs voice. Save to keep it."; status.className="ok"; }
+      catch(e){ status.textContent="ElevenLabs didn't answer — check the key (and that it has credits). The browser voice will be used until this works."; status.className="bad"; }
+    } else {
+      await Voice.browserSay("Hello. This is the built-in voice. Take one slow breath with me.");
+      status.textContent="That's the browser voice on this device."; status.className="ok";
+    }
+  });
+})();
 
 /* ----------------------- boot -------------------------------------- */
 initWorld();
