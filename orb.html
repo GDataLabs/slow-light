@@ -27,6 +27,11 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
   filter:brightness(.5) saturate(.85); opacity:0; transition:opacity 3.5s ease;
 }
 #backdrop .on{opacity:1}
+/* a soft darkening toward the edges — the depth the flat render was missing */
+#vignette{
+  position:fixed; inset:0; z-index:2; pointer-events:none;
+  background:radial-gradient(115% 85% at 50% 44%, transparent 52%, rgba(2,6,10,.38) 100%);
+}
 #ambBtn{
   position:fixed; top:calc(14px + env(safe-area-inset-top)); right:66px; z-index:21;
   width:42px; height:42px; border-radius:50%; border:1px solid rgba(160,190,215,.22);
@@ -83,6 +88,12 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
 .obtn:hover{border-color:rgba(127,212,193,.6); background:rgba(20,34,44,.85)}
 .obtn.primary{background:rgba(127,212,193,.16); border-color:rgba(127,212,193,.5); color:#c9f2e6}
 .obtn.mic.listening{border-color:#f0b27a; color:#ffd9ae; animation:micpulse 1.6s ease-in-out infinite}
+/* the proof it hears you: a live trace of your own voice */
+#vu{
+  display:none; margin:0 auto; width:300px; height:46px; border-radius:14px;
+  background:rgba(10,18,26,.6); border:1px solid rgba(240,178,122,.28); backdrop-filter:blur(8px);
+}
+#vu.on{display:block}
 @keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(240,178,122,.0)} 50%{box-shadow:0 0 0 9px rgba(240,178,122,.12)}}
 .chiprow{display:flex; gap:8px; justify-content:center; flex-wrap:wrap}
 .ochip{
@@ -149,6 +160,9 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
 .vchoice button[aria-pressed="true"]{border-color:rgba(127,212,193,.6); background:rgba(127,212,193,.14); color:#c9f2e6}
 #voxStatus{font-size:13.5px; color:var(--ink-faint); min-height:20px; margin:4px 0 10px}
 #voxStatus.ok{color:#9fd8a8} #voxStatus.bad{color:#f0b27a}
+#diagOut{display:flex; flex-direction:column; gap:5px; margin-top:8px}
+#diagOut div{font-size:13px; line-height:1.5}
+#diagOut .ok{color:#9fd8a8} #diagOut .bad{color:#f0b27a}
 .vlchips{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
 .vlchips button{
   border:1px solid rgba(160,190,215,.25); background:rgba(10,18,26,.6); color:var(--ink-dim);
@@ -175,10 +189,12 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
 <body>
 <div id="backdrop"><img id="bdImg" alt=""><video id="bdVid" loop muted playsinline></video></div>
 <canvas id="stage"></canvas>
+<div id="vignette"></div>
 <div id="caption" aria-live="polite"></div>
 <div id="subcap"></div>
 
 <div id="answers">
+  <canvas id="vu" width="300" height="46" aria-hidden="true"></canvas>
   <div id="sliderWrap">
     <div id="sliderVal">5</div>
     <input type="range" id="oSlider" min="0" max="10" step="1" value="5" aria-label="Answer, 0 to 10">
@@ -207,7 +223,7 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
     <details class="fineprint">
       <summary>The full details…</summary>
       <p class="tiny" style="margin-top:10px">The orb is an automated guide, not a clinician. It can misunderstand you and say things that are wrong, and it is built only for gentle relaxation — never a substitute for professional help. If things feel heavy more days than not, bring that to a real person; in the US you can also text HOME to 741741, and in immediate danger call your local emergency number.</p>
-      <p class="tiny">Voice is optional; the mic is used only if you tap it, only while it pulses, and audio is processed by your browser's own speech service. If the orb's voice is set to ElevenLabs (⚙, top right), only the orb's own lines and fixed scene descriptions are sent there — nothing you say or type ever is. Motion here is slow, there is no strobing, and your device's reduce-motion setting is respected.</p>
+      <p class="tiny">Voice is optional. After each question the orb listens for a few seconds — a small waveform shows exactly when it can hear you, and typing or sliding always works instead. When ElevenLabs is set up (⚙, top right), your short voice answers are sent there to be turned into text, and the orb's own lines and fixed scene descriptions are sent there to be spoken and drawn; otherwise your browser's own speech service is used. This page keeps nothing on any server. Motion here is slow, there is no strobing, and your device's reduce-motion setting is respected.</p>
     </details>
   </div>
 </div>
@@ -270,14 +286,16 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
         </div>
         <p class="tiny" style="margin:2px 0 0">A dreamlike generated image (fast, cheap) or a slowly moving video (slower to arrive, costs more credits) appears softly behind the particles. The scene works fine while it's on its way — or without it.</p>
       </div>
-      <p class="tiny">Only the orb's own lines, and fixed scene descriptions for sound and scenery, are ever sent to ElevenLabs; nothing you say or type is. Everything generated is cached on this device so repeats don't spend credits. If ElevenLabs can't be reached, the orb falls back to the browser voice and plain scenery rather than stopping.</p>
+      <p class="tiny">What reaches ElevenLabs: the orb's own lines, fixed scene descriptions for sound and scenery, and — when you answer out loud — that short voice clip, to be turned into text. What you type never goes anywhere. Everything generated is cached on this device so repeats don't spend credits, and if ElevenLabs can't be reached the orb falls back to the browser voice and plain scenery rather than stopping.</p>
     </div>
     <div id="voxStatus"></div>
     <p style="margin-top:6px">
       <button class="obtn primary" id="voxSave">Save</button>
       <button class="obtn" id="voxTest">Hear a line</button>
+      <button class="obtn" id="voxDiag">Check ElevenLabs</button>
       <button class="obtn" id="voxClose">Close</button>
     </p>
+    <div id="diagOut"></div>
   </div>
 </div>
 
@@ -290,7 +308,7 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
       In the US, call or text <a href="tel:988">988</a> — the Suicide &amp; Crisis Lifeline, free, 24/7 — or text HOME to <b>741741</b>. Outside the US, <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a> lists local lines. If you are in immediate danger, call your local emergency number now.
     </div>
     <p><button class="obtn primary" id="helpBack">I hear you — keep breathing with me</button></p>
-    <p class="tiny">The orb will stay simple and slow from here. Nothing you shared was sent anywhere.</p>
+    <p class="tiny">The orb will stay simple and slow from here. Nothing you shared is kept by this page.</p>
   </div>
 </div>
 
@@ -489,6 +507,8 @@ const Media={
     }catch(e){}
   },
   stopAmb(){ try{ if(this.amb){ this.amb.pause(); this.amb=null; } }catch(e){} },
+  /* soften the soundscape while the orb is listening to the person */
+  duck(on){ try{ if(this.amb && !this.amb.paused) this.amb.volume = on? .07 : .3; }catch(e){} },
   /* ---- generated backdrops (async flows API, polled) ---- */
   async poll(kind,id,everyMs,maxMs){
     const t0=Date.now();
@@ -586,9 +606,10 @@ const Voice = {
     if("speechSynthesis" in window){ load(); speechSynthesis.onvoiceschanged=load; }
   },
   async say(text){
+    if(this.elFailed && Date.now()-(this._elFailedAt||0)>60000) this.elFailed=false;  // give it another chance
     if(this.cfg.engine==="eleven" && Eleven.key(this.cfg) && Eleven.voiceId(this.cfg) && !this.elFailed){
       try{ await Eleven.say(this.cfg, text); return; }
-      catch(e){ this.elFailed=true; /* fall through to browser voice, never silence */ }
+      catch(e){ this.elFailed=true; this._elFailedAt=Date.now(); /* fall through to browser voice, never silence */ }
     }
     await this.browserSay(text);
   },
@@ -609,30 +630,218 @@ const Voice = {
   stop(){ try{ speechSynthesis.cancel(); }catch(e){} Eleven.stop(); }
 };
 
+/* Listening. Two engines: ElevenLabs Scribe (records a short clip, sends it
+   for transcription — works in every browser) when a key is configured, or
+   the browser's own SpeechRecognition otherwise. After the orb asks, it
+   simply listens: speak, and a moment of quiet sends the answer. Typing,
+   chips and sliders stay live the whole time — voice is one way among the
+   others, never the only one.                                            */
 const Ears = {
-  rec:null, listening:false,
-  supported: !!(window.SpeechRecognition||window.webkitSpeechRecognition),
-  start(onText){
-    if(!this.supported) return false;
+  rec:null, listening:false, thinking:false, stream:null, denied:false,
+  lastSpeakers:1,
+  _token:0, _cleanup:null, _finishNow:null,
+  get supported(){ return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia) || !!(window.SpeechRecognition||window.webkitSpeechRecognition); },
+  mode(){
+    if((Voice.cfg.key||"").trim() && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder) return "scribe";
+    if(window.SpeechRecognition||window.webkitSpeechRecognition) return "webspeech";
+    return null;
+  },
+  setBtn(state){
+    const b=$("#micBtn"); if(!b) return;
+    b.classList.toggle("listening", state==="listening");
+    b.textContent = state==="listening"? "listening…" : state==="thinking"? "…" : "🎙 speak";
+  },
+  mime(){
+    const c=["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/ogg;codecs=opus"];
+    return (window.MediaRecorder && c.find(m=>MediaRecorder.isTypeSupported(m)))||"";
+  },
+  async ensureStream(){
+    if(this.stream) return this.stream;
+    this.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true}});
+    return this.stream;
+  },
+  /* start listening for one answer; resolves via onText, or quietly not at all */
+  async listen(onText, opts={}){
+    if(this.listening||this.thinking||this.denied) return;
+    this.lastSpeakers=1;
+    const m=this.mode(); if(!m) return;
+    const token=++this._token;
+    if(m==="webspeech"){ this._webListen(onText, token); return; }
+    let stream;
+    try{ stream=await this.ensureStream(); }
+    catch(e){ this.denied=true; $("#micBtn").style.display="none"; return; }
+    if(token!==this._token) return;
+    try{ this._scribeListen(stream, onText, token, opts); }catch(e){ this.cancel(); }
+  },
+  /* live spectrum while recording — the visible proof it hears you. Bars are
+     the voice band of a real frequency analysis with the noise floor cut, so
+     they rise and fall with speech, not with room hum.                    */
+  _vuStart(an, ac){
+    const cv=$("#vu"); if(!cv) return ()=>{};
+    cv.classList.add("on");
+    an.smoothingTimeConstant=.72;
+    const g=cv.getContext("2d"), freq=new Uint8Array(an.frequencyBinCount);
+    const binHz=(ac&&ac.sampleRate? ac.sampleRate:48000)/an.fftSize;
+    const lo=Math.max(1, Math.round(90/binHz)), hi=Math.min(an.frequencyBinCount-1, Math.round(3800/binHz));
+    let run=true;
+    const draw=()=>{
+      if(!run) return;
+      an.getByteFrequencyData(freq);
+      g.clearRect(0,0,cv.width,cv.height);
+      const bars=36, bw=cv.width/bars;
+      for(let i=0;i<bars;i++){
+        // sample the voice band on a slight curve so lows don't hog the row
+        const t0=i/bars, t1=(i+1)/bars;
+        const b0=Math.round(lo+(hi-lo)*Math.pow(t0,1.35)), b1=Math.max(b0+1, Math.round(lo+(hi-lo)*Math.pow(t1,1.35)));
+        let m=0; for(let b=b0;b<b1;b++) m=Math.max(m, freq[b]);
+        let v=m/255; v=Math.max(0,(v-.10))/.90;          // cut the noise floor
+        const h=Math.max(2.5, Math.min(cv.height-8, v*(cv.height-8)));
+        g.fillStyle=`rgba(240,178,122,${.3+.6*v})`;
+        g.fillRect(i*bw+1.5, (cv.height-h)/2, bw-3, h);
+      }
+      requestAnimationFrame(draw);
+    };
+    draw();
+    return ()=>{ run=false; cv.classList.remove("on"); };
+  },
+  _scribeListen(stream, onText, token, opts){
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    const src=ac.createMediaStreamSource(stream);
+    const an=ac.createAnalyser(); an.fftSize=1024; src.connect(an);
+    const buf=new Uint8Array(an.fftSize);
+    const rec=new MediaRecorder(stream, this.mime()? {mimeType:this.mime()} : undefined);
+    const chunks=[]; rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+    rec.start(250);
+    this.listening=true; this.setBtn("listening");
+    Media.duck(true);
+    const stopVu=this._vuStart(an);
+    const t0=performance.now();
+    let speechMs=0, silenceMs=0, last=t0, ended=false;
+    const finish=(transcribe)=>{
+      if(ended) return; ended=true;
+      clearInterval(iv); stopVu();
+      this.listening=false; this._finishNow=null;
+      try{ rec.state!=="inactive" && rec.stop(); }catch(e){}
+      let onstopRan=false;
+      rec.onstop=async ()=>{
+        if(onstopRan) return; onstopRan=true;
+        try{ if(ac.state!=="closed") ac.close().catch(()=>{}); }catch(e){}
+        Media.duck(false);
+        if(!transcribe || token!==this._token){ this.setBtn("idle"); return; }
+        this.thinking=true; this.setBtn("thinking");
+        try{
+          const blob=new Blob(chunks, {type:rec.mimeType||"audio/webm"});
+          if(blob.size<800) throw 0;
+          const fd=new FormData();
+          fd.append("model_id","scribe_v1");
+          fd.append("file", blob, "answer.webm");
+          if(opts.diarize){ fd.append("diarize","true"); }
+          const r=await fetch(EL_API+"/v1/speech-to-text",{method:"POST", headers:{"xi-api-key":(Voice.cfg.key||"").trim()}, body:fd});
+          if(!r.ok) throw 0;
+          const j=await r.json();
+          const text=(j.text||"").trim();
+          const ids=new Set((j.words||[]).map(w=>w.speaker_id).filter(x=>x!=null));
+          this.lastSpeakers=Math.max(1, ids.size||1);
+          this.thinking=false; this.setBtn("idle");
+          if(text && token===this._token) onText(text);
+        }catch(e){ this.thinking=false; this.setBtn("idle"); }
+      };
+      if(rec.state==="inactive" && rec.onstop) rec.onstop();
+    };
+    this._cleanup=()=>{ finish(false); };
+    this._finishNow=()=>finish(true);
+    const iv=setInterval(()=>{
+      if(token!==this._token){ finish(false); return; }
+      an.getByteTimeDomainData(buf);
+      let sum=0; for(let i=0;i<buf.length;i++){ const v=(buf[i]-128)/128; sum+=v*v; }
+      const rms=Math.sqrt(sum/buf.length);
+      const now=performance.now(), dt=now-last; last=now;
+      if(rms>0.02){ speechMs+=dt; silenceMs=0; } else silenceMs+=dt;
+      const elapsed=now-t0;
+      if(speechMs>350 && silenceMs>1700) finish(true);          // they spoke, then paused
+      else if(elapsed>20000) finish(speechMs>350);              // long answers get sent too
+      else if(elapsed>(opts.patienceMs||10000) && speechMs<350) finish(false); // quiet person — stop listening, no fuss
+    },80);
+  },
+  _webListen(onText, token){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     try{
       this.rec=new SR(); this.rec.lang="en-US"; this.rec.interimResults=false; this.rec.maxAlternatives=1;
-      this.rec.onresult=e=>{ this.stop(); onText(e.results[0][0].transcript||""); };
-      this.rec.onerror=()=>this.stop();
-      this.rec.onend=()=>this.stop();
-      this.rec.start(); this.listening=true; $("#micBtn").classList.add("listening"); $("#micBtn").textContent="listening…";
-      return true;
-    }catch(e){ return false; }
+      this.rec.onresult=e=>{ this.cancel(); if(token===this._token) onText(e.results[0][0].transcript||""); };
+      this.rec.onerror=()=>this.cancel();
+      this.rec.onend=()=>{ if(this.listening) this.cancel(); };
+      this.rec.start(); this.listening=true; this.setBtn("listening");
+    }catch(e){ this.cancel(); }
   },
-  stop(){
-    this.listening=false; $("#micBtn").classList.remove("listening"); $("#micBtn").textContent="🎙 speak";
+  /* the person taps 🎙 while it's listening: "I'm done — send it now" */
+  finishNow(){ if(this._finishNow){ const f=this._finishNow; this._finishNow=null; f(); } },
+  /* stop listening without sending anything (question answered another way) */
+  cancel(){
+    this._token++;
+    this.listening=false; this.thinking=false; this._finishNow=null;
     try{ this.rec && this.rec.stop(); }catch(e){}
-  }
+    if(this._cleanup){ const c=this._cleanup; this._cleanup=null; try{ c(); }catch(e){} }
+    Media.duck(false);
+    this.setBtn("idle");
+    const cv=$("#vu"); if(cv) cv.classList.remove("on");
+  },
+  stop(){ this.cancel(); }
 };
+/* "about seven", "a four", "10" → a slider value */
+function spokenNumber(t){
+  t=(t||"").toLowerCase();
+  const words={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
+  const m=t.match(/\b(10|[0-9])\b/); if(m) return +m[1];
+  for(const w in words) if(new RegExp("\\b"+w+"\\b").test(t)) return words[w];
+  return null;
+}
 
 /* ------------------------- three.js world -------------------------- */
 let T=null; // {renderer, scene, camera, orb, glow, mats...}
 const HAVE_3D = typeof THREE !== "undefined";
+
+/* shared soft textures — points and sprites must never render as hard squares */
+let _dotTex=null, _jellyTex=null, _kelpTex=null;
+function dotTex(){
+  if(_dotTex) return _dotTex;
+  const c=document.createElement("canvas"); c.width=c.height=64; const g=c.getContext("2d");
+  const gr=g.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,"rgba(255,255,255,1)"); gr.addColorStop(.4,"rgba(255,255,255,.5)"); gr.addColorStop(1,"rgba(255,255,255,0)");
+  g.fillStyle=gr; g.fillRect(0,0,64,64);
+  return _dotTex=new THREE.CanvasTexture(c);
+}
+function jellyTex(){
+  if(_jellyTex) return _jellyTex;
+  const c=document.createElement("canvas"); c.width=128; c.height=170; const g=c.getContext("2d");
+  // bell: a soft dome of light
+  let gr=g.createRadialGradient(64,58,4,64,58,54);
+  gr.addColorStop(0,"rgba(255,255,255,.95)"); gr.addColorStop(.45,"rgba(210,235,255,.5)");
+  gr.addColorStop(.8,"rgba(180,215,245,.16)"); gr.addColorStop(1,"rgba(180,215,245,0)");
+  g.fillStyle=gr; g.beginPath(); g.ellipse(64,58,54,46,0,0,Math.PI*2); g.fill();
+  // tentacles: faint trailing threads
+  g.strokeStyle="rgba(200,228,252,.28)"; g.lineWidth=2; g.lineCap="round";
+  for(let i=0;i<5;i++){
+    const x=34+i*15;
+    g.beginPath(); g.moveTo(x,86);
+    g.bezierCurveTo(x+6,110, x-6,134, x+4,162);
+    g.stroke();
+  }
+  return _jellyTex=new THREE.CanvasTexture(c);
+}
+function kelpTex(){
+  if(_kelpTex) return _kelpTex;
+  const c=document.createElement("canvas"); c.width=32; c.height=256; const g=c.getContext("2d");
+  const gr=g.createLinearGradient(0,256,0,0);
+  gr.addColorStop(0,"rgba(255,255,255,.95)"); gr.addColorStop(.65,"rgba(255,255,255,.55)"); gr.addColorStop(1,"rgba(255,255,255,.12)");
+  g.fillStyle=gr; g.fillRect(0,0,32,256);
+  // soften the ribbon's edges
+  const eg=g.createLinearGradient(0,0,32,0);
+  eg.addColorStop(0,"rgba(0,0,0,1)"); eg.addColorStop(.28,"rgba(0,0,0,0)");
+  eg.addColorStop(.72,"rgba(0,0,0,0)"); eg.addColorStop(1,"rgba(0,0,0,1)");
+  g.globalCompositeOperation="destination-out"; g.fillStyle=eg; g.fillRect(0,0,32,256);
+  g.globalCompositeOperation="source-over";
+  return _kelpTex=new THREE.CanvasTexture(c);
+}
 function initWorld(){
   if(!HAVE_3D){ document.body.style.background="radial-gradient(120% 90% at 50% 20%, #0a1420, #04060a)"; return; }
   const renderer=new THREE.WebGLRenderer({canvas:$("#stage"), antialias:true, alpha:true});
@@ -689,7 +898,7 @@ function initWorld(){
   const N=REDUCED? 300 : 900, pos=new Float32Array(N*3);
   for(let i=0;i<N;i++){ pos[i*3]=(R()-.5)*160; pos[i*3+1]=(R()-.5)*90; pos[i*3+2]=-20-R()*160; }
   starGeo.setAttribute("position", new THREE.BufferAttribute(pos,3));
-  const stars=new THREE.Points(starGeo, new THREE.PointsMaterial({color:0x8fb8c9, size:.24, transparent:true, opacity:.55, depthWrite:false, blending:THREE.AdditiveBlending}));
+  const stars=new THREE.Points(starGeo, new THREE.PointsMaterial({color:0x8fb8c9, size:.34, map:dotTex(), transparent:true, opacity:.55, depthWrite:false, blending:THREE.AdditiveBlending}));
   scene.add(stars);
 
   T={renderer, scene, camera, orbGroup, core, orbMat, glow, halo, light, stars, sceneObjs:[], drift:[], glows:[], t:0,
@@ -770,7 +979,7 @@ function buildUnderwater(){
   const n=REDUCED?220:640, g=new THREE.BufferGeometry(), p=new Float32Array(n*3);
   for(let i=0;i<n;i++){ p[i*3]=(R()-.5)*46; p[i*3+1]=(R()-.5)*26; p[i*3+2]=-2-R()*40; }
   g.setAttribute("position",new THREE.BufferAttribute(p,3));
-  const motes=new THREE.Points(g,new THREE.PointsMaterial({color:0x9fe0d8,size:.16,transparent:true,opacity:.55,depthWrite:false}));
+  const motes=new THREE.Points(g,new THREE.PointsMaterial({color:0x9fe0d8,size:.26,map:dotTex(),transparent:true,opacity:.5,depthWrite:false,blending:THREE.AdditiveBlending}));
   addObj(motes,(dt)=>{ if(REDUCED)return; motes.rotation.y+=dt*.008; motes.position.y=Math.sin(T.t*.2)*.5; });
   // light shafts
   for(let i=0;i<5;i++){
@@ -784,7 +993,7 @@ function buildUnderwater(){
   for(let i=0;i<9;i++){
     const h=6+R()*7;
     const kelp=new THREE.Mesh(new THREE.PlaneGeometry(.5+R()*.5,h,1,8),
-      new THREE.MeshBasicMaterial({color:0x14584e, transparent:true, opacity:.5, side:THREE.DoubleSide, depthWrite:false}));
+      new THREE.MeshBasicMaterial({color:0x1c6f60, map:kelpTex(), transparent:true, opacity:.42+R()*.18, side:THREE.DoubleSide, depthWrite:false}));
     kelp.position.set((R()-.5)*40,-9+h/2,-8-R()*22);
     const ph=R()*6, pos0=kelp.geometry.attributes.position.array.slice();
     addObj(kelp,(dt,t)=>{ if(REDUCED)return;
@@ -793,15 +1002,19 @@ function buildUnderwater(){
       a.needsUpdate=true;
     });
   }
-  // slow jellies
+  // slow jellies — luminous bells with trailing threads, breathing as they rise
   for(let i=0;i<3;i++){
-    const jelly=new THREE.Mesh(new THREE.SphereGeometry(.6+R()*.5, 14, 10, 0, Math.PI*2, 0, Math.PI/2),
-      new THREE.MeshBasicMaterial({color:0xa8cfe8, transparent:true, opacity:.28, blending:THREE.AdditiveBlending, depthWrite:false}));
+    const jelly=new THREE.Sprite(new THREE.SpriteMaterial({map:jellyTex(), color:0xbfe0f5, transparent:true, opacity:.38+R()*.2, blending:THREE.AdditiveBlending, depthWrite:false}));
+    const s=1.4+R()*1.2;
+    jelly.scale.set(s, s*1.35, 1);
     jelly.position.set((R()-.5)*26, -6+R()*4, -6-R()*14);
-    const ph=R()*6, sp=.24+R()*.3;
+    const ph=R()*6, sp=.24+R()*.3, base=s;
     addObj(jelly,(dt,t)=>{ if(REDUCED)return;
       jelly.position.y+=dt*sp*(.6+.4*Math.sin(t*.8+ph));
-      jelly.scale.y=1+.16*Math.sin(t*1.4+ph);
+      jelly.position.x+=Math.sin(t*.22+ph)*dt*.4;
+      jelly.scale.y=base*1.35*(1+.1*Math.sin(t*1.2+ph));
+      jelly.scale.x=base*(1-.06*Math.sin(t*1.2+ph));
+      jelly.material.opacity=.32+.14*(.5+.5*Math.sin(t*.9+ph));
       if(jelly.position.y>12){ jelly.position.y=-9; jelly.position.x=(R()-.5)*26; }
     });
   }
@@ -824,7 +1037,7 @@ function buildNightMeadow(){
   const n=REDUCED?40:110, fg=new THREE.BufferGeometry(), fp=new Float32Array(n*3), seeds=[];
   for(let i=0;i<n;i++){ fp[i*3]=(R()-.5)*50; fp[i*3+1]=-3+R()*6; fp[i*3+2]=-4-R()*28; seeds.push(R()*6); }
   fg.setAttribute("position",new THREE.BufferAttribute(fp,3));
-  const flies=new THREE.Points(fg,new THREE.PointsMaterial({color:0xf4d98a,size:.22,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false}));
+  const flies=new THREE.Points(fg,new THREE.PointsMaterial({color:0xf4d98a,size:.34,map:dotTex(),transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false}));
   addObj(flies,(dt,t)=>{ if(REDUCED)return;
     const p=fg.attributes.position;
     for(let i=0;i<n;i++){ p.array[i*3]+=Math.sin(t*.4+seeds[i])*dt*.5; p.array[i*3+1]+=Math.cos(t*.33+seeds[i]*2)*dt*.3; }
@@ -861,7 +1074,7 @@ function buildDawn(){
   const n=REDUCED?150:420, g=new THREE.BufferGeometry(), p=new Float32Array(n*3);
   for(let i=0;i<n;i++){ p[i*3]=(R()-.5)*60; p[i*3+1]=(R()-.5)*24; p[i*3+2]=-4-R()*50; }
   g.setAttribute("position",new THREE.BufferAttribute(p,3));
-  const dust=new THREE.Points(g,new THREE.PointsMaterial({color:0xf0c9a0,size:.14,transparent:true,opacity:.5,depthWrite:false}));
+  const dust=new THREE.Points(g,new THREE.PointsMaterial({color:0xf0c9a0,size:.24,map:dotTex(),transparent:true,opacity:.45,depthWrite:false,blending:THREE.AdditiveBlending}));
   addObj(dust,(dt)=>{ if(REDUCED)return; dust.rotation.y+=dt*.006; });
 }
 const SCENES={ underwater:{build:buildUnderwater, name:"deep water", line:"Somewhere the light falls in slow shafts and everything sinks at its own speed."},
@@ -886,11 +1099,14 @@ const Cap={
   }
 };
 const UI={
-  hide(){ $("#answers").classList.remove("on"); $("#sliderWrap").classList.remove("on"); $("#chips").innerHTML=""; $("#freeRow").style.display="none"; },
-  free(placeholder){
+  hide(){ Ears.cancel(); $("#answers").classList.remove("on"); $("#sliderWrap").classList.remove("on"); $("#chips").innerHTML=""; $("#freeRow").style.display="none"; },
+  free(placeholder, opts){
     $("#answers").classList.add("on"); $("#freeRow").style.display="flex";
     $("#txtIn").value=""; $("#txtIn").placeholder=placeholder||"…or type it here";
-    $("#micBtn").style.display = Ears.supported? "" : "none";
+    $("#micBtn").style.display = (Ears.supported && !Ears.denied)? "" : "none";
+    // the orb listens on its own — speaking is just one of the open doors
+    UI._lastListen={ fn:t=>{ $("#txtIn").value=t; submitText(t); }, opts:opts||{} };
+    Ears.listen(UI._lastListen.fn, UI._lastListen.opts);
     return new Promise(res=>{ UI._resolve=res; });
   },
   chips(list, keepFree){
@@ -902,6 +1118,14 @@ const UI={
     $("#answers").classList.add("on"); $("#freeRow").style.display="none"; $("#sliderWrap").classList.add("on");
     $("#sLo").textContent=lo; $("#sHi").textContent=hi;
     $("#oSlider").value=start??5; $("#sliderVal").textContent=$("#oSlider").value;
+    // a spoken number answers too ("about seven" → 7)
+    UI._lastListen={ fn:t=>{
+      const n=spokenNumber(t);
+      if(n===null) return;
+      $("#oSlider").value=n; $("#sliderVal").textContent=n;
+      const r=UI._sliderResolve; UI.hide(); r && r(n);
+    }, opts:{patienceMs:14000} };
+    Ears.listen(UI._lastListen.fn, UI._lastListen.opts);
     return new Promise(res=>{ UI._sliderResolve=res; });
   }
 };
@@ -915,8 +1139,10 @@ function submitText(t){
 $("#sendBtn").addEventListener("click",()=>submitText($("#txtIn").value));
 $("#txtIn").addEventListener("keydown",e=>{ if(e.key==="Enter") submitText($("#txtIn").value); });
 $("#micBtn").addEventListener("click",()=>{
-  if(Ears.listening){ Ears.stop(); return; }
-  Ears.start(t=>{ $("#txtIn").value=t; submitText(t); });
+  if(Ears.listening){ Ears.finishNow(); return; }     // "I'm done" — send what it heard
+  if(Ears.thinking) return;
+  const h=UI._lastListen;                              // re-open the ear for this question
+  if(h) Ears.listen(h.fn, h.opts);
 });
 
 /* care overlay */
@@ -954,24 +1180,36 @@ async function run(){
     "Tell me how it is there right now. A word or two is plenty."
   ]), "speak, type, or just pick something close");
   let ans = await Promise.race([
-    UI.free("anxious? heavy? okay? your words…"),
+    UI.free("anxious? heavy? okay? your words…", {diarize:true}),
     UI.chips(["wired / anxious","heavy / tired","sad","angry / tense","overwhelmed","numb / far away","okay, mostly","something good"], true)
   ]);
+  const CHIPMAP={"wired / anxious":"wired","heavy / tired":"heavy","sad":"sad","angry / tense":"tense","overwhelmed":"overwhelmed","numb / far away":"numb","okay, mostly":"hopeful","something good":"joyful"};
   let g=guard(ans);
   if(g==="crisis"){ crisisShown=true; await showCare(); S.moods=["heavy"]; }
   else if(g==="dark"){ await Cap.show("I only know how to build gentle places — so I'll hold onto the feeling underneath that instead."); }
+  let wasFree=false;
   if(!S.moods.length){
-    S.moods=readMood(ans);
-    if(!S.moods.length){
-      const m={"wired / anxious":"wired","heavy / tired":"heavy","sad":"sad","angry / tense":"tense","overwhelmed":"overwhelmed","numb / far away":"numb","okay, mostly":"hopeful","something good":"joyful"}[ans];
-      S.moods = m? [m] : ["hopeful"];
-    }
+    if(CHIPMAP[ans]) S.moods=[CHIPMAP[ans]];
+    else { wasFree=true; S.moods=readMood(ans); }
+  }
+  // if their words didn't carry a feeling it knows, the orb asks — it never
+  // pretends to have understood
+  if(!S.moods.length){
+    await Cap.show(`I heard you — “${ans.trim().slice(0,50)}” — and I want to get the feeling underneath it right. Which of these is closest?`);
+    const pick2=await UI.chips(Object.keys(CHIPMAP));
+    S.moods=[CHIPMAP[pick2]||"neutral"]; wasFree=false;
   }
   S.moods=S.moods.slice(0,3);
   tintOrb(MOODS[S.moods[0]].swatch);
+  if(Ears.lastSpeakers>1){
+    S.people=Ears.lastSpeakers;
+    await Cap.show("I can hear more than one of you — good. This place is big enough for everyone who came.");
+  }
   const wx=S.moods.map(k=>MOODS[k].weather);
   const wxLine = wx.length===1? wx[0] : wx.slice(0,-1).join(", ")+" and "+wx[wx.length-1];
-  await Cap.show(`${pick(["Thank you for saying it.","Good. Naming it already loosens it a little."])} That sounds like ${wxLine}.`);
+  // its reply carries their own words back to them, so being heard is visible
+  const echo = wasFree? `“${ans.trim().slice(0,50)}” — ` : "";
+  await Cap.show(`${echo}${pick(["Thank you for saying it.","Good. Naming it already loosens it a little."])} That sounds like ${wxLine}.`);
 
   /* Q2 — how much */
   await Cap.show("And how much of you is it taking up, right now?", "slide to where it honestly is");
@@ -1122,7 +1360,8 @@ function saveOrbSession(){
       before:S.grip, after:S.gripEnd,
       mins:Math.round((Date.now()-S.t0)/6000)/10,
       breaths:Math.round((Date.now()-S.t0)/10000),
-      thought:S.released.join(" · "), carry:"", goal:S.goalFeel? "arrive "+S.goalFeel : ""
+      thought:S.released.join(" · "), carry:"", goal:S.goalFeel? "arrive "+S.goalFeel : "",
+      people:S.people||1
     };
     const all=JSON.parse(localStorage.getItem("slowlight.history")||"[]");
     all.push(rec);
@@ -1274,6 +1513,32 @@ function showExit(){
     if(!c.ambience) Media.stopAmb();
     if(c.backdrop==="off") Media.clearBackdrop();
     status.textContent="Saved. The orb will use this from its next line."; status.className="ok";
+  });
+  /* per-endpoint health check with plain-language causes, so a restricted
+     key or an empty balance is a readable sentence, not a silent fallback */
+  $("#voxDiag").addEventListener("click", async ()=>{
+    const key=(Voice.cfg.key||"").trim();
+    const out=$("#diagOut"); out.innerHTML="";
+    const row=(ok,name,detail)=>{ const d=document.createElement("div"); d.className=ok?"ok":"bad"; d.textContent=(ok?"✓ ":"✗ ")+name+(detail? " — "+detail:""); out.appendChild(d); };
+    if(!key){ row(false,"API key","none is set up on this device (voice-config.js next to orb.html)"); return; }
+    status.textContent="Checking each ElevenLabs door…"; status.className="";
+    const explain=r=> r.status===401? "the key can't use this endpoint — in ElevenLabs, edit the key's restrictions and grant it (or use an unrestricted key)"
+      : (r.status===402||r.status===429)? "the account looks out of credits, or rate-limited"
+      : r.status===404? "not found — the voice ID may not exist in this account"
+      : "answered with status "+r.status;
+    const check=async (name,fn)=>{
+      try{ const r=await fn(); row(r.ok,name, r.ok? "":explain(r)); return r.ok; }
+      catch(e){ row(false,name,"couldn't be reached at all (network, or the browser blocked it)"); return false; }
+    };
+    const H={"xi-api-key":key};
+    await check("Account", ()=>fetch(EL_API+"/v1/user",{headers:H}));
+    await check("Your voices (list & add)", ()=>fetch(EL_API+"/v1/voices",{headers:H}));
+    await check("Voice library search", ()=>fetch(EL_API+"/v1/shared-voices?page_size=1",{headers:H}));
+    await check("Speaking (text to speech)", ()=>fetch(EL_API+"/v1/text-to-speech/"+encodeURIComponent(Eleven.voiceId(Voice.cfg)||"EXAVITQu4vr4xnSDxMaL")+"?output_format=mp3_22050_32",{
+      method:"POST", headers:{...H,"Content-Type":"application/json"},
+      body:JSON.stringify({text:"Hello.", model_id:"eleven_turbo_v2_5"})}));
+    row(true,"Listening, scenery & sound","use the same key permissions: Speech to Text, Sound Effects, Image & Video");
+    status.textContent="Done. Anything marked ✗ says why — most often the key's endpoint restrictions."; status.className="";
   });
   $("#voxTest").addEventListener("click",async ()=>{
     const c=formCfg();
