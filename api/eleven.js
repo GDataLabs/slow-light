@@ -20,7 +20,11 @@ const ALLOW = [
   { m: "GET",  p: /^\/v1\/flows\/(image|video)\/[^/]+$/ },
 ];
 
-const RATE_LIMIT_PER_MIN = 80;
+/* Polling GETs (flow status checks) are cheap and frequent; generation POSTs
+   spend credits. Budget them separately so a session's status polling can
+   never crowd out its own voice. */
+const RATE_LIMIT_GET_PER_MIN = 240;
+const RATE_LIMIT_POST_PER_MIN = 60;
 const bucket = new Map();
 
 module.exports = async (req, res) => {
@@ -40,14 +44,16 @@ module.exports = async (req, res) => {
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
   if (!originOk) { res.status(403).send("This proxy only serves its own site."); return; }
 
-  // best-effort per-visitor rate limit
+  // best-effort per-visitor rate limit, budgeted by method
   const ip = String(req.headers["x-forwarded-for"] || "unknown").split(",")[0].trim();
   const now = Date.now();
-  const rec = bucket.get(ip) || { t: now, n: 0 };
-  if (now - rec.t > 60000) { rec.t = now; rec.n = 0; }
-  rec.n++; bucket.set(ip, rec);
+  const rec = bucket.get(ip) || { t: now, g: 0, p: 0 };
+  if (now - rec.t > 60000) { rec.t = now; rec.g = 0; rec.p = 0; }
+  if (req.method === "GET") rec.g++; else rec.p++;
+  bucket.set(ip, rec);
   if (bucket.size > 5000) bucket.clear();
-  if (rec.n > RATE_LIMIT_PER_MIN) { res.status(429).send("Slow down a little."); return; }
+  const over = req.method === "GET" ? rec.g > RATE_LIMIT_GET_PER_MIN : rec.p > RATE_LIMIT_POST_PER_MIN;
+  if (over) { res.status(429).send("Slow down a little."); return; }
 
   // path arrives via the rewrite as ?path=v1/...
   const raw = req.query.path;

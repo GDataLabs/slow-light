@@ -111,12 +111,14 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
 
 /* ---------- overlays ---------- */
 .veil{
-  position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
+  position:fixed; inset:0; z-index:20; display:flex; align-items:flex-start; justify-content:center;
   background:radial-gradient(120% 90% at 50% 0%, rgba(8,13,20,.9), rgba(3,5,9,.96));
   backdrop-filter:blur(18px); padding:20px; overflow-y:auto;
 }
 .veil.hide{display:none}
-.panel{max-width:600px; text-align:left}
+/* margin:auto centres short panels but — unlike align-items:center — lets a
+   tall panel scroll all the way to its top instead of clipping it */
+.panel{max-width:600px; text-align:left; margin:auto; padding:14px 0 30px}
 .panel h1{font-weight:400; letter-spacing:.2em; text-transform:uppercase; font-size:clamp(15px,2.2vw,18px); color:var(--ink-dim); margin:0 0 6px}
 .panel h2{font-family:var(--font-display); font-weight:350; font-size:clamp(26px,5vw,40px); line-height:1.22; margin:0 0 14px}
 .panel p{color:var(--ink-dim); margin:0 0 13px; font-size:15.5px}
@@ -567,7 +569,7 @@ const Media={
         body:JSON.stringify({model_id:"gemini-3.1-flash-image", prompt, aspect_ratio:"16:9"})});
       if(!r.ok) throw 0;
       const j=await r.json();
-      const done=await this.poll("image", j.id, 2500, 120000);
+      const done=await this.poll("image", j.id, 4000, 150000);
       blob=await this.fetchAsset(done.content_url);
       if(blob) TTSCache.put(ck, blob);
       this.showImage(blob? URL.createObjectURL(blob) : done.content_url);
@@ -631,7 +633,7 @@ const Voice = {
     if("speechSynthesis" in window){ load(); speechSynthesis.onvoiceschanged=load; }
   },
   async say(text){
-    if(this.elFailed && Date.now()-(this._elFailedAt||0)>60000) this.elFailed=false;  // give it another chance
+    if(this.elFailed && Date.now()-(this._elFailedAt||0)>20000) this.elFailed=false;  // give it another chance soon
     if(this.cfg.engine==="eleven" && elReady() && Eleven.voiceId(this.cfg) && !this.elFailed){
       try{ await Eleven.say(this.cfg, text); return; }
       catch(e){ this.elFailed=true; this._elFailedAt=Date.now(); /* fall through to browser voice, never silence */ }
