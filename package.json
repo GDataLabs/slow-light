@@ -1,0 +1,6 @@
+{
+  "name": "slow-light",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Slow Light — a multi-sensory relaxation space. Static site plus the ElevenLabs proxy function in api/."
+}
