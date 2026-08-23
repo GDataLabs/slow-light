@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slow Light — how it's been going</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#2b261f; --ink-dim:#5d5344; --ink-faint:#7d7160;
+  --line:rgba(90,70,40,.2); --accent:#3f8b76; --accent-warm:#d98b5a;
+  --font:"Atkinson Hyperlegible", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display:"Fraunces","Iowan Old Style",Georgia,serif;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%; text-size-adjust:100%}
+body{
+  margin:0; min-height:100vh; color:var(--ink); font-family:var(--font);
+  font-size:clamp(16px, 15.2px + .25vw, 18px); line-height:1.6;
+  background:radial-gradient(130% 90% at 18% -10%, #fdf7ec 0%, #f6ecd9 38%, #ecdcc2 72%, #e3d0b2 100%) fixed;
+  padding:clamp(20px,5vh,56px) clamp(18px,5vw,48px);
+}
+.wrap{max-width:760px; margin:0 auto; padding-bottom:60px}
+h1{font-weight:400; letter-spacing:.2em; text-transform:uppercase; font-size:clamp(15px,2.2vw,19px); margin:0 0 6px; color:#a08b68}
+h2{font-family:var(--font-display); font-weight:350; font-size:clamp(27px,5vw,42px); line-height:1.22; margin:0 0 10px; color:#1f1a13}
+h3{font-weight:400; font-size:14.5px; letter-spacing:.14em; text-transform:uppercase; color:#a1876a; margin:34px 0 12px}
+p{color:var(--ink-dim); margin:0 0 14px; max-width:62ch}
+.small{font-size:14.5px; color:var(--ink-faint); line-height:1.65}
+a{color:#2f7d6b}
+.btn{
+  border:1px solid var(--accent); background:var(--accent); color:#fbf7ef; border-radius:999px;
+  padding:14px 32px; font-family:inherit; font-size:16px; cursor:pointer; text-decoration:none; display:inline-block;
+  box-shadow:0 6px 20px rgba(63,139,118,.24); transition:background .3s;
+}
+.btn:hover{background:#356f5f; border-color:#356f5f}
+.btn.ghost{background:rgba(255,252,244,.5); color:#1d5748}
+.btn.ghost:hover{background:rgba(63,139,118,.13)}
+
+/* ---- calendar ---- */
+.calhead{display:flex; align-items:center; justify-content:space-between; margin:8px 0 10px}
+.calhead b{font-family:var(--font-display); font-weight:400; font-size:21px; color:#1f1a13}
+.calhead button{
+  border:1px solid var(--line); background:rgba(255,252,244,.6); color:#6a5f4e; font-family:inherit;
+  width:40px; height:40px; border-radius:12px; font-size:17px; cursor:pointer;
+}
+.calhead button:hover{background:rgba(255,255,250,.95)}
+.calhead button:disabled{opacity:.35; cursor:default}
+.dow, .grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px}
+.dow span{font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:#8d8171; text-align:center; padding:4px 0}
+.day{
+  position:relative; aspect-ratio:1; border-radius:12px; border:1px solid transparent;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  font-size:13.5px; color:#867a68; background:transparent;
+}
+.day.inmonth{background:rgba(255,252,244,.55); border-color:rgba(90,70,40,.14)}
+.day.has{cursor:pointer; border-color:rgba(63,139,118,.4)}
+.day.has:hover{background:rgba(255,255,250,.95)}
+.day.today{outline:2px solid rgba(63,139,118,.5); outline-offset:1px}
+.day.sel{background:rgba(63,139,118,.14); border-color:var(--accent)}
+.day .dots{display:flex; gap:3px; min-height:7px}
+.day .dots i{width:7px; height:7px; border-radius:50%; display:block; box-shadow:0 0 4px rgba(0,0,0,.12)}
+.day .n{position:absolute; top:4px; right:6px; font-size:10px; color:#a1876a}
+
+/* ---- day detail ---- */
+.sess{
+  border:1px solid var(--line); border-radius:16px; background:rgba(255,252,244,.66);
+  padding:16px 18px; margin:0 0 12px;
+}
+.sess .when{font-size:12.5px; letter-spacing:.1em; text-transform:uppercase; color:#a1876a; margin-bottom:6px}
+.sess .moods{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 8px}
+.sess .moods span{
+  display:inline-flex; align-items:center; gap:6px; font-size:13.5px; color:#4a4234;
+  border:1px solid var(--line); border-radius:999px; padding:3px 11px; background:rgba(255,255,250,.7);
+}
+.sess .moods i{width:9px; height:9px; border-radius:50%; display:inline-block}
+.sess .grip{font-size:14.5px; color:var(--ink-dim); margin:0 0 6px}
+.sess .quote{font-family:var(--font-display); font-size:16.5px; color:#3a332a; font-style:italic; margin:6px 0 0}
+.empty{
+  border:1px dashed var(--line); border-radius:16px; padding:26px 20px; text-align:center;
+  color:#8d8171; font-size:15px; background:rgba(255,252,244,.4);
+}
+.legend{display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:10px}
+.legend span{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:#7d7160}
+.legend i{width:9px; height:9px; border-radius:50%; display:inline-block}
+.statrow{display:flex; flex-wrap:wrap; gap:10px; margin:4px 0 6px}
+.stat{
+  flex:1 1 140px; border:1px solid var(--line); border-radius:14px; background:rgba(255,252,244,.6);
+  padding:13px 15px;
+}
+.stat b{display:block; font-family:var(--font-display); font-weight:400; font-size:24px; color:#241f17}
+.stat span{font-size:11.5px; color:#8d8171; text-transform:uppercase; letter-spacing:.12em}
+footer{color:#9c907d; font-size:12.8px; line-height:1.65; margin-top:40px; max-width:64ch}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Slow&nbsp;Light</h1>
+  <h2>How it's been going</h2>
+  <p class="small">Every finished session is kept on this device — and only this device — so you can watch your own weather over time. A day's dots are the feelings you arrived with; tap a day to read what happened in it.</p>
+
+  <div class="statrow" id="stats"></div>
+
+  <div class="calhead">
+    <button id="prevM" aria-label="Earlier month">‹</button>
+    <b id="mLabel"></b>
+    <button id="nextM" aria-label="Later month">›</button>
+  </div>
+  <div class="dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+  <div class="grid" id="grid"></div>
+  <div class="legend" id="legend"></div>
+
+  <h3 id="dayTitle" style="display:none"></h3>
+  <div id="dayDetail"></div>
+
+  <p style="margin-top:34px">
+    <a class="btn" href="index.html">Another session</a>
+    <a class="btn ghost" href="#" id="copyAll" style="margin-left:8px">Copy this history</a>
+  </p>
+
+  <footer>
+    This history never leaves this device and is never sent anywhere; clearing this browser's site data will clear it too. Slow Light is a self-guided relaxation tool, not medical treatment. If what you see here worries you — days that keep ending heavier than they began, or a weight that isn't lifting — that's exactly the kind of pattern worth bringing to a professional. In the US, call or text <a href="tel:988">988</a> or text HOME to 741741; outside the US, <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a> lists local lines.
+  </footer>
+</div>
+
+<script>
+"use strict";
+const SWATCH = {
+  tense:"#e8836a", wired:"#67d4e8", overwhelmed:"#b7a3e3", excited:"#ff9f80",
+  joyful:"#f4c56a", hopeful:"#9fd8a8", numb:"#cfd6da", heavy:"#9aa8b2",
+  sad:"#7fa6c9", frustrated:"#e0a060", fearful:"#8f9ee0", neutral:"#d9cdb4"
+};
+const NAME = {
+  tense:"Angry", wired:"Wired", overwhelmed:"Overwhelmed", excited:"Excited",
+  joyful:"Joyful", hopeful:"Hopeful", numb:"Numb", heavy:"Heavy",
+  sad:"Sad", frustrated:"Frustrated", fearful:"Scared", neutral:"Neutral"
+};
+const $=s=>document.querySelector(s);
+let hist=[];
+try{ hist=JSON.parse(localStorage.getItem("slowlight.history")||"[]"); }catch(e){}
+hist = hist.filter(r=>r && r.t).sort((a,b)=>a.t-b.t);
+
+const dayKey = t => { const d=new Date(t); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const byDay = {};
+for(const r of hist) (byDay[dayKey(r.t)] = byDay[dayKey(r.t)]||[]).push(r);
+
+/* ---- summary ---- */
+(function(){
+  const el=$("#stats");
+  if(!hist.length){ el.innerHTML=""; return; }
+  const now=Date.now(), month=hist.filter(r=>now-r.t < 30*864e5);
+  const eased = hist.filter(r=>r.after!=null && r.after<r.before).length;
+  const rated = hist.filter(r=>r.after!=null).length;
+  const avgDrop = rated? (hist.reduce((s,r)=>s+(r.after!=null? r.before-r.after : 0),0)/rated) : 0;
+  el.innerHTML = `
+    <div class="stat"><b>${hist.length}</b><span>session${hist.length===1?"":"s"} kept</span></div>
+    <div class="stat"><b>${month.length}</b><span>in the last 30 days</span></div>
+    ${rated? `<div class="stat"><b>${avgDrop>=0?"−":"+"}${Math.abs(avgDrop).toFixed(1)}</b><span>average change in grip</span></div>`:""}
+    ${rated? `<div class="stat"><b>${Math.round(eased/rated*100)}%</b><span>ended lighter than they began</span></div>`:""}
+  `;
+})();
+
+/* ---- legend of feelings actually seen ---- */
+(function(){
+  const seen=new Set();
+  hist.forEach(r=>(r.keys||[]).forEach(k=>seen.add(k)));
+  $("#legend").innerHTML=[...seen].map(k=>`<span><i style="background:${SWATCH[k]||"#ccc"}"></i>${NAME[k]||k}</span>`).join("");
+})();
+
+/* ---- calendar ---- */
+let cur=new Date(); cur.setDate(1);
+let selKey=null;
+const firstT = hist.length? new Date(hist[0].t) : new Date();
+
+function drawMonth(){
+  const y=cur.getFullYear(), m=cur.getMonth();
+  $("#mLabel").textContent = cur.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  const today=dayKey(Date.now());
+  const first=new Date(y,m,1);
+  const lead=(first.getDay()+6)%7;               // Monday-first
+  const dim=new Date(y,m+1,0).getDate();
+  const cells=[];
+  for(let i=0;i<lead;i++) cells.push(`<div class="day"></div>`);
+  for(let d=1; d<=dim; d++){
+    const k=y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+    const rs=byDay[k]||[];
+    const dots=rs.slice(0,4).flatMap(r=>(r.keys||[]).slice(0,2)).slice(0,4)
+      .map(kk=>`<i style="background:${SWATCH[kk]||"#ccc"}"></i>`).join("");
+    cells.push(`<div class="day inmonth ${rs.length?"has":""} ${k===today?"today":""} ${k===selKey?"sel":""}" data-k="${k}" role="${rs.length?"button":""}" ${rs.length?`tabindex="0" aria-label="${rs.length} session${rs.length>1?"s":""} on day ${d}"`:""}>
+      ${rs.length>1?`<span class="n">${rs.length}</span>`:""}<span>${d}</span><span class="dots">${dots}</span></div>`);
+  }
+  $("#grid").innerHTML=cells.join("");
+  const monthStart=new Date(y,m,1);
+  $("#prevM").disabled = monthStart <= new Date(firstT.getFullYear(), firstT.getMonth(), 1);
+  $("#nextM").disabled = monthStart >= new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+}
+$("#prevM").addEventListener("click",()=>{ cur.setMonth(cur.getMonth()-1); drawMonth(); });
+$("#nextM").addEventListener("click",()=>{ cur.setMonth(cur.getMonth()+1); drawMonth(); });
+$("#grid").addEventListener("click", e=>{ const d=e.target.closest(".day.has"); if(d) showDay(d.dataset.k); });
+$("#grid").addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ const d=e.target.closest(".day.has"); if(d){ e.preventDefault(); showDay(d.dataset.k); } } });
+
+function gripLine(r){
+  if(r.after==null) return `Arrived at ${r.before} / 10.`;
+  const d=r.before-r.after;
+  return d>0? `From ${r.before} down to ${r.after} / 10.` : d===0? `Stayed at ${r.after} / 10.` : `From ${r.before} up to ${r.after} / 10.`;
+}
+function showDay(k){
+  selKey=k; drawMonth();
+  const rs=byDay[k]||[];
+  const d=new Date(k+"T12:00:00");
+  $("#dayTitle").style.display="block";
+  $("#dayTitle").textContent=d.toLocaleDateString(undefined,{weekday:"long", month:"long", day:"numeric", year:"numeric"});
+  $("#dayDetail").innerHTML = rs.map(r=>{
+    const time=new Date(r.t).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+    const moods=(r.keys||[]).map(kk=>`<span><i style="background:${SWATCH[kk]||"#ccc"}"></i>${NAME[kk]||kk}</span>`).join("");
+    return `<div class="sess">
+      <div class="when">${time}${r.mins?` · ${r.mins} min`:""}${r.breaths?` · ${r.breaths} breaths`:""}</div>
+      <div class="moods">${moods}</div>
+      <div class="grip">${gripLine(r)}</div>
+      ${r.carry? `<p class="quote">“${r.carry}”</p>`:""}
+      ${r.goal? `<p class="small" style="margin:6px 0 0">Goal set: ${r.goal}</p>`:""}
+    </div>`;
+  }).join("");
+  $("#dayTitle").scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
+if(!hist.length){
+  $("#grid").insertAdjacentHTML("afterend", `<div class="empty" style="margin-top:14px">Nothing here yet. Finish a session and it will appear on this calendar — only on this device.</div>`);
+} else {
+  // open on the most recent session's month and day
+  const last=hist[hist.length-1];
+  cur=new Date(last.t); cur.setDate(1);
+}
+drawMonth();
+if(hist.length) showDay(dayKey(hist[hist.length-1].t));
+
+$("#copyAll").addEventListener("click", e=>{
+  e.preventDefault();
+  const txt = hist.map(r=>{
+    const d=new Date(r.t);
+    return [
+      d.toLocaleDateString()+" "+d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}),
+      "  Arrived: "+(r.label||(r.keys||[]).map(k=>NAME[k]||k).join(", ")),
+      "  Grip: "+gripLine(r),
+      r.carry? "  Carried out: "+r.carry : "",
+      r.goal? "  Goal: "+r.goal : ""
+    ].filter(Boolean).join("\n");
+  }).join("\n\n") || "No sessions yet.";
+  if(navigator.clipboard) navigator.clipboard.writeText("Slow Light — history\n\n"+txt).then(()=>{
+    $("#copyAll").textContent="Copied";
+    setTimeout(()=>$("#copyAll").textContent="Copy this history",1800);
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slow Light — the Orb (preview)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#e9eef2; --ink-dim:#9fb0bd; --ink-faint:#66788a; --accent:#7fd4c1;
+  --font:"Atkinson Hyperlegible", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display:"Fraunces","Iowan Old Style",Georgia,serif;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+html,body{height:100%}
+body{margin:0; background:#04060a; color:var(--ink); font-family:var(--font);
+  font-size:clamp(16px,15.2px + .25vw,18px); line-height:1.6; overflow:hidden}
+canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block}
+
+/* ---------- spoken text ---------- */
+#caption{
+  position:fixed; left:50%; bottom:clamp(120px, 22vh, 220px); transform:translateX(-50%);
+  width:min(92vw, 640px); text-align:center; pointer-events:none; z-index:5;
+  font-family:var(--font-display); font-weight:350; font-size:clamp(20px,3.4vw,28px);
+  line-height:1.45; color:rgba(233,242,245,.94); text-shadow:0 2px 26px rgba(0,0,0,.75);
+  opacity:0; transition:opacity 1.1s ease;
+}
+#caption.on{opacity:1}
+#subcap{
+  position:fixed; left:50%; bottom:clamp(96px,18.5vh,190px); transform:translateX(-50%);
+  width:min(92vw,560px); text-align:center; pointer-events:none; z-index:5;
+  font-size:14px; color:rgba(233,242,245,.55); opacity:0; transition:opacity .9s; text-shadow:0 1px 14px rgba(0,0,0,.7);
+}
+#subcap.on{opacity:1}
+
+/* ---------- answer bar ---------- */
+#answers{
+  position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+  width:min(94vw, 620px); z-index:6; display:none; flex-direction:column; gap:10px;
+}
+#answers.on{display:flex}
+.arow{display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap}
+#txtIn{
+  flex:1; min-width:200px; background:rgba(10,18,26,.72); border:1px solid rgba(160,190,215,.22);
+  border-radius:999px; color:var(--ink); padding:13px 20px; font-family:inherit; font-size:16px;
+  backdrop-filter:blur(10px);
+}
+#txtIn:focus{outline:none; border-color:rgba(127,212,193,.55)}
+.obtn{
+  border:1px solid rgba(160,190,215,.25); background:rgba(10,18,26,.72); color:var(--ink);
+  border-radius:999px; padding:13px 22px; font-family:inherit; font-size:15.5px; cursor:pointer;
+  backdrop-filter:blur(10px); transition:all .3s;
+}
+.obtn:hover{border-color:rgba(127,212,193,.6); background:rgba(20,34,44,.85)}
+.obtn.primary{background:rgba(127,212,193,.16); border-color:rgba(127,212,193,.5); color:#c9f2e6}
+.obtn.mic.listening{border-color:#f0b27a; color:#ffd9ae; animation:micpulse 1.6s ease-in-out infinite}
+@keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(240,178,122,.0)} 50%{box-shadow:0 0 0 9px rgba(240,178,122,.12)}}
+.chiprow{display:flex; gap:8px; justify-content:center; flex-wrap:wrap}
+.ochip{
+  border:1px solid rgba(160,190,215,.22); background:rgba(10,18,26,.66); color:var(--ink-dim);
+  border-radius:999px; padding:10px 18px; font-family:inherit; font-size:14.5px; cursor:pointer; transition:all .3s;
+  backdrop-filter:blur(10px);
+}
+.ochip:hover{color:var(--ink); border-color:rgba(127,212,193,.55)}
+#sliderWrap{display:none; flex-direction:column; gap:4px; background:rgba(10,18,26,.72);
+  border:1px solid rgba(160,190,215,.22); border-radius:18px; padding:14px 20px 10px; backdrop-filter:blur(10px)}
+#sliderWrap.on{display:flex}
+#sliderWrap input[type=range]{width:100%; accent-color:var(--accent)}
+#sliderWrap .lab{display:flex; justify-content:space-between; font-size:12.5px; color:var(--ink-faint)}
+#sliderVal{text-align:center; font-family:var(--font-display); font-size:22px; color:var(--ink)}
+
+/* ---------- overlays ---------- */
+.veil{
+  position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(120% 90% at 50% 0%, rgba(8,13,20,.9), rgba(3,5,9,.96));
+  backdrop-filter:blur(18px); padding:20px; overflow-y:auto;
+}
+.veil.hide{display:none}
+.panel{max-width:600px; text-align:left}
+.panel h1{font-weight:400; letter-spacing:.2em; text-transform:uppercase; font-size:clamp(15px,2.2vw,18px); color:var(--ink-dim); margin:0 0 6px}
+.panel h2{font-family:var(--font-display); font-weight:350; font-size:clamp(26px,5vw,40px); line-height:1.22; margin:0 0 14px}
+.panel p{color:var(--ink-dim); margin:0 0 13px; font-size:15.5px}
+.panel .note{
+  border:1px solid rgba(240,178,122,.3); background:rgba(240,178,122,.07); border-radius:14px;
+  padding:14px 17px; font-size:14.5px; color:#e8d9c4; line-height:1.6; margin:18px 0;
+}
+.panel .note a{color:#ffd9ae}
+.panel .tiny{font-size:12.8px; color:var(--ink-faint); line-height:1.6}
+.panel a{color:var(--accent)}
+#helpVeil .note{border-color:rgba(127,212,193,.35); background:rgba(127,212,193,.07); color:#d7efe7}
+#helpVeil .note a{color:#aef0dd}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="caption" aria-live="polite"></div>
+<div id="subcap"></div>
+
+<div id="answers">
+  <div id="sliderWrap">
+    <div id="sliderVal">5</div>
+    <input type="range" id="oSlider" min="0" max="10" step="1" value="5" aria-label="Answer, 0 to 10">
+    <div class="lab"><span id="sLo">not at all</span><span id="sHi">completely</span></div>
+    <div class="arow" style="margin-top:8px"><button class="obtn primary" id="sliderGo">That's about right</button></div>
+  </div>
+  <div class="chiprow" id="chips"></div>
+  <div class="arow" id="freeRow">
+    <button class="obtn mic" id="micBtn" title="Answer by voice">🎙 speak</button>
+    <input id="txtIn" type="text" autocomplete="off" placeholder="…or type it here">
+    <button class="obtn primary" id="sendBtn">Answer</button>
+  </div>
+</div>
+
+<!-- ---------- opening disclaimer ---------- -->
+<div class="veil" id="introVeil">
+  <div class="panel">
+    <h1>Slow&nbsp;Light</h1>
+    <h2>The Orb</h2>
+    <p>A quiet guide in a dark, slow space. It will ask where you are and where you'd like to be, and then shape a place around your answers — somewhere to breathe, let a few things drift off, and land somewhere softer. You can answer it out loud, by typing, or with a slider. Nothing you say or type leaves this device.</p>
+    <div class="note">
+      <b>Before you begin:</b> the orb is an automated guide, not a person and not a clinician. It can misunderstand you and it can say things that are wrong. It is built only for gentle relaxation — it is not therapy, diagnosis, or crisis support, and it is never a substitute for professional help. If things feel heavy more days than not, please bring that to a real person. In the US, call or text <a href="tel:988">988</a> (24/7) or text HOME to 741741; elsewhere <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a> lists local lines. In immediate danger, call your local emergency number.
+    </div>
+    <p><button class="obtn primary" id="beginBtn" style="font-size:17px; padding:15px 34px">I understand — begin</button>
+       <a class="obtn" href="index.html" style="text-decoration:none; margin-left:6px">Back to Slow Light</a></p>
+    <p class="tiny">Voice is optional; the mic is used only if you tap it, only while it pulses, and audio is processed by your browser's own speech service. Motion here is slow and there is no strobing. Your device's reduce-motion setting is respected.</p>
+  </div>
+</div>
+
+<!-- ---------- crisis / care overlay ---------- -->
+<div class="veil hide" id="helpVeil">
+  <div class="panel">
+    <h2>That sounds like more than this page should hold.</h2>
+    <p>The orb is only a relaxation exercise, and what you just shared deserves a real person's care. Reaching out is the strong move, not the weak one.</p>
+    <div class="note">
+      In the US, call or text <a href="tel:988">988</a> — the Suicide &amp; Crisis Lifeline, free, 24/7 — or text HOME to <b>741741</b>. Outside the US, <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a> lists local lines. If you are in immediate danger, call your local emergency number now.
+    </div>
+    <p><button class="obtn primary" id="helpBack">I hear you — keep breathing with me</button></p>
+    <p class="tiny">The orb will stay simple and slow from here. Nothing you shared was sent anywhere.</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   THE ORB — a guided, generative 3D space. Prototype.
+   Everything is scripted and procedural: no network calls, no accounts,
+   nothing recorded off-device. The orb can only build calm places — its
+   palette, motion and content are clamped to soothing ranges no matter
+   what is asked of it.
+   ===================================================================== */
+const $=s=>document.querySelector(s);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const pick=a=>a[(Math.random()*a.length)|0];
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* seeded rng so each visit's space is its own */
+function rng(seed){ let s=seed>>>0; return ()=>{ s|=0; s=s+0x6D2B79F5|0; let t=Math.imul(s^s>>>15,1|s); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+const R = rng(Date.now()%2147483647);
+
+/* ------------------------- guardrails ------------------------------ */
+/* The orb cannot be talked into a distressing space: scene parameters
+   are chosen from fixed calm presets, free text is only ever *read* for
+   feeling words, never rendered into the world. These lists just decide
+   how the orb responds in words. */
+const CRISIS = /(suicid\w*|kill (myself|me)|end (it all|my life)|hurt (myself|me)|self[- ]?harm\w*|don'?t want to (live|be here)|no reason to live|want(s|ed)? to die|wanna die|wish i was dead|better off dead|overdose)/i;
+const DARK   = /\b(scar(y|e)|horror|blood|violen|monster|storm at me|attack|gun|knife|drown me|nightmare|demon|hell)\b/i;
+const RUDE   = /\b(fuck|shit|bitch|asshole|dick|cunt|slut|whore)\b/i;
+
+const MOODS = {
+  wired:{words:/\b(anxious|anxiety|wired|racing|buzz\w*|panic\w*|on edge|jitter\w*|nervous|restless|stress\w*)\b/i, label:"wired", weather:"sleet", swatch:0x67d4e8},
+  tense:{words:/\b(angry|furious|rage|mad|tense|clench\w*|irritat\w*|annoy\w*|pissed)\b/i, label:"tense", weather:"hot wind", swatch:0xe8836a},
+  overwhelmed:{words:/\b(overwhelm\w*|too much|drowning in|swamped|buried)\b/i, label:"overwhelmed", weather:"hard rain", swatch:0xb7a3e3},
+  fearful:{words:/\b(scared|afraid|fear\w*|terrified|unsafe|dread\w*|worr(y|ied|ying))\b/i, label:"scared", weather:"fog", swatch:0x8f9ee0},
+  heavy:{words:/\b(heavy|low|drained|exhaust\w*|tired|weary|flat|grey|gray|burn(t|ed)?[- ]?out)\b/i, label:"heavy", weather:"grey drizzle", swatch:0x9aa8b2},
+  sad:{words:/\b(sad|tearful|crying|grie(f|v\w*)|missing|lonely|blue|down|heartbroken)\b/i, label:"sad", weather:"soft rain", swatch:0x7fa6c9},
+  numb:{words:/\b(numb|nothing|empty|far away|foggy|unreal|disconnect\w*|checked out)\b/i, label:"numb", weather:"white-out", swatch:0xcfd6da},
+  frustrated:{words:/\b(frustrat\w*|stuck|blocked|thwarted|spinning|going nowhere)\b/i, label:"frustrated", weather:"blowing dust", swatch:0xe0a060},
+  hopeful:{words:/\b(hopeful|better|lighter|lifting|improving|okay|alright|fine|good|calm\w*)\b/i, label:"hopeful", weather:"early light", swatch:0x9fd8a8},
+  joyful:{words:/\b(happy|joy\w*|great|wonderful|grateful|content|peaceful)\b/i, label:"joyful", weather:"warm light", swatch:0xf4c56a},
+  excited:{words:/\b(excited|thrilled|pumped|energi[sz]ed|can'?t sit still)\b/i, label:"excited", weather:"a bright breeze", swatch:0xff9f80}
+};
+function readMood(text){
+  const found=[];
+  for(const k in MOODS) if(MOODS[k].words.test(text)) found.push(k);
+  return found;
+}
+
+/* ------------------------- speech ---------------------------------- */
+const Voice = {
+  on:true, v:null,
+  init(){
+    if(!("speechSynthesis" in window)){ this.on=false; return; }
+    const load=()=>{
+      const vs=speechSynthesis.getVoices();
+      this.v = vs.find(v=>/samantha|serena|moira|karen|google uk english female|google us english/i.test(v.name))
+            || vs.find(v=>v.lang.startsWith("en")) || vs[0] || null;
+    };
+    load(); speechSynthesis.onvoiceschanged=load;
+  },
+  say(text){
+    return new Promise(res=>{
+      if(!this.on || !("speechSynthesis" in window)){ setTimeout(res, Math.max(1400, text.length*55)); return; }
+      try{
+        speechSynthesis.cancel();
+        const u=new SpeechSynthesisUtterance(text);
+        if(this.v) u.voice=this.v;
+        u.rate=.86; u.pitch=1.02; u.volume=.9;
+        u.onend=res; u.onerror=res;
+        speechSynthesis.speak(u);
+        setTimeout(res, Math.max(2500, text.length*130)); // belt & braces
+      }catch(e){ setTimeout(res, Math.max(1400, text.length*55)); }
+    });
+  },
+  stop(){ try{ speechSynthesis.cancel(); }catch(e){} }
+};
+
+const Ears = {
+  rec:null, listening:false,
+  supported: !!(window.SpeechRecognition||window.webkitSpeechRecognition),
+  start(onText){
+    if(!this.supported) return false;
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    try{
+      this.rec=new SR(); this.rec.lang="en-US"; this.rec.interimResults=false; this.rec.maxAlternatives=1;
+      this.rec.onresult=e=>{ this.stop(); onText(e.results[0][0].transcript||""); };
+      this.rec.onerror=()=>this.stop();
+      this.rec.onend=()=>this.stop();
+      this.rec.start(); this.listening=true; $("#micBtn").classList.add("listening"); $("#micBtn").textContent="listening…";
+      return true;
+    }catch(e){ return false; }
+  },
+  stop(){
+    this.listening=false; $("#micBtn").classList.remove("listening"); $("#micBtn").textContent="🎙 speak";
+    try{ this.rec && this.rec.stop(); }catch(e){}
+  }
+};
+
+/* ------------------------- three.js world -------------------------- */
+let T=null; // {renderer, scene, camera, orb, glow, mats...}
+const HAVE_3D = typeof THREE !== "undefined";
+function initWorld(){
+  if(!HAVE_3D){ document.body.style.background="radial-gradient(120% 90% at 50% 20%, #0a1420, #04060a)"; return; }
+  const renderer=new THREE.WebGLRenderer({canvas:$("#stage"), antialias:true, alpha:false});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  const scene=new THREE.Scene();
+  scene.fog=new THREE.FogExp2(0x04070c, .055);
+  scene.background=new THREE.Color(0x04070c);
+  const camera=new THREE.PerspectiveCamera(58, innerWidth/innerHeight, .1, 400);
+  camera.position.set(0, 0, 7.5);
+
+  /* the orb */
+  const orbGroup=new THREE.Group();
+  const core=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1, 4),
+    new THREE.MeshStandardMaterial({color:0x9fe8d8, emissive:0x7fd4c1, emissiveIntensity:1.35, roughness:.32, metalness:.05, transparent:true, opacity:.96})
+  );
+  const shell=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1.18, 3),
+    new THREE.MeshBasicMaterial({color:0x7fd4c1, transparent:true, opacity:.10, blending:THREE.AdditiveBlending, depthWrite:false})
+  );
+  const glowTex=(()=>{ const c=document.createElement("canvas"); c.width=c.height=256; const g=c.getContext("2d");
+    const gr=g.createRadialGradient(128,128,0,128,128,128);
+    gr.addColorStop(0,"rgba(190,255,236,.85)"); gr.addColorStop(.35,"rgba(127,212,193,.32)"); gr.addColorStop(1,"rgba(127,212,193,0)");
+    g.fillStyle=gr; g.fillRect(0,0,256,256); return new THREE.CanvasTexture(c); })();
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, transparent:true, opacity:.9, blending:THREE.AdditiveBlending, depthWrite:false}));
+  glow.scale.set(6,6,1);
+  const light=new THREE.PointLight(0x9fe8d8, 1.6, 60, 1.8);
+  orbGroup.add(core, shell, glow, light);
+  scene.add(orbGroup);
+  scene.add(new THREE.AmbientLight(0x33465a, .5));
+
+  /* idle starfield */
+  const starGeo=new THREE.BufferGeometry();
+  const N=REDUCED? 300 : 900, pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){ pos[i*3]=(R()-.5)*160; pos[i*3+1]=(R()-.5)*90; pos[i*3+2]=-20-R()*160; }
+  starGeo.setAttribute("position", new THREE.BufferAttribute(pos,3));
+  const stars=new THREE.Points(starGeo, new THREE.PointsMaterial({color:0x8fb8c9, size:.24, transparent:true, opacity:.6, depthWrite:false}));
+  scene.add(stars);
+
+  T={renderer, scene, camera, orbGroup, core, shell, glow, light, stars, sceneObjs:[], drift:[], glows:[], t:0,
+     orbTarget:new THREE.Vector3(0,0,0), camTarget:new THREE.Vector3(0,0,7.5), hue:new THREE.Color(0x7fd4c1)};
+  const resize=()=>{ renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); };
+  addEventListener("resize", resize); resize();
+
+  /* gentle parallax with the pointer — the space answers you */
+  addEventListener("pointermove", e=>{
+    if(REDUCED) return;
+    T.camTarget.x=((e.clientX/innerWidth)-.5)*1.1;
+    T.camTarget.y=-((e.clientY/innerHeight)-.5)*.7;
+  }, {passive:true});
+  requestAnimationFrame(tick);
+}
+
+let breathPhase=0;
+function tick(){
+  requestAnimationFrame(tick);
+  if(!T) return;
+  const dt=1/60; T.t+=dt;
+  // orb breathes at ~6/min — always, everywhere; it is the pacer
+  breathPhase=(breathPhase+dt/10)%1;
+  const b=.5-.5*Math.cos(breathPhase*Math.PI*2);
+  const s=lerp(.86,1.14,b);
+  T.core.scale.setScalar(s); T.shell.scale.setScalar(s*1.02);
+  T.glow.scale.setScalar(6*lerp(.9,1.18,b));
+  T.light.intensity=lerp(1.15,2.0,b);
+  T.core.material.emissiveIntensity=lerp(1.0,1.7,b);
+  if(!REDUCED){
+    T.orbGroup.position.y=T.orbTarget.y+Math.sin(T.t*.5)*.14;
+    T.orbGroup.position.x=lerp(T.orbGroup.position.x,T.orbTarget.x,.02);
+    T.orbGroup.position.z=lerp(T.orbGroup.position.z,T.orbTarget.z,.02);
+    T.camera.position.x=lerp(T.camera.position.x,T.camTarget.x,.03);
+    T.camera.position.y=lerp(T.camera.position.y,T.camTarget.y,.03);
+    T.camera.position.z=lerp(T.camera.position.z,T.camTarget.z,.02);
+    T.camera.lookAt(T.orbGroup.position.x*.4,T.orbGroup.position.y*.4,0);
+    T.stars.rotation.z+=dt*.004;
+  }
+  // scene life
+  for(const o of T.sceneObjs) o.update && o.update(dt,T.t);
+  // drifting released thoughts
+  for(let i=T.drift.length-1;i>=0;i--){
+    const d=T.drift[i]; d.mesh.position.addScaledVector(d.vel,dt);
+    d.mesh.material.opacity*=.9985; d.life-=dt;
+    if(d.life<=0){ T.scene.remove(d.mesh); T.drift.splice(i,1); }
+  }
+  T.renderer.render(T.scene,T.camera);
+}
+
+/* orb color eases toward a mood-blend; always stays in soothing range */
+function tintOrb(hex){
+  if(!T) return;
+  const c=new THREE.Color(hex);
+  // clamp saturation/lightness into calm range
+  const hsl={}; c.getHSL(hsl);
+  c.setHSL(hsl.h, clamp(hsl.s,.25,.55), clamp(hsl.l,.55,.72));
+  T.core.material.emissive=c; T.glow.material.color=c; T.light.color=c; T.shell.material.color=c;
+}
+
+/* ----------------------- scene presets ----------------------------- */
+/* Only calm places exist. Each is procedural, so no two visits match. */
+function clearScene(){
+  if(!T) return;
+  for(const o of T.sceneObjs){ T.scene.remove(o.obj); }
+  T.sceneObjs=[];
+}
+function addObj(obj, update){ T.scene.add(obj); T.sceneObjs.push({obj, update}); }
+
+function buildUnderwater(){
+  if(!T) return;
+  T.scene.fog=new THREE.FogExp2(0x06222e, .075);
+  T.scene.background=new THREE.Color(0x06222e);
+  T.stars.visible=false;
+  // motes
+  const n=REDUCED?220:640, g=new THREE.BufferGeometry(), p=new Float32Array(n*3);
+  for(let i=0;i<n;i++){ p[i*3]=(R()-.5)*46; p[i*3+1]=(R()-.5)*26; p[i*3+2]=-2-R()*40; }
+  g.setAttribute("position",new THREE.BufferAttribute(p,3));
+  const motes=new THREE.Points(g,new THREE.PointsMaterial({color:0x9fe0d8,size:.16,transparent:true,opacity:.55,depthWrite:false}));
+  addObj(motes,(dt)=>{ if(REDUCED)return; motes.rotation.y+=dt*.008; motes.position.y=Math.sin(T.t*.2)*.5; });
+  // light shafts
+  for(let i=0;i<5;i++){
+    const cone=new THREE.Mesh(new THREE.ConeGeometry(2.6+R()*2.5, 34, 5, 1, true),
+      new THREE.MeshBasicMaterial({color:0x9fe8d8, transparent:true, opacity:.028+R()*.02, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
+    cone.position.set((R()-.5)*34, 16, -6-R()*22); cone.rotation.z=(R()-.5)*.3;
+    const ph=R()*6;
+    addObj(cone,(dt,t)=>{ cone.material.opacity=.03+.022*(.5+.5*Math.sin(t*.3+ph)); });
+  }
+  // kelp ribbons
+  for(let i=0;i<9;i++){
+    const h=6+R()*7;
+    const kelp=new THREE.Mesh(new THREE.PlaneGeometry(.5+R()*.5,h,1,8),
+      new THREE.MeshBasicMaterial({color:0x14584e, transparent:true, opacity:.5, side:THREE.DoubleSide, depthWrite:false}));
+    kelp.position.set((R()-.5)*40,-9+h/2,-8-R()*22);
+    const ph=R()*6, pos0=kelp.geometry.attributes.position.array.slice();
+    addObj(kelp,(dt,t)=>{ if(REDUCED)return;
+      const a=kelp.geometry.attributes.position;
+      for(let v=0;v<a.count;v++){ const y=pos0[v*3+1]; a.array[v*3]=pos0[v*3]+Math.sin(t*.5+ph+y*.35)*.32*((y+h/2)/h); }
+      a.needsUpdate=true;
+    });
+  }
+  // slow jellies
+  for(let i=0;i<3;i++){
+    const jelly=new THREE.Mesh(new THREE.SphereGeometry(.6+R()*.5, 14, 10, 0, Math.PI*2, 0, Math.PI/2),
+      new THREE.MeshBasicMaterial({color:0xa8cfe8, transparent:true, opacity:.28, blending:THREE.AdditiveBlending, depthWrite:false}));
+    jelly.position.set((R()-.5)*26, -6+R()*4, -6-R()*14);
+    const ph=R()*6, sp=.24+R()*.3;
+    addObj(jelly,(dt,t)=>{ if(REDUCED)return;
+      jelly.position.y+=dt*sp*(.6+.4*Math.sin(t*.8+ph));
+      jelly.scale.y=1+.16*Math.sin(t*1.4+ph);
+      if(jelly.position.y>12){ jelly.position.y=-9; jelly.position.x=(R()-.5)*26; }
+    });
+  }
+}
+function buildNightMeadow(){
+  if(!T) return;
+  T.scene.fog=new THREE.FogExp2(0x070b14, .045);
+  T.scene.background=new THREE.Color(0x070b14);
+  T.stars.visible=true;
+  // ground
+  const geo=new THREE.PlaneGeometry(140,80,48,28);
+  const a=geo.attributes.position;
+  for(let i=0;i<a.count;i++){ const x=a.array[i*3], y=a.array[i*3+1];
+    a.array[i*3+2]=Math.sin(x*.12)*Math.cos(y*.15)*1.6+R()*.25; }
+  geo.computeVertexNormals();
+  const ground=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0x0d2018, roughness:1}));
+  ground.rotation.x=-Math.PI/2; ground.position.y=-4.5;
+  addObj(ground,null);
+  // fireflies
+  const n=REDUCED?40:110, fg=new THREE.BufferGeometry(), fp=new Float32Array(n*3), seeds=[];
+  for(let i=0;i<n;i++){ fp[i*3]=(R()-.5)*50; fp[i*3+1]=-3+R()*6; fp[i*3+2]=-4-R()*28; seeds.push(R()*6); }
+  fg.setAttribute("position",new THREE.BufferAttribute(fp,3));
+  const flies=new THREE.Points(fg,new THREE.PointsMaterial({color:0xf4d98a,size:.22,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false}));
+  addObj(flies,(dt,t)=>{ if(REDUCED)return;
+    const p=fg.attributes.position;
+    for(let i=0;i<n;i++){ p.array[i*3]+=Math.sin(t*.4+seeds[i])*dt*.5; p.array[i*3+1]+=Math.cos(t*.33+seeds[i]*2)*dt*.3; }
+    p.needsUpdate=true;
+    flies.material.opacity=.55+.3*Math.sin(t*.7);
+  });
+  // a low moon
+  const moon=new THREE.Mesh(new THREE.SphereGeometry(2.4,24,24),
+    new THREE.MeshBasicMaterial({color:0xdfe8ef, transparent:true, opacity:.85}));
+  moon.position.set(-16,10,-60); addObj(moon,null);
+  const moonGlow=new THREE.Sprite(new THREE.SpriteMaterial({map:T.glow.material.map, color:0xbcd4e8, transparent:true, opacity:.5, blending:THREE.AdditiveBlending, depthWrite:false}));
+  moonGlow.position.copy(moon.position); moonGlow.scale.set(16,16,1); addObj(moonGlow,null);
+}
+function buildDawn(){
+  if(!T) return;
+  T.scene.fog=new THREE.FogExp2(0x1a1420, .035);
+  T.scene.background=new THREE.Color(0x1a1420);
+  T.stars.visible=true; T.stars.material.opacity=.25;
+  // sky glow on the horizon
+  const sun=new THREE.Sprite(new THREE.SpriteMaterial({map:T.glow.material.map, color:0xf4b678, transparent:true, opacity:.65, blending:THREE.AdditiveBlending, depthWrite:false}));
+  sun.position.set(0,-2,-70); sun.scale.set(70,42,1);
+  addObj(sun,(dt,t)=>{ sun.material.opacity=.55+.12*Math.sin(t*.15); sun.position.y=-2+Math.min(3,t*.02); });
+  // dunes
+  for(let i=0;i<4;i++){
+    const dg=new THREE.PlaneGeometry(160,30,42,10), da=dg.attributes.position;
+    for(let v=0;v<da.count;v++){ da.array[v*3+2]=Math.sin(da.array[v*3]*.05+i*2.2)*2.2; }
+    dg.computeVertexNormals();
+    const shade=[0x2a1e2a,0x3a2733,0x4a3038,0x5c3b3c][i];
+    const dune=new THREE.Mesh(dg,new THREE.MeshBasicMaterial({color:shade}));
+    dune.rotation.x=-Math.PI/2.15; dune.position.set(0,-5-i*.7,-12-i*14);
+    addObj(dune,null);
+  }
+  // drifting warm dust
+  const n=REDUCED?150:420, g=new THREE.BufferGeometry(), p=new Float32Array(n*3);
+  for(let i=0;i<n;i++){ p[i*3]=(R()-.5)*60; p[i*3+1]=(R()-.5)*24; p[i*3+2]=-4-R()*50; }
+  g.setAttribute("position",new THREE.BufferAttribute(p,3));
+  const dust=new THREE.Points(g,new THREE.PointsMaterial({color:0xf0c9a0,size:.14,transparent:true,opacity:.5,depthWrite:false}));
+  addObj(dust,(dt)=>{ if(REDUCED)return; dust.rotation.y+=dt*.006; });
+}
+const SCENES={ underwater:{build:buildUnderwater, name:"deep water", line:"Somewhere the light falls in slow shafts and everything sinks at its own speed."},
+               meadow:{build:buildNightMeadow, name:"a night meadow", line:"Somewhere dark and wide, where small lights move at their own pace and nothing is asked of you."},
+               dawn:{build:buildDawn, name:"first light", line:"Somewhere just before morning, where the light is on its way and there is nothing to do but let it come."} };
+
+/* ----------------------- dialogue engine --------------------------- */
+const Cap={
+  async show(text, sub){
+    const c=$("#caption"); c.classList.remove("on");
+    await new Promise(r=>setTimeout(r,350));
+    c.textContent=text; c.classList.add("on");
+    const sc=$("#subcap");
+    if(sub){ sc.textContent=sub; sc.classList.add("on"); } else sc.classList.remove("on");
+    await Voice.say(text);
+  }
+};
+const UI={
+  hide(){ $("#answers").classList.remove("on"); $("#sliderWrap").classList.remove("on"); $("#chips").innerHTML=""; $("#freeRow").style.display="none"; },
+  free(placeholder){
+    $("#answers").classList.add("on"); $("#freeRow").style.display="flex";
+    $("#txtIn").value=""; $("#txtIn").placeholder=placeholder||"…or type it here";
+    $("#micBtn").style.display = Ears.supported? "" : "none";
+    return new Promise(res=>{ UI._resolve=res; });
+  },
+  chips(list, keepFree){
+    $("#answers").classList.add("on"); if(!keepFree) $("#freeRow").style.display="none";
+    $("#chips").innerHTML=list.map((c,i)=>`<button class="ochip" data-i="${i}">${c}</button>`).join("");
+    return new Promise(res=>{ UI._chipResolve=i=>res(list[i]); });
+  },
+  slider(lo,hi,start){
+    $("#answers").classList.add("on"); $("#freeRow").style.display="none"; $("#sliderWrap").classList.add("on");
+    $("#sLo").textContent=lo; $("#sHi").textContent=hi;
+    $("#oSlider").value=start??5; $("#sliderVal").textContent=$("#oSlider").value;
+    return new Promise(res=>{ UI._sliderResolve=res; });
+  }
+};
+$("#oSlider").addEventListener("input",e=>$("#sliderVal").textContent=e.target.value);
+$("#sliderGo").addEventListener("click",()=>{ const v=+$("#oSlider").value; UI.hide(); UI._sliderResolve&&UI._sliderResolve(v); });
+$("#chips").addEventListener("click",e=>{ const b=e.target.closest(".ochip"); if(!b)return; UI.hide(); UI._chipResolve&&UI._chipResolve(+b.dataset.i); });
+function submitText(t){
+  t=(t||"").trim(); if(!t) return;
+  UI.hide(); Ears.stop(); UI._resolve&&UI._resolve(t);
+}
+$("#sendBtn").addEventListener("click",()=>submitText($("#txtIn").value));
+$("#txtIn").addEventListener("keydown",e=>{ if(e.key==="Enter") submitText($("#txtIn").value); });
+$("#micBtn").addEventListener("click",()=>{
+  if(Ears.listening){ Ears.stop(); return; }
+  Ears.start(t=>{ $("#txtIn").value=t; submitText(t); });
+});
+
+/* care overlay */
+let crisisShown=false;
+function showCare(){
+  return new Promise(res=>{
+    $("#helpVeil").classList.remove("hide");
+    Voice.stop();
+    $("#helpBack").onclick=()=>{ $("#helpVeil").classList.add("hide"); res(); };
+  });
+}
+function guard(text){
+  if(CRISIS.test(text)) return "crisis";
+  if(DARK.test(text)||RUDE.test(text)) return "dark";
+  return "ok";
+}
+
+/* ----------------------- the session ------------------------------- */
+const S={ moods:[], grip:5, goalFeel:null, released:[], gripEnd:null, paceMs:[], t0:0 };
+
+async function run(){
+  S.t0=Date.now();
+  tintOrb(0x7fd4c1);
+  await Cap.show(pick([
+    "Hello. I'm glad you came.",
+    "Hello. You made it here — that's the hardest part.",
+    "Welcome. There's nothing to do here yet."
+  ]));
+  await Cap.show("Take one slow breath with me while I look around for you… in… and out.");
+  await new Promise(r=>setTimeout(r,1800));
+
+  /* Q1 — where are you */
+  await Cap.show(pick([
+    "Where are you right now — not the room. Inside. What's the weather like in there?",
+    "Tell me how it is in there right now. A word or two is plenty."
+  ]), "speak, type, or just pick something close");
+  let ans = await Promise.race([
+    UI.free("anxious? heavy? okay? your words…"),
+    UI.chips(["wired / anxious","heavy / tired","sad","angry / tense","overwhelmed","numb / far away","okay, mostly","something good"], true)
+  ]);
+  let g=guard(ans);
+  if(g==="crisis"){ crisisShown=true; await showCare(); S.moods=["heavy"]; }
+  else if(g==="dark"){ await Cap.show("I only know how to build gentle places — so I'll hold onto the feeling underneath that instead."); }
+  if(!S.moods.length){
+    S.moods=readMood(ans);
+    if(!S.moods.length){
+      const m={"wired / anxious":"wired","heavy / tired":"heavy","sad":"sad","angry / tense":"tense","overwhelmed":"overwhelmed","numb / far away":"numb","okay, mostly":"hopeful","something good":"joyful"}[ans];
+      S.moods = m? [m] : ["hopeful"];
+    }
+  }
+  S.moods=S.moods.slice(0,3);
+  tintOrb(MOODS[S.moods[0]].swatch);
+  const wx=S.moods.map(k=>MOODS[k].weather);
+  const wxLine = wx.length===1? wx[0] : wx.slice(0,-1).join(", ")+" and "+wx[wx.length-1];
+  await Cap.show(`${pick(["Thank you for saying it.","Good. Naming it already loosens it a little."])} That sounds like ${wxLine}.`);
+
+  /* Q2 — how much */
+  await Cap.show("And how much of you is it taking up, right now?", "slide to where it honestly is");
+  S.grip = await UI.slider("barely there","all of me", 6);
+  await Cap.show(S.grip>=7? "That's a lot to be carrying in. We'll go slowly." :
+                 S.grip>=4? "Enough to feel. We have room for that here." :
+                 "Light enough to work with. Let's keep it that way.");
+
+  /* Q3 — where to */
+  await Cap.show("If you could drift anywhere from here — not fixed, just… different — how would you want to feel when you arrive?", "pick, speak, or type");
+  let feel = await Promise.race([
+    UI.free("calmer? grounded? lighter?…"),
+    UI.chips(["calmer, quieter","grounded, steadier","lighter, softer"], true)
+  ]);
+  g=guard(feel);
+  if(g==="crisis" && !crisisShown){ crisisShown=true; await showCare(); }
+  const f=(feel||"").toLowerCase();
+  S.goalFeel = /ground|stead|safe|solid|earth/.test(f)? "grounded" : /light|soft|hope|bright|warm|morning/.test(f)? "lighter" : "calmer";
+
+  /* choose + build the space */
+  const domGroup = S.moods[0];
+  const sceneKey = S.goalFeel==="grounded"? "meadow" : S.goalFeel==="lighter"? "dawn" :
+                   (domGroup==="wired"||domGroup==="overwhelmed"||domGroup==="tense")? "underwater" : pick(["underwater","meadow"]);
+  const sc=SCENES[sceneKey];
+  await Cap.show(`Then let me make somewhere for that. ${sc.line}`);
+  await Cap.show("Close your eyes for three breaths if you like. When you open them, we'll be there.");
+  await fadeSwap(sc.build);
+  await Cap.show(`This place is yours — it didn't exist before tonight, and no one else will ever stand in it.`);
+
+  /* activity 1 — release */
+  await Cap.show(pick([
+    "Here's the first thing this place can do. Give me something you're carrying — a word or a few — and watch what the water does with it.",
+    "Let's set something down. Type or say one thing that came in with you, and let this place take it."
+  ]).replace("water", sceneKey==="underwater"?"water":"dark"), "one small thing at a time");
+  for(let i=0;i<3;i++){
+    const w=await UI.free(i===0?"the meeting… her voice… the list…":"anything else? or say 'done'");
+    if(/^(done|no|nothing|stop|that's all|nope)\b/i.test(w)) break;
+    const gg=guard(w);
+    if(gg==="crisis" && !crisisShown){ crisisShown=true; await showCare(); break; }
+    S.released.push(w.slice(0,60));
+    releaseVisual();
+    await Cap.show(pick([
+      "There it goes. It can float without you holding it.",
+      "Released. Notice it needs nothing from you out there.",
+      "Watch how slowly it leaves. Nothing here is urgent — not even letting go."
+    ]));
+    if(i===2) break;
+  }
+
+  /* activity 2 — slow lights (pace sensing framed as visualization) */
+  await Cap.show("Now a slower game. Lights will rise, one at a time. When one feels ready — not before — touch it. There is no clock and no score.","touch each light when it feels right");
+  await slowLights(4);
+  const avg=S.paceMs.length? S.paceMs.reduce((a,b)=>a+b,0)/S.paceMs.length : 4000;
+  await Cap.show(avg<2200? "You met them quickly. There's still some speed in your hands — that's all right, it has somewhere soft to land now." :
+                 avg<5000? "That was an easy rhythm. Your pace is already lower than when you arrived." :
+                 "You let each one wait for you. That's the slowest, kindest pace there is.");
+
+  /* check-out */
+  await Cap.show("Before I let the place hold you a while — where is it now, the thing you carried in?", "same slider as before");
+  S.gripEnd = await UI.slider("barely there","all of me", S.grip);
+  const d=S.grip-S.gripEnd;
+  await Cap.show(d>0? `From ${S.grip} down to ${S.gripEnd}. Nothing outside you changed — that was you.` :
+                 d===0? `Still at ${S.grip}. Honest is better than improved. Some weather needs more than one visit.` :
+                 `It rose — from ${S.grip} to ${S.gripEnd}. Slowing down can uncover what speed was muffling. That's worth telling a person you trust, not just an orb.`);
+  saveOrbSession();
+  await Cap.show("I'll remember how this felt on this device, so you can watch your own weather change over time.", "see 'How it's been going' from the close of any session");
+  await Cap.show(pick([
+    "Stay as long as you like. The place doesn't close. When you're ready, the door back is just below.",
+    "There's nothing left to do. Stay and breathe with me, or drift back when you're ready."
+  ]));
+  showExit();
+}
+
+function fadeSwap(build){
+  return new Promise(res=>{
+    const veil=document.createElement("div");
+    veil.style.cssText="position:fixed;inset:0;background:#04060a;opacity:0;transition:opacity 2.2s;z-index:8;pointer-events:none";
+    document.body.appendChild(veil);
+    requestAnimationFrame(()=>veil.style.opacity="1");
+    setTimeout(()=>{
+      clearScene(); build();
+      if(T){ T.orbTarget.set(0,.5,0); T.camTarget.set(0,0,8.5); }
+      veil.style.opacity="0";
+      setTimeout(()=>{ veil.remove(); res(); },2300);
+    },2400);
+  });
+}
+
+/* a released thought becomes a small light that drifts away */
+function releaseVisual(){
+  if(!T) return;
+  const m=new THREE.Sprite(new THREE.SpriteMaterial({map:T.glow.material.map, color:0xf4d9a8, transparent:true, opacity:.85, blending:THREE.AdditiveBlending, depthWrite:false}));
+  m.position.copy(T.orbGroup.position); m.position.y-=.4; m.scale.set(1.4,1.4,1);
+  T.scene.add(m);
+  T.drift.push({mesh:m, vel:new THREE.Vector3((R()-.5)*.5, .55+R()*.4, -(.7+R()*.6)), life:26});
+}
+
+/* slow-lights activity: taps timed, gently */
+function slowLights(count){
+  return new Promise(async res=>{
+    if(!T){ S.paceMs=[3000]; return res(); }
+    let done=0, shownAt=0;
+    const spawn=()=>{
+      const l=new THREE.Sprite(new THREE.SpriteMaterial({map:T.glow.material.map, color:0xbde8da, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false}));
+      const px=(R()-.5)*5.4, py=(R()-.5)*3.2;
+      l.position.set(px,py,2.2); l.scale.set(1.8,1.8,1);
+      T.scene.add(l);
+      let a=0; const fade=setInterval(()=>{ a+=.04; l.material.opacity=Math.min(.9,a); if(a>=.9) clearInterval(fade); },50);
+      shownAt=performance.now();
+      let hit=false;
+      const onTap=e=>{
+        // project tap to NDC and see if near the light (generous target — this
+        // is an invitation, not a test of aim)
+        const nx=(e.clientX/innerWidth)*2-1, ny=-(e.clientY/innerHeight)*2+1;
+        const v=l.position.clone().project(T.camera);
+        if(!hit && Math.hypot(nx-v.x, ny-v.y)<.3){
+          hit=true;
+          removeEventListener("pointerdown",onTap);
+          S.paceMs.push(performance.now()-shownAt);
+          const shrink=setInterval(()=>{ l.material.opacity*=.82; l.scale.multiplyScalar(1.06); if(l.material.opacity<.03){ clearInterval(shrink); T.scene.remove(l);} },40);
+          done++;
+          if(done>=count) res(); else setTimeout(spawn, 1400+R()*1400);
+        }
+      };
+      addEventListener("pointerdown",onTap);
+      // auto-advance if ignored for 30s — never trap the person
+      setTimeout(()=>{ if(!hit){ removeEventListener("pointerdown",onTap); if(l.parent) T.scene.remove(l); done++; if(done>=count) res(); else spawn(); } },30000);
+    };
+    spawn();
+  });
+}
+
+/* ----------------------- persistence ------------------------------- */
+function saveOrbSession(){
+  try{
+    const rec={
+      id:new Date().toISOString()+"~orb", t:Date.now(), src:"orb",
+      keys:S.moods, label:S.moods.map(k=>MOODS[k].label).join(", "),
+      weights:S.moods.map(()=>0.62),
+      before:S.grip, after:S.gripEnd,
+      mins:Math.round((Date.now()-S.t0)/6000)/10,
+      breaths:Math.round((Date.now()-S.t0)/10000),
+      thought:S.released.join(" · "), carry:"", goal:S.goalFeel? "arrive "+S.goalFeel : ""
+    };
+    const all=JSON.parse(localStorage.getItem("slowlight.history")||"[]");
+    all.push(rec);
+    localStorage.setItem("slowlight.history", JSON.stringify(all.slice(-400)));
+  }catch(e){}
+}
+function showExit(){
+  const bar=document.createElement("div");
+  bar.style.cssText="position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:7;display:flex;gap:8px;flex-wrap:wrap;justify-content:center";
+  bar.innerHTML=`<a class="obtn" style="text-decoration:none" href="orb.html">Begin again</a>
+    <a class="obtn" style="text-decoration:none" href="index.html">Back to Slow Light</a>
+    <a class="obtn" style="text-decoration:none" href="history.html">How it's been going</a>`;
+  document.body.appendChild(bar);
+}
+
+/* ----------------------- boot -------------------------------------- */
+initWorld();
+Voice.init();
+$("#beginBtn").addEventListener("click", async ()=>{
+  $("#introVeil").classList.add("hide");
+  if(!HAVE_3D){
+    $("#caption").textContent="The 3D space couldn't load here — but the words and breathing still work.";
+    $("#caption").classList.add("on");
+    await new Promise(r=>setTimeout(r,2200));
+  }
+  run().catch(()=>{ /* never strand the person on an error */
+    Cap.show("Something in me stumbled — but nothing is lost. Breathe once more, and use the door below whenever you like.");
+    showExit();
+  });
+});
+</script>
+</body>
+</html>

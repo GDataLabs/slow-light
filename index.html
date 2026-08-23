@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Slow Light — a multi-sensory entrainment platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&display=swap" rel="stylesheet">
 <style>
 :root{
   --ink:#e9eef2;
@@ -15,15 +18,21 @@
   --accent:#7fd4c1;
   --accent2:#f0b27a;
   --radius:16px;
-  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+  /* Body type: Atkinson Hyperlegible — designed for low-vision readability,
+     warm and humanist rather than clinical. Display type: Fraunces — a soft,
+     unhurried serif for the big lines. Both fall back gracefully offline. */
+  --font: "Atkinson Hyperlegible", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, "Times New Roman", serif;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%; text-size-adjust:100%}
 html,body{height:100%}
 body{
   margin:0; background:var(--bg); color:var(--ink); font-family:var(--font);
   overflow:hidden; overscroll-behavior:none;
   -webkit-font-smoothing:antialiased;
-  font-size:16px; line-height:1.55;
+  /* fluid base size: never below 16px, breathes up to 18px on larger screens */
+  font-size:clamp(16px, 15.2px + .25vw, 18px); line-height:1.6;
 }
 canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none}
 .screen{
@@ -37,11 +46,11 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; to
 @keyframes fadein{from{opacity:0} to{opacity:1}}
 .wrap{max-width:760px; margin:0 auto; padding-bottom:40px}
 
-h1{font-weight:300; letter-spacing:.16em; text-transform:uppercase; font-size:clamp(15px,2.2vw,19px); margin:0 0 6px; color:var(--ink-dim)}
-h2{font-weight:300; font-size:clamp(24px,4.6vw,38px); line-height:1.25; margin:0 0 10px; letter-spacing:-.01em}
-h3{font-weight:400; font-size:14px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); margin:34px 0 12px}
+h1{font-weight:400; letter-spacing:.2em; text-transform:uppercase; font-size:clamp(15px,2.2vw,19px); margin:0 0 6px; color:var(--ink-dim)}
+h2{font-family:var(--font-display); font-weight:350; font-size:clamp(27px,5vw,42px); line-height:1.22; margin:0 0 10px; letter-spacing:.005em}
+h3{font-weight:400; font-size:14.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); margin:34px 0 12px}
 p{color:var(--ink-dim); margin:0 0 14px; max-width:62ch}
-.small{font-size:13.5px; color:var(--ink-faint); line-height:1.6}
+.small{font-size:14.5px; color:var(--ink-faint); line-height:1.65}
 .hair{height:1px; background:var(--line); margin:26px 0; border:0}
 
 .states{display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr)); gap:10px; margin:6px 0 4px}
@@ -97,7 +106,7 @@ textarea:focus, input[type=text]:focus{outline:none; border-color:rgba(127,212,1
 .toggle:hover{background:rgba(255,255,255,.045)}
 .toggle input{margin-top:4px; accent-color:#7fd4c1; width:17px;height:17px; flex:none}
 .toggle b{font-weight:500; font-size:15px; display:block; color:var(--ink)}
-.toggle span{color:var(--ink-faint); font-size:12.8px; line-height:1.5}
+.toggle span{color:var(--ink-faint); font-size:13.8px; line-height:1.55}
 
 /* ---------- session HUD ---------- */
 #hud{position:fixed; inset:0; pointer-events:none; z-index:6; display:none; font-size:13px}
@@ -135,8 +144,8 @@ textarea:focus, input[type=text]:focus{outline:none; border-color:rgba(127,212,1
   animation:rise 1.1s cubic-bezier(.2,.7,.3,1) both; box-shadow:0 24px 70px rgba(0,0,0,.5);
 }
 @keyframes rise{from{opacity:0; transform:translateY(16px)} to{opacity:1; transform:none}}
-.card h4{margin:0 0 6px; font-weight:300; font-size:23px; letter-spacing:-.01em}
-.card p{margin:0 auto 16px; color:var(--ink-dim); font-size:14.5px; max-width:44ch}
+.card h4{margin:0 0 6px; font-family:var(--font-display); font-weight:350; font-size:24px; letter-spacing:.005em}
+.card p{margin:0 auto 16px; color:var(--ink-dim); font-size:15.5px; line-height:1.6; max-width:44ch}
 .senses{display:flex; gap:9px; justify-content:center; flex-wrap:wrap; margin:16px 0 18px}
 .sense{
   width:46px;height:46px;border-radius:50%; border:1px solid var(--line); background:rgba(255,255,255,.03);
@@ -152,7 +161,7 @@ textarea:focus, input[type=text]:focus{outline:none; border-color:rgba(127,212,1
 @keyframes senseGlow{0%,100%{box-shadow:0 0 0 0 rgba(127,212,193,.30)} 50%{box-shadow:0 0 0 9px rgba(127,212,193,0)}}
 @media (prefers-reduced-motion: reduce){ .sense:not(:disabled):not(.done){animation:none; box-shadow:0 0 0 4px rgba(127,212,193,.18)} }
 .sense.done{background:rgba(127,212,193,.22); border-color:rgba(127,212,193,.7); color:#eafaf6; transform:scale(1.06); box-shadow:0 0 22px rgba(127,212,193,.3)}
-.tiny{font-size:12px; color:var(--ink-faint); letter-spacing:.05em}
+.tiny{font-size:13px; color:var(--ink-faint); letter-spacing:.05em}
 
 #toast{
   position:fixed; left:50%; transform:translateX(-50%); top:calc(66px + env(safe-area-inset-top)); z-index:9;
@@ -176,7 +185,7 @@ textarea:focus, input[type=text]:focus{outline:none; border-color:rgba(127,212,1
 }
 .reframe:hover{color:var(--ink); border-color:rgba(127,212,193,.4); background:rgba(127,212,193,.06)}
 
-footer.legal{color:#3d4a56; font-size:11.5px; line-height:1.6; margin-top:30px; max-width:64ch}
+footer.legal{color:#4a5a68; font-size:12.8px; line-height:1.65; margin-top:30px; max-width:64ch}
 
 /* ================= the check-in arrives in daylight =================
    Warm parchment on the way in; it dissolves into the dark session on
@@ -358,6 +367,13 @@ footer.legal{color:#3d4a56; font-size:11.5px; line-height:1.6; margin-top:30px; 
 .btn.small.primary:hover{
   background:#356f5f;
 }
+.breathpace{display:grid; grid-template-columns:1fr 1fr; gap:12px 18px; margin-top:6px}
+@media (max-width:560px){ .breathpace{grid-template-columns:1fr} }
+.breathpace label{display:grid; grid-template-columns:1fr auto; align-items:center; gap:2px 8px;
+  font-size:13.5px; color:#57503f; padding:10px 12px; border:1px solid rgba(90,70,40,.22);
+  border-radius:12px; background:rgba(255,252,244,.55)}
+.breathpace output{font-variant-numeric:tabular-nums; color:#3f8b76; font-size:13.5px}
+.breathpace input[type=range]{grid-column:1 / -1; width:100%; accent-color:#3f8b76; margin:2px 0 0}
 .linkish{ border:0; background:none; color:#8a7b68; font:inherit; font-size:12px; cursor:pointer; margin-top:6px; text-decoration:underline dotted; }
 .linkish:hover{ color:#3f8b76; }
 .quick-chip-row{
@@ -414,7 +430,7 @@ footer.legal{color:#3d4a56; font-size:11.5px; line-height:1.6; margin-top:30px; 
 }
 a{color:var(--accent)}
 .hide{display:none !important}
-@media (max-width:520px){ .card{padding:22px 18px 18px} h2{font-size:26px} }
+@media (max-width:520px){ .card{padding:22px 18px 18px} h2{font-size:28px} body{line-height:1.65} .btn{font-size:17px; padding:15px 34px} }
 </style>
 </head>
 <body>
@@ -463,6 +479,17 @@ a{color:var(--accent)}
       <label class="toggle"><input type="checkbox" id="optSimple"><span><b>Just the breath</b><span>Dims the scenery and keeps only the breathing light, so there is less to look at and nothing to get right. Good if visuals tend to overstimulate you.</span></span></label>
     </div>
 
+    <h3>The rhythm it settles into <span style="text-transform:none;letter-spacing:0;color:#3d4a56">— optional</span></h3>
+    <p class="small">Seconds for each part of the breath, once it has slowed all the way down. The pacer still starts at your speed and glides here — you don't have to hit these numbers, only drift toward them.</p>
+    <div class="breathpace" id="breathPace">
+      <label>Inhale <output id="bpInV">3.5s</output><input type="range" id="bpIn" min="2" max="7" step="0.5" value="3.5" aria-label="Inhale length in seconds"></label>
+      <label>Hold <output id="bpHoldV">2s</output><input type="range" id="bpHold" min="0" max="8" step="0.5" value="2" aria-label="Hold length in seconds"></label>
+      <label>Exhale <output id="bpOutV">4.5s</output><input type="range" id="bpOut" min="3" max="9" step="0.5" value="4.5" aria-label="Exhale length in seconds"></label>
+      <label>Rest <output id="bpRestV">1s</output><input type="range" id="bpRest" min="0" max="4" step="0.5" value="1" aria-label="Rest length in seconds"></label>
+    </div>
+    <p class="tiny" id="bpSummary"></p>
+    <button class="linkish" id="bpReset" type="button">Back to the default rhythm</button>
+
     <div id="goalPrev" class="hide">
       <h3>Last time you set a goal</h3>
       <p class="small" id="goalPrevText"></p>
@@ -478,6 +505,7 @@ a{color:var(--accent)}
       <button class="btn" id="beginBtn">Begin</button>
       <span class="small" id="beginHint">Four rooms, one continuous breath.</span>
     </div>
+    <p class="small" style="margin-top:14px">Or try <a href="orb.html">the Orb</a> — a quieter, guided preview: a small light in a dark space that asks where you are, listens, and shapes a place around your answer.</p>
 
     <footer class="legal">
       Slow Light is a self-guided relaxation tool, not medical treatment, and it does not diagnose or monitor anything. Any pulse figure it shows is a rough visual estimate, not a measurement. If you're in crisis, please reach a person — a friend, a clinician, or a local crisis line. In the US, call or text <a href="tel:988">988</a> (Suicide &amp; Crisis Lifeline, 24/7) or text HOME to 741741; outside the US, <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a> lists local lines. If you are in immediate danger, call your local emergency number. Motion is deliberately slow and there is no strobing, but if you're photosensitive or prone to motion sickness, use the reduce-motion setting on your device; this page follows it.
@@ -540,7 +568,9 @@ a{color:var(--accent)}
     <div class="row">
       <button class="btn" id="againBtn">Another session</button>
       <button class="btn ghost" id="copyBtn">Copy my notes</button>
+      <a class="btn ghost" id="historyBtn" href="history.html" style="text-decoration:none">How it's been going</a>
     </div>
+    <p class="small" style="margin-top:10px">This session is kept on this device only, so "How it's been going" can show your feelings over time on a calendar. Nothing is sent anywhere.</p>
   </div>
 </section>
 
@@ -1267,7 +1297,7 @@ class EmotionGraph {
       ctx.fillStyle = U.col(ink, (0.62 + 0.38 * bloom) * dim);
       ctx.fillText(b.word.toUpperCase(), x, y);
       if(bloom > 0.3){
-        ctx.font = `400 10px ${fam}`;
+        ctx.font = `400 11px ${fam}`;
         ctx.letterSpacing && (ctx.letterSpacing = "1px");
         ctx.fillStyle = `rgba(90, 76, 56, ${(bloom - .3) / .7 * 0.8})`;
         ctx.fillText(b.sub, x, y + 15);
@@ -1404,7 +1434,7 @@ class EmotionGraph {
 
       // label — always readable, brighter when lit or near
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.font = `${isSelected ? "600" : isHovered ? "500" : "400"} ${Math.round(11 * (isHovered || isSelected ? 1.08 : 1))}px ${fam}`;
+      ctx.font = `${isSelected ? "600" : isHovered ? "500" : "400"} ${Math.round(12 * (isHovered || isSelected ? 1.08 : 1))}px ${fam}`;
       // labels sit radially outside the node, away from the hub, so the
       // east/west points read to the side and the north/south ones above/below
       if(!showLabel) continue;
@@ -1418,7 +1448,7 @@ class EmotionGraph {
       ctx.fillStyle = isSelected ? "#1f1a13" : isHovered ? "#1f1a13" : "rgba(50, 42, 30, 0.88)";
       ctx.fillText(n.label, lx, ly);
       if(isSelected && !n.centre){
-        ctx.font = `400 9.5px ${fam}`;
+        ctx.font = `400 10.5px ${fam}`;
         ctx.fillStyle = "rgba(70, 60, 44, 0.85)";
         ctx.fillText(intensityWord(w), lx, ly + (side ? 12 : (n.uy > 0 ? 12 : -12)));
       }
@@ -1497,13 +1527,14 @@ class Breath {
     const prev = this.phase;
     this.phase += cps*dt;
     if(this.phase >= 1){ this.phase -= Math.floor(this.phase); this.cycles++; }
-    // segment ratios shift from even to exhale-dominant as we slow.
-    // Holds are deliberately long (client feedback, Aug 2026): a real pause
-    // at the top and at the bottom means the ball spends more of each cycle
-    // still, which reads as slower and is easier to stay with. At resonance
-    // (~5.5/min ≈ 11s) this is roughly in 3.5s · hold 1.8s · out 4.6s · rest 1.1s.
+    // segment ratios shift from even to the person's chosen resting shape as
+    // we slow. The default resting shape (in 3.5s · hold 2s · out 4.5s ·
+    // rest 1s at ~5.5/min) keeps the deliberately long holds from the Aug
+    // 2026 feedback; the check-in's "rhythm it settles into" sliders replace
+    // it with whatever the person set (see Breath.setShape).
     const p = U.clamp(U.inv(this.startRate, this.target, this.rate),0,1);
-    const i = U.lerp(.40,.32,p), h1 = U.lerp(.10,.16,p), e = U.lerp(.42,.42,p);
+    const sh = this.shape || Breath.DEFAULT_SHAPE;
+    const i = U.lerp(.40, sh.i, p), h1 = U.lerp(.10, sh.h1, p), e = U.lerp(.42, sh.e, p);
     const h2 = 1 - i - h1 - e;
     const t = this.phase;
     if(t < i){ this.segment="in";   this.level = U.smoother(t/i); }
@@ -1516,9 +1547,20 @@ class Breath {
     this.rateSum += this.rate*dt; this.rateN += dt;
     return this;
   }
+  /* The person's resting breath, in seconds per phase. Sets both the target
+     tempo (60 / total seconds) and the segment fractions the cycle relaxes
+     into. Called before start(). */
+  setShape(sec){
+    const inS=U.clamp(+sec.inS||3.5,1,10), hS=U.clamp(+sec.holdS||0,0,10),
+          outS=U.clamp(+sec.outS||4.5,1,12), rS=U.clamp(+sec.restS||0,0,8);
+    const tot = inS+hS+outS+rS;
+    this.target = U.clamp(60/tot, 3.5, 10);
+    this.shape = { i:inS/tot, h1:hS/tot, e:outS/tot, h2:rS/tot };
+  }
   get bpmText(){ return this.rate.toFixed(1)+" breaths/min"; }
   get avg(){ return this.rateN ? this.rateSum/this.rateN : this.rate; }
 }
+Breath.DEFAULT_SHAPE = { i:.32, h1:.18, e:.41, h2:.09 };   // ≈ 3.5 · 2 · 4.5 · 1 s at 5.5/min
 
 /* =====================================================================
    AUDIO — everything synthesised live. No files, no network.
@@ -3330,6 +3372,7 @@ const App = {
     $("#optCam").addEventListener("change", e=>this.toggleSensor("cam", e.target));
     $("#suds").addEventListener("input", e=>{ $("#sudsVal").textContent=e.target.value; this._sudsTouched=true; });
     $("#suds2").addEventListener("input", e=>{ $("#suds2Val").textContent=e.target.value; this._suds2Touched=true; this.updateDelta(); });
+    this.initBreathPace();
     $("#beginBtn").addEventListener("click", ()=>this.begin());
     $("#againBtn").addEventListener("click", ()=>location.reload());
     $("#copyBtn").addEventListener("click", ()=>this.copyNotes());
@@ -3351,6 +3394,35 @@ const App = {
 
     const g=this.loadGoal();
     if(g){ $("#goalPrevText").textContent = "“"+g+"”"; $("#goalPrev").classList.remove("hide"); }
+  },
+  /* --------- the rhythm the breath settles into (per-phase seconds) ------ */
+  breathDefaults:{ inS:3.5, holdS:2, outS:4.5, restS:1 },
+  initBreathPace(){
+    const ids={inS:"bpIn", holdS:"bpHold", outS:"bpOut", restS:"bpRest"};
+    let saved=null; try{ saved=JSON.parse(localStorage.getItem("slowlight.breathShape")||"null"); }catch(e){}
+    this.breathShape = { ...this.breathDefaults, ...(saved||{}) };
+    const fmt=v=>(+v).toFixed(1).replace(/\.0$/,"")+"s";
+    const paint=()=>{
+      for(const k in ids){
+        const el=$("#"+ids[k]); el.value=this.breathShape[k];
+        $("#"+ids[k]+"V").textContent=fmt(this.breathShape[k]);
+      }
+      const t=this.breathShape.inS+this.breathShape.holdS+this.breathShape.outS+this.breathShape.restS;
+      $("#bpSummary").textContent=`One breath ≈ ${fmt(t)} — about ${(60/t).toFixed(1)} breaths a minute at its slowest.`;
+    };
+    for(const k in ids){
+      $("#"+ids[k]).addEventListener("input", e=>{
+        this.breathShape[k]=+e.target.value;
+        try{ localStorage.setItem("slowlight.breathShape", JSON.stringify(this.breathShape)); }catch(e2){}
+        paint();
+      });
+    }
+    $("#bpReset").addEventListener("click", ()=>{
+      this.breathShape={ ...this.breathDefaults };
+      try{ localStorage.removeItem("slowlight.breathShape"); }catch(e){}
+      paint();
+    });
+    paint();
   },
   loadGoal(){ try{ return localStorage.getItem("slowlight.goal")||""; }catch(e){ return ""; } },
   saveGoal(v){ try{ v? localStorage.setItem("slowlight.goal", v) : localStorage.removeItem("slowlight.goal"); }catch(e){} },
@@ -3454,6 +3526,7 @@ const App = {
 
     // arousal from both the blended state and the reported grip
     const arousal = U.clamp(G.st.arousal*.45 + (this.suds/10)*.55, 0, 1);
+    G.breath.setShape(this.breathShape || this.breathDefaults);
     G.breath.start(arousal, this.sessionSec);
 
     this.rooms=[new Weathering(), new SlowGarden(), new Descent(), new Resonance()];
@@ -3512,7 +3585,7 @@ const App = {
     ctx.save();
     ctx.textAlign="center";
     ctx.fillStyle="rgba(233,242,245,.82)";
-    ctx.font=`300 ${Math.round(Math.min(W,H)*.055)}px ${fam}`;
+    ctx.font=`350 ${Math.round(Math.min(W,H)*.055)}px Fraunces, Georgia, ${fam}`;
     ctx.fillText("Paused", W/2, H*.47);
     ctx.fillStyle="rgba(210,226,232,.42)";
     ctx.font=`400 ${Math.round(Math.min(W,H)*.019)}px ${fam}`;
@@ -3789,9 +3862,8 @@ const App = {
     $("#statGrid").innerHTML = stats.map(([l,v,s])=>`<div class="stat"><b>${v}</b><span>${l}</span><div class="tiny" style="margin-top:2px">${s}</div></div>`).join("");
     $("#suds2").value=this.suds; $("#suds2Val").textContent=this.suds; this._suds2Touched=false;
     
-    // Title reflects single or blended state
-    const keys = G.st.keys || [this.stateKey];
-    $("#closeTitle").textContent = this.blendLine(keys, 1);
+    // Title + lede respond to what the person actually reports (set in updateCloseCopy)
+    this.updateCloseCopy();
 
     // the report repeats the check-in's own words, so before/after read as one pair
     const arrivedLabel = G.st.labelFull ? G.st.labelFull.toLowerCase() : STATES[this.stateKey].label.toLowerCase();
@@ -3799,7 +3871,35 @@ const App = {
     this.buildReframes();
     this.buildGoals();
     $("#scr-close").classList.add("active");
+    this._sid = new Date().toISOString()+"~"+Math.random().toString(36).slice(2,7);
     this.updateDelta();
+    this.saveSession();
+    if(!this._carryBound){
+      this._carryBound=true;
+      $("#carry").addEventListener("input", ()=>this.saveSession());
+    }
+  },
+  /* One record per finished session, on this device only, so history.html can
+     draw the calendar of how things have been going. Updated in place as the
+     person answers the close-screen questions. */
+  saveSession(){
+    if(!this._sid) return;
+    try{
+      const keys=(G.st&&G.st.keys)||[this.stateKey];
+      const rec={
+        id:this._sid, t:Date.now(),
+        keys, label:(G.st&&G.st.labelFull)||STATES[this.stateKey].label,
+        weights:keys.map(k=>+((this.weights&&this.weights[k])??INTENSITY_DEFAULT).toFixed(2)),
+        before:this.suds, after:this._suds2Touched? +$("#suds2").value : null,
+        mins:Math.round((performance.now()-this.startedAt)/6000)/10,
+        breaths:G.breath.cycles,
+        thought:this.thought||"", carry:$("#carry").value.trim(), goal:$("#goal").value.trim()
+      };
+      const all=JSON.parse(localStorage.getItem("slowlight.history")||"[]");
+      const i=all.findIndex(r=>r.id===rec.id);
+      if(i>=0) all[i]=rec; else all.push(rec);
+      localStorage.setItem("slowlight.history", JSON.stringify(all.slice(-400)));
+    }catch(e){}
   },
   fadeOut(){
     let a=0; const ctx=G.ctx;
@@ -3861,15 +3961,52 @@ const App = {
       this._goalBound=true;
       list.addEventListener("click", e=>{
         const b=e.target.closest(".reframe"); if(!b) return;
-        $("#goal").value=b.textContent; this.saveGoal(b.textContent);
+        $("#goal").value=b.textContent; this.saveGoal(b.textContent); this.saveSession();
       });
-      $("#goal").addEventListener("input", e=>this.saveGoal(e.target.value.trim()));
+      $("#goal").addEventListener("input", e=>{ this.saveGoal(e.target.value.trim()); this.saveSession(); });
     }
     const prev=this.loadGoal(); if(prev && !$("#goal").value) $("#goal").placeholder="Last time: "+prev;
+  },
+  /* The closing sentences answer the person, not a script: they change with
+     what was lit at arrival, how much of it there was, what was typed during
+     the session, and — most of all — where they put the slider just now.   */
+  updateCloseCopy(){
+    const keys = (G.st && G.st.keys) || [this.stateKey];
+    const after=+$("#suds2").value, before=this.suds, d=before-after;
+    const domW = (STATE_WEATHER[keys[0]] || STATE_WEATHER.neutral);
+    const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+    const arrived = G.st && G.st.labelFull ? G.st.labelFull.toLowerCase() : STATES[this.stateKey].label.toLowerCase();
+    const title=$("#closeTitle"), lede=$("#closeLede");
+    const thoughtBit = this.thought ? ` You set one thought down on the way — it doesn't have to be picked back up on the way out.` : "";
+    if(!this._suds2Touched){
+      title.textContent = "Notice where you are now.";
+      lede.textContent = `You came in ${arrived}, in ${this.blendWeatherIn(keys)}. Nothing outside you changed in the last few minutes. Something inside you might have — that's worth checking honestly, including if the answer is "not much".${thoughtBit}`;
+    } else if(d>=3){
+      title.textContent = this.blendLine(keys, 1);
+      lede.textContent = `From ${before} to ${after} is a real distance, and you covered it without anything outside you changing. Worth remembering how the way down felt — it's yours now.${thoughtBit}`;
+    } else if(d>0){
+      title.textContent = this.blendLine(keys, 1);
+      lede.textContent = `Down from ${before} to ${after}. ${cap(domW.out)} hasn't cleared, but you're not standing in it the same way. Small and real is the kind that lasts.${thoughtBit}`;
+    } else if(d===0){
+      title.textContent = `${cap(domW.out)} is still here. So are you.`;
+      lede.textContent = `Still at ${after}. That isn't a failure — some days the nervous system needs more than one pass, or needs something else entirely. You stayed with it, which is the part that was up to you.${thoughtBit}`;
+    } else {
+      title.textContent = `${cap(domW.out)} got louder when you slowed down.`;
+      lede.textContent = `Up from ${before} to ${after} — worth saying honestly. Sometimes slowing down lets you feel what the speed was covering. That's information, not a setback, and it can be worth bringing to someone you trust.${thoughtBit}`;
+    }
+  },
+  /* Arrival-weather phrase for one or several feelings: "sleet, with fog underneath". */
+  blendWeatherIn(keys){
+    const w = keys.map(k => (STATE_WEATHER[k]||STATE_WEATHER.neutral).in);
+    if(w.length===1) return w[0];
+    const rest = w.slice(1);
+    return w[0] + ", with " + (rest.length===1 ? rest[0] : rest.slice(0,-1).join(", ") + " and " + rest[rest.length-1]) + " underneath";
   },
   updateDelta(){
     const after=+$("#suds2").value, before=this.suds, d=before-after;
     $("#deltaFill").style.width=U.clamp((10-after)/10,0,1)*100+"%";
+    this.updateCloseCopy();
+    this.saveSession();
     if(!this._suds2Touched){ $("#deltaText").textContent="Move the slider to where you actually are — it starts where you came in, not where you're supposed to land."; return; }
     $("#deltaText").textContent = d>0
       ? `Down ${d} point${d>1?"s":""}, from ${before} to ${after}. Small and real beats big and imagined.`
@@ -3911,8 +4048,10 @@ const App = {
   window.addEventListener("touchmove", e=>{ if(e.touches[0]) move(e.touches[0].clientX,e.touches[0].clientY); }, {passive:true});
   window.addEventListener("keydown", e=>{
     if(App.screen!=="session") return;
+    const t=e.target;
+    const typing = t && (t.tagName==="INPUT" || t.tagName==="TEXTAREA" || t.tagName==="SELECT" || t.isContentEditable);
     if(e.key==="Escape"){ if(App.held) App.closeCard(); else App.finish(); }
-    if(e.key===" "){ e.preventDefault(); App.togglePause(); }
+    if(e.key===" " && !typing){ e.preventDefault(); App.togglePause(); }
   });
 })();
 
