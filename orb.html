@@ -44,10 +44,11 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
 
 /* ---------- spoken text ---------- */
 #caption{
-  position:fixed; left:50%; bottom:clamp(120px, 22vh, 220px); transform:translateX(-50%);
+  position:fixed; left:50%; bottom:calc(var(--stackH, clamp(90px,16vh,160px)) + 30px); transform:translateX(-50%);
   width:min(92vw, 640px); text-align:center; pointer-events:none; z-index:5;
   font-family:var(--font-display); font-weight:340; font-size:clamp(20px,3.4vw,28px);
   letter-spacing:.015em; line-height:1.5; color:rgba(236,244,246,.95);
+  transition:bottom .5s ease;
   text-shadow:0 0 30px rgba(159,232,216,.28), 0 0 8px rgba(159,232,216,.14), 0 2px 26px rgba(0,0,0,.75);
 }
 /* each word condenses out of smoke: blurred, drifting, translucent → still */
@@ -60,8 +61,18 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
 @media (prefers-reduced-motion: reduce){
   #caption .w{filter:none; transform:none; transition:opacity .8s ease}
 }
+/* the mind sometimes writes a longer thought — let it shrink, never collide */
+#caption.long{font-size:clamp(17px,2.6vw,22px); line-height:1.45}
+#subcap{transition:bottom .5s ease}
+/* the words the orb is hearing, appearing as they're spoken */
+#liveTx{
+  display:none; text-align:center; font-size:14.5px; color:#ffd9ae; font-style:italic;
+  text-shadow:0 1px 12px rgba(0,0,0,.7); min-height:20px; padding:0 12px;
+  max-width:min(92vw,560px); margin:0 auto;
+}
+#liveTx.on{display:block}
 #subcap{
-  position:fixed; left:50%; bottom:clamp(96px,18.5vh,190px); transform:translateX(-50%);
+  position:fixed; left:50%; bottom:calc(var(--stackH, clamp(70px,13vh,130px)) + 8px); transform:translateX(-50%);
   width:min(92vw,560px); text-align:center; pointer-events:none; z-index:5;
   font-size:14px; color:rgba(233,242,245,.55); opacity:0; transition:opacity .9s; text-shadow:0 1px 14px rgba(0,0,0,.7);
 }
@@ -197,6 +208,7 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
 
 <div id="answers">
   <canvas id="vu" width="300" height="46" aria-hidden="true"></canvas>
+  <div id="liveTx" aria-live="polite"></div>
   <div id="sliderWrap">
     <div id="sliderVal">5</div>
     <input type="range" id="oSlider" min="0" max="10" step="1" value="5" aria-label="Answer, 0 to 10">
@@ -711,6 +723,7 @@ const Ears = {
   _token:0, _cleanup:null, _finishNow:null,
   get supported(){ return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia) || !!(window.SpeechRecognition||window.webkitSpeechRecognition); },
   mode(){
+    if(elReady() && !this.rtDown && window.WebSocket && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) return "realtime";
     if(elReady() && !this.sttDown && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder) return "scribe";
     if(window.SpeechRecognition||window.webkitSpeechRecognition) return "webspeech";
     return null;
@@ -740,7 +753,99 @@ const Ears = {
     try{ stream=await this.ensureStream(); }
     catch(e){ this.denied=true; $("#micBtn").style.display="none"; return; }
     if(token!==this._token) return;
+    if(m==="realtime"){
+      try{ await this._realtimeListen(stream, onText, token, opts); }
+      catch(e){ if(token===this._token){ this.rtDown=true; try{ this._scribeListen(stream, onText, token, opts); }catch(e2){ this.cancel(); } } }
+      return;
+    }
     try{ this._scribeListen(stream, onText, token, opts); }catch(e){ this.cancel(); }
+  },
+  /* ---- the realtime ear: words appear as they're spoken -------------------
+     Streams mic audio over a WebSocket to ElevenLabs Scribe v2 Realtime.
+     Auth is a 15-minute single-use token minted through the proxy, so the
+     API key still never reaches the browser. The server's voice-activity
+     detection decides when a thought is complete and commits it.          */
+  async _rtToken(){
+    const r=await fetch(elBase()+"/v1/single-use-tokens/realtime_scribe",{method:"POST",headers:elHeaders()});
+    if(!r.ok) throw 0;
+    const j=await r.json().catch(()=>null);
+    const t=(j && (j.token||j.single_use_token||j.value)) || null;
+    if(!t) throw 0;
+    return t;
+  },
+  async _realtimeListen(stream, onText, token, opts){
+    const tok=await this._rtToken();
+    if(token!==this._token) return;
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    const src=ac.createMediaStreamSource(stream);
+    const an=ac.createAnalyser(); an.fftSize=1024; src.connect(an);
+    const proc=ac.createScriptProcessor(4096,1,1);
+    const inRate=ac.sampleRate;
+    const url="wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+      +"?model_id=scribe_v2_realtime&audio_format=pcm_16000"
+      +"&commit_strategy=vad&vad_silence_threshold_secs=1.2&min_speech_duration_ms=250"
+      +"&token="+encodeURIComponent(tok);
+    const ws=new WebSocket(url);
+    const live=$("#liveTx");
+    this.listening=true; this.setBtn("listening");
+    Media.duck(true);
+    const stopVu=this._vuStart(an, ac);
+    let ended=false, committed="", gotAny=false;
+    const started=performance.now();
+    const cleanup=(send)=>{
+      if(ended) return; ended=true;
+      try{ proc.disconnect(); src.disconnect(); }catch(e){}
+      try{ if(ac.state!=="closed") ac.close().catch(()=>{}); }catch(e){}
+      try{ ws.close(); }catch(e){}
+      stopVu(); Media.duck(false);
+      live.classList.remove("on"); live.textContent="";
+      this.listening=false; this._finishNow=null; this._cleanup=null;
+      this.setBtn("idle");
+      const text=committed.trim();
+      if(send && text && token===this._token) onText(text);
+    };
+    this._cleanup=()=>cleanup(false);
+    this._finishNow=()=>{ try{ ws.send(JSON.stringify({message_type:"input_audio_chunk", audio_base_64:"", commit:true})); }catch(e){} setTimeout(()=>cleanup(true), 900); };
+    ws.onmessage=ev=>{
+      let m=null; try{ m=JSON.parse(ev.data); }catch(e){ return; }
+      const t=m.message_type||m.type||"";
+      if(t==="partial_transcript"){
+        gotAny=true;
+        live.textContent=(committed+" "+(m.text||"")).trim();
+        live.classList.add("on");
+      } else if(t==="committed_transcript"||t==="final_transcript"||t==="committed_transcript_with_timestamps"||t==="final_transcript_with_timestamps"){
+        if(m.text){ gotAny=true; committed=(committed+" "+m.text).trim(); live.textContent=committed; live.classList.add("on"); }
+        // a completed thought followed by the VAD's silence — that's the answer
+        if(t.startsWith("committed") && committed) setTimeout(()=>cleanup(true), 250);
+      } else if(t==="auth_error"||t==="quota_exceeded"||t==="rate_limited"){
+        this.rtDown = (t!=="rate_limited");
+        cleanup(false);
+      }
+    };
+    ws.onerror=()=>{ if(!gotAny) this.rtDown=true; cleanup(false); };
+    ws.onclose=()=>{ if(!ended) cleanup(!!committed); };
+    ws.onopen=()=>{
+      proc.onaudioprocess=e=>{
+        if(ended || ws.readyState!==1) return;
+        const f=e.inputBuffer.getChannelData(0);
+        // resample to 16 kHz mono, 16-bit
+        const ratio=inRate/16000, n=Math.floor(f.length/ratio);
+        const pcm=new Int16Array(n);
+        for(let i=0;i<n;i++){ const v=Math.max(-1,Math.min(1, f[Math.floor(i*ratio)]||0)); pcm[i]=v<0? v*0x8000 : v*0x7FFF; }
+        let bin=""; const bytes=new Uint8Array(pcm.buffer);
+        for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+        try{ ws.send(JSON.stringify({message_type:"input_audio_chunk", audio_base_64:btoa(bin)})); }catch(e2){}
+      };
+      src.connect(proc); proc.connect(ac.destination);
+    };
+    // patience: a quiet person shouldn't be listened at forever
+    const patience=opts.patienceMs||12000;
+    const watch=setInterval(()=>{
+      if(ended){ clearInterval(watch); return; }
+      const elapsed=performance.now()-started;
+      if(!gotAny && elapsed>patience){ clearInterval(watch); cleanup(false); }
+      else if(elapsed>45000){ clearInterval(watch); cleanup(!!committed); }
+    }, 500);
   },
   /* live spectrum while recording — the visible proof it hears you. Bars are
      the voice band of a real frequency analysis with the noise floor cut, so
@@ -1164,6 +1269,7 @@ const Cap={
     // let the last line dissolve back into smoke before the next condenses
     if(c.classList.contains("on")){ c.classList.remove("on"); await new Promise(r=>setTimeout(r,650)); }
     c.setAttribute("aria-label", text);
+    c.classList.toggle("long", text.length>110);
     c.innerHTML = text.split(/\s+/).map((w,i)=>
       `<span class="w" style="transition-delay:${Math.min(i*110,1400)}ms">${w.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</span>`
     ).join(" ");
@@ -1205,6 +1311,18 @@ const UI={
     return new Promise(res=>{ UI._sliderResolve=res; });
   }
 };
+/* the caption always floats just above whatever the answer area occupies —
+   a long mind-written line and a tall slider panel can no longer collide */
+(function(){
+  const a=$("#answers");
+  const set=()=>{
+    const h=a.classList.contains("on")? a.offsetHeight+44 : Math.round(innerHeight*.16);
+    document.documentElement.style.setProperty("--stackH", Math.max(h, Math.round(innerHeight*.14))+"px");
+  };
+  try{ new ResizeObserver(set).observe(a); }catch(e){}
+  try{ new MutationObserver(set).observe(a,{attributes:true,attributeFilter:["class"]}); }catch(e){}
+  addEventListener("resize", set); set();
+})();
 $("#oSlider").addEventListener("input",e=>$("#sliderVal").textContent=e.target.value);
 $("#sliderGo").addEventListener("click",()=>{ const v=+$("#oSlider").value; UI.hide(); UI._sliderResolve&&UI._sliderResolve(v); });
 $("#chips").addEventListener("click",e=>{ const b=e.target.closest(".ochip"); if(!b)return; UI.hide(); UI._chipResolve&&UI._chipResolve(+b.dataset.i); });

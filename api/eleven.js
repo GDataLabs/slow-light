@@ -15,6 +15,7 @@ const ALLOW = [
   { m: "POST", p: /^\/v1\/voices\/add\/[^/]+\/[^/]+$/ },
   { m: "POST", p: /^\/v1\/text-to-speech\/[^/]+$/ },
   { m: "POST", p: /^\/v1\/speech-to-text$/ },
+  { m: "POST", p: /^\/v1\/single-use-tokens\/realtime_scribe$/ },   // 15-min token for the realtime ear
   { m: "POST", p: /^\/v1\/sound-generation$/ },
   { m: "POST", p: /^\/v1\/flows\/(image|video)$/ },
   { m: "GET",  p: /^\/v1\/flows\/(image|video)\/[^/]+$/ },
