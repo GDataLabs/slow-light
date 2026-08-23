@@ -241,6 +241,11 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
       <button id="vEleven" aria-pressed="false">ElevenLabs</button>
     </div>
     <div id="elFields" style="display:none">
+      <div class="field" id="elKeyWrap" style="display:none">
+        <label for="elKey">ElevenLabs API key</label>
+        <input type="password" id="elKey" autocomplete="off" placeholder="sk_…">
+        <p class="tiny" style="margin:4px 0 0">No key is set up on this device. Paste one here — it is kept only in this browser, and sent nowhere except directly to ElevenLabs.</p>
+      </div>
       <div class="field">
         <label for="elVoice">Voice</label>
         <select id="elVoice">
@@ -312,6 +317,7 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
   </div>
 </div>
 
+<script src="site-config.js"></script>
 <script src="voice-config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -370,19 +376,35 @@ const VoiceCfg = {
   load(){
     let c=null; try{ c=JSON.parse(localStorage.getItem("slowlight.voice")||"null"); }catch(e){}
     const d=window.SLOWLIGHT_DEFAULTS||{};   // optional voice-config.js on this device (gitignored)
+    const pub=window.SLOWLIGHT_PUBLIC||{};   // committed site-config.js — proxy URL, nothing secret
+    const proxy=(pub.proxy||"").trim();
+    const hasEl=!!(d.elKey||proxy);
     if(!c){
-      c={ engine: d.elKey? (d.engine||"eleven") : "browser", key: d.elKey||"",
+      c={ engine: hasEl? (d.engine||"eleven") : "browser", key: d.elKey||"",
           voice: d.voice||"EXAVITQu4vr4xnSDxMaL", customVoice:"",
-          ambience: d.ambience!==false, backdrop: d.backdrop||(d.elKey? "image":"off") };
+          ambience: d.ambience!==false, backdrop: d.backdrop||(hasEl? "image":"off") };
     } else {
       if(!c.key && d.elKey){ c.key=d.elKey; if(c.engine==="browser" && d.engine==="eleven" && !c._engineChosen) c.engine="eleven"; }
+      if(c.engine==="browser" && !c._engineChosen && proxy) c.engine="eleven";
       if(c.ambience===undefined) c.ambience = d.ambience!==false;
-      if(!c.backdrop) c.backdrop = d.backdrop||(c.key? "image":"off");
+      if(!c.backdrop) c.backdrop = d.backdrop||(hasEl||c.key? "image":"off");
     }
+    c.proxy=proxy;                            // always live from site-config.js
     return c;
   },
   save(c){ try{ localStorage.setItem("slowlight.voice", JSON.stringify(c)); }catch(e){} }
 };
+/* All ElevenLabs traffic flows through these three: a device key (private
+   file / pasted) calls the API directly; otherwise the site's proxy — which
+   holds the key server-side — carries the call for us. */
+function elBase(){ const p=(Voice.cfg.proxy||"").trim(); const k=(Voice.cfg.key||"").trim(); return (k||!p)? EL_API : p.replace(/\/+$/,""); }
+function elHeaders(extra){
+  const h={...(extra||{})};
+  const k=(Voice.cfg.key||"").trim();
+  if(k) h["xi-api-key"]=k;                    // proxy path sends no key — the worker adds it
+  return h;
+}
+function elReady(){ return !!(((Voice.cfg&&Voice.cfg.key)||"").trim() || ((Voice.cfg&&Voice.cfg.proxy)||"").trim()); }
 
 /* tiny on-device audio cache so repeated lines cost no credits */
 const TTSCache = {
@@ -423,16 +445,19 @@ const Eleven = {
   },
   async fetchClip(cfg, text){
     const vid=this.voiceId(cfg);
-    const url=`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(vid)}?output_format=mp3_44100_128`;
+    const k=(cfg.key||"").trim();
+    const base = k? EL_API : elBase();
+    const hdr = c => k? {"xi-api-key":k, ...c} : elHeaders(c);
+    const url=`${base}/v1/text-to-speech/${encodeURIComponent(vid)}?output_format=mp3_44100_128`;
     const body=(withSpeed)=>{
       const vs={stability:.55, similarity_boost:.8, style:.2};
       if(withSpeed) vs.speed=.87;                      // unhurried; retried without if the model refuses it
       return JSON.stringify({text, model_id:"eleven_turbo_v2_5", voice_settings:vs});
     };
-    let r=await fetch(url,{method:"POST",headers:{"xi-api-key":this.key(cfg),"Content-Type":"application/json"},body:body(this.useSpeed)});
+    let r=await fetch(url,{method:"POST",headers:hdr({"Content-Type":"application/json"}),body:body(this.useSpeed)});
     if(!r.ok && this.useSpeed && (r.status===400||r.status===422)){
       this.useSpeed=false;
-      r=await fetch(url,{method:"POST",headers:{"xi-api-key":this.key(cfg),"Content-Type":"application/json"},body:body(false)});
+      r=await fetch(url,{method:"POST",headers:hdr({"Content-Type":"application/json"}),body:body(false)});
     }
     if(!r.ok) throw new Error("elevenlabs "+r.status);
     return await r.blob();
@@ -482,13 +507,13 @@ const Media={
   key(){ return ((Voice.cfg&&Voice.cfg.key)||"").trim(); },
   /* ---- ambient soundscape (looped, cached per scene) ---- */
   async soundscape(sceneKey){
-    if(!Voice.cfg.ambience || !this.key() || !AMBIENCE[sceneKey]) return;
+    if(!Voice.cfg.ambience || !elReady() || !AMBIENCE[sceneKey]) return;
     try{
       const ck="amb1|"+sceneKey;
       let blob=await TTSCache.get(ck);
       if(!blob){
-        const r=await fetch(EL_API+"/v1/sound-generation?output_format=mp3_44100_128",{
-          method:"POST", headers:{"xi-api-key":this.key(),"Content-Type":"application/json"},
+        const r=await fetch(elBase()+"/v1/sound-generation?output_format=mp3_44100_128",{
+          method:"POST", headers:elHeaders({"Content-Type":"application/json"}),
           body:JSON.stringify({text:AMBIENCE[sceneKey], loop:true, duration_seconds:18, prompt_influence:.35})});
         if(!r.ok) throw 0;
         blob=await r.blob(); TTSCache.put(ck, blob);
@@ -515,7 +540,7 @@ const Media={
     for(;;){
       await new Promise(r=>setTimeout(r,everyMs));
       if(Date.now()-t0>maxMs) throw 0;
-      const r=await fetch(`${EL_API}/v1/flows/${kind}/${id}`,{headers:{"xi-api-key":this.key()}});
+      const r=await fetch(`${elBase()}/v1/flows/${kind}/${id}`,{headers:elHeaders()});
       if(!r.ok) throw 0;
       const j=await r.json();
       if(j.status==="completed") return j;
@@ -528,7 +553,7 @@ const Media={
   },
   backdrop(sceneKey,tint){
     const mode=Voice.cfg.backdrop||"off";
-    if(mode==="off" || !this.key() || !BACKDROPS[sceneKey]) return;
+    if(mode==="off" || !elReady() || !BACKDROPS[sceneKey]) return;
     const p=this.prompt(sceneKey,tint);
     this.image(sceneKey,tint,p).catch(()=>{});          // fast layer first, always
     if(mode==="video" && !REDUCED) this.video(sceneKey,tint,p).catch(()=>{});
@@ -537,8 +562,8 @@ const Media={
     const ck="bdimg1|"+sceneKey+"|"+tint;
     let blob=await TTSCache.get(ck);
     if(!blob){
-      const r=await fetch(EL_API+"/v1/flows/image",{method:"POST",
-        headers:{"xi-api-key":this.key(),"Content-Type":"application/json"},
+      const r=await fetch(elBase()+"/v1/flows/image",{method:"POST",
+        headers:elHeaders({"Content-Type":"application/json"}),
         body:JSON.stringify({model_id:"gemini-3.1-flash-image", prompt, aspect_ratio:"16:9"})});
       if(!r.ok) throw 0;
       const j=await r.json();
@@ -554,8 +579,8 @@ const Media={
     const ck="bdvid1|"+sceneKey+"|"+tint;
     let blob=await TTSCache.get(ck);
     if(!blob){
-      const r=await fetch(EL_API+"/v1/flows/video",{method:"POST",
-        headers:{"xi-api-key":this.key(),"Content-Type":"application/json"},
+      const r=await fetch(elBase()+"/v1/flows/video",{method:"POST",
+        headers:elHeaders({"Content-Type":"application/json"}),
         body:JSON.stringify({model_id:"veo-3.1-fast-generate-001",
           prompt:prompt+" Very slow, almost still movement.",
           duration_secs:8, aspect_ratio:"16:9", resolution:"720p", generate_audio:false})});
@@ -607,7 +632,7 @@ const Voice = {
   },
   async say(text){
     if(this.elFailed && Date.now()-(this._elFailedAt||0)>60000) this.elFailed=false;  // give it another chance
-    if(this.cfg.engine==="eleven" && Eleven.key(this.cfg) && Eleven.voiceId(this.cfg) && !this.elFailed){
+    if(this.cfg.engine==="eleven" && elReady() && Eleven.voiceId(this.cfg) && !this.elFailed){
       try{ await Eleven.say(this.cfg, text); return; }
       catch(e){ this.elFailed=true; this._elFailedAt=Date.now(); /* fall through to browser voice, never silence */ }
     }
@@ -642,7 +667,7 @@ const Ears = {
   _token:0, _cleanup:null, _finishNow:null,
   get supported(){ return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia) || !!(window.SpeechRecognition||window.webkitSpeechRecognition); },
   mode(){
-    if((Voice.cfg.key||"").trim() && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder) return "scribe";
+    if(elReady() && !this.sttDown && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder) return "scribe";
     if(window.SpeechRecognition||window.webkitSpeechRecognition) return "webspeech";
     return null;
   },
@@ -736,15 +761,22 @@ const Ears = {
           fd.append("model_id","scribe_v1");
           fd.append("file", blob, "answer.webm");
           if(opts.diarize){ fd.append("diarize","true"); }
-          const r=await fetch(EL_API+"/v1/speech-to-text",{method:"POST", headers:{"xi-api-key":(Voice.cfg.key||"").trim()}, body:fd});
+          const r=await fetch(elBase()+"/v1/speech-to-text",{method:"POST", headers:elHeaders(), body:fd});
           if(!r.ok) throw 0;
           const j=await r.json();
+          this._sttFails=0;
           const text=(j.text||"").trim();
           const ids=new Set((j.words||[]).map(w=>w.speaker_id).filter(x=>x!=null));
           this.lastSpeakers=Math.max(1, ids.size||1);
           this.thinking=false; this.setBtn("idle");
           if(text && token===this._token) onText(text);
-        }catch(e){ this.thinking=false; this.setBtn("idle"); }
+        }catch(e){
+          this.thinking=false; this.setBtn("idle");
+          // two failed transcriptions in a row → stop recording pointlessly and
+          // fall back to the browser's own recognition (or typing) instead
+          this._sttFails=(this._sttFails||0)+1;
+          if(this._sttFails>=2) this.sttDown=true;
+        }
       };
       if(rec.state==="inactive" && rec.onstop) rec.onstop();
     };
@@ -1387,10 +1419,24 @@ function showExit(){
   };
   const setBdUI=bd=>{ document.querySelectorAll("#bdChoice button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.bd===bd)); };
   const getBdUI=()=>{ const b=document.querySelector('#bdChoice button[aria-pressed="true"]'); return b? b.dataset.bd : "off"; };
+  /* the key comes from this device's config file when present (never shown);
+     with no device key — e.g. on the public GitHub Pages copy — a paste
+     field appears, and the key lives only in that browser's storage */
+  const panelKey=()=>{
+    const pasted=$("#elKeyWrap").style.display!=="none"? $("#elKey").value.trim() : "";
+    return pasted || (Voice.cfg.key||"").trim();
+  };
+  const proxySet=()=>!!((Voice.cfg.proxy||"").trim());
+  const elConfigured=()=>!!(panelKey() || proxySet());
+  /* a pasted-but-unsaved key goes direct; otherwise follow the normal route */
+  const elOpts=()=>{
+    const k=panelKey();
+    return k? {base:EL_API, h:x=>({"xi-api-key":k, ...(x||{})})} : {base:elBase(), h:x=>elHeaders(x)};
+  };
   const formCfg=()=>({
     engine: $("#vEleven").getAttribute("aria-pressed")==="true"? "eleven":"browser",
     _engineChosen:true,
-    key: (Voice.cfg.key||"").trim(),          // from this device's config, never shown in the UI
+    key: panelKey(),
     voice: $("#elVoice").value,
     customVoice: $("#elCustom").value.trim(),
     ambience: $("#elAmb").checked,
@@ -1399,6 +1445,8 @@ function showExit(){
   const paint=()=>{
     const c=Voice.cfg;
     setEngineUI(c.engine||"browser");
+    $("#elKeyWrap").style.display = ((c.key||"").trim()||proxySet())? "none" : "";
+    if((c.key||"").trim()) $("#elKey").value="";
     const sel=$("#elVoice");
     // a saved account voice may not be in the preset list yet — show it anyway
     if(c.voice && ![...sel.options].some(o=>o.value===c.voice)){
@@ -1414,11 +1462,11 @@ function showExit(){
   };
   document.querySelectorAll("#bdChoice button").forEach(b=>b.addEventListener("click",()=>setBdUI(b.dataset.bd)));
   $("#elLoadVoices").addEventListener("click", async ()=>{
-    const key=(Voice.cfg.key||"").trim();
-    if(!key){ status.textContent="No ElevenLabs key is set up on this device."; status.className="bad"; return; }
+    if(!elConfigured()){ status.textContent="No ElevenLabs key is set up on this device — paste one in the key field above."; status.className="bad"; return; }
     status.textContent="Asking ElevenLabs for your voices…"; status.className="";
     try{
-      const r=await fetch(EL_API+"/v1/voices",{headers:{"xi-api-key":key}});
+      const o=elOpts();
+      const r=await fetch(o.base+"/v1/voices",{headers:o.h()});
       if(!r.ok) throw 0;
       const j=await r.json();
       const sel=$("#elVoice"), keep=sel.value;
@@ -1444,16 +1492,16 @@ function showExit(){
   let vlPrev=null, vlFound=[];
   const stopPrev=()=>{ try{ if(vlPrev){ vlPrev.pause(); vlPrev=null; } }catch(e){} };
   async function vlSearch(q, g){
-    const key=(Voice.cfg.key||"").trim();
-    if(!key){ status.textContent="No ElevenLabs key is set up on this device."; status.className="bad"; return; }
+    if(!elConfigured()){ status.textContent="No ElevenLabs key is set up on this device — paste one in the key field above."; status.className="bad"; return; }
     status.textContent="Searching the voice library…"; status.className="";
     $("#vlResults").innerHTML="";
     try{
-      const u=new URL(EL_API+"/v1/shared-voices");
+      const o=elOpts();
+      const u=new URL(o.base+"/v1/shared-voices", location.href);   // base may be a relative path like /api/eleven
       u.searchParams.set("page_size","8");
       if(q) u.searchParams.set("search", q);
       if(g) u.searchParams.set("gender", g);
-      const r=await fetch(u,{headers:{"xi-api-key":key}});
+      const r=await fetch(u,{headers:o.h()});
       if(!r.ok) throw 0;
       const j=await r.json();
       vlFound=j.voices||[];
@@ -1486,11 +1534,11 @@ function showExit(){
     const use=e.target.closest("button[data-vl-use]"); if(!use) return;
     const v=vlFound[+use.dataset.vlUse]; if(!v) return;
     stopPrev();
-    const key=(Voice.cfg.key||"").trim();
+    const o=elOpts();
     status.textContent="Adding “"+v.name+"” to your voices…"; status.className="";
     try{
-      const r=await fetch(`${EL_API}/v1/voices/add/${encodeURIComponent(v.public_owner_id)}/${encodeURIComponent(v.voice_id)}`,{
-        method:"POST", headers:{"xi-api-key":key,"Content-Type":"application/json"},
+      const r=await fetch(`${o.base}/v1/voices/add/${encodeURIComponent(v.public_owner_id)}/${encodeURIComponent(v.voice_id)}`,{
+        method:"POST", headers:o.h({"Content-Type":"application/json"}),
         body:JSON.stringify({new_name:v.name})});
       if(!r.ok) throw 0;
       const j=await r.json().catch(()=>({}));
@@ -1508,7 +1556,7 @@ function showExit(){
 
   $("#voxSave").addEventListener("click",()=>{
     const c=formCfg();
-    if(c.engine==="eleven" && !c.key){ status.textContent="No ElevenLabs key is set up on this device, so the browser voice will be used."; status.className="bad"; return; }
+    if(c.engine==="eleven" && !c.key && !proxySet()){ status.textContent="No ElevenLabs key is set up on this device, so the browser voice will be used."; status.className="bad"; return; }
     Voice.cfg=c; Voice.elFailed=false; Eleven.useSpeed=true; VoiceCfg.save(c);
     if(!c.ambience) Media.stopAmb();
     if(c.backdrop==="off") Media.clearBackdrop();
@@ -1517,10 +1565,10 @@ function showExit(){
   /* per-endpoint health check with plain-language causes, so a restricted
      key or an empty balance is a readable sentence, not a silent fallback */
   $("#voxDiag").addEventListener("click", async ()=>{
-    const key=(Voice.cfg.key||"").trim();
     const out=$("#diagOut"); out.innerHTML="";
     const row=(ok,name,detail)=>{ const d=document.createElement("div"); d.className=ok?"ok":"bad"; d.textContent=(ok?"✓ ":"✗ ")+name+(detail? " — "+detail:""); out.appendChild(d); };
-    if(!key){ row(false,"API key","none is set up on this device (voice-config.js next to orb.html)"); return; }
+    if(!elConfigured()){ row(false,"API key","none on this device — paste one in the key field above, or add voice-config.js next to orb.html, or set the site proxy in site-config.js"); return; }
+    row(true,"Route", panelKey()? "using this device's key, straight to ElevenLabs" : "using the site's proxy — the key stays on the server");
     status.textContent="Checking each ElevenLabs door…"; status.className="";
     const explain=r=> r.status===401? "the key can't use this endpoint — in ElevenLabs, edit the key's restrictions and grant it (or use an unrestricted key)"
       : (r.status===402||r.status===429)? "the account looks out of credits, or rate-limited"
@@ -1530,12 +1578,12 @@ function showExit(){
       try{ const r=await fn(); row(r.ok,name, r.ok? "":explain(r)); return r.ok; }
       catch(e){ row(false,name,"couldn't be reached at all (network, or the browser blocked it)"); return false; }
     };
-    const H={"xi-api-key":key};
-    await check("Account", ()=>fetch(EL_API+"/v1/user",{headers:H}));
-    await check("Your voices (list & add)", ()=>fetch(EL_API+"/v1/voices",{headers:H}));
-    await check("Voice library search", ()=>fetch(EL_API+"/v1/shared-voices?page_size=1",{headers:H}));
-    await check("Speaking (text to speech)", ()=>fetch(EL_API+"/v1/text-to-speech/"+encodeURIComponent(Eleven.voiceId(Voice.cfg)||"EXAVITQu4vr4xnSDxMaL")+"?output_format=mp3_22050_32",{
-      method:"POST", headers:{...H,"Content-Type":"application/json"},
+    const o=elOpts();
+    await check("Account", ()=>fetch(o.base+"/v1/user",{headers:o.h()}));
+    await check("Your voices (list & add)", ()=>fetch(o.base+"/v1/voices",{headers:o.h()}));
+    await check("Voice library search", ()=>fetch(o.base+"/v1/shared-voices?page_size=1",{headers:o.h()}));
+    await check("Speaking (text to speech)", ()=>fetch(o.base+"/v1/text-to-speech/"+encodeURIComponent(Eleven.voiceId(Voice.cfg)||"EXAVITQu4vr4xnSDxMaL")+"?output_format=mp3_22050_32",{
+      method:"POST", headers:o.h({"Content-Type":"application/json"}),
       body:JSON.stringify({text:"Hello.", model_id:"eleven_turbo_v2_5"})}));
     row(true,"Listening, scenery & sound","use the same key permissions: Speech to Text, Sound Effects, Image & Video");
     status.textContent="Done. Anything marked ✗ says why — most often the key's endpoint restrictions."; status.className="";
@@ -1544,7 +1592,7 @@ function showExit(){
     const c=formCfg();
     status.textContent="Listening for it…"; status.className="";
     if(c.engine==="eleven"){
-      if(!c.key){ status.textContent="No ElevenLabs key is set up on this device."; status.className="bad"; return; }
+      if(!elConfigured()){ status.textContent="No ElevenLabs key is set up on this device."; status.className="bad"; return; }
       if(!Eleven.voiceId(c)){ status.textContent="Pick a voice first."; status.className="bad"; return; }
       try{ await Eleven.say(c, "Hello. This is how I would sound. Take one slow breath with me."); status.textContent="That's the ElevenLabs voice. Save to keep it."; status.className="ok"; }
       catch(e){ status.textContent="ElevenLabs didn't answer — it may be out of credits or unreachable. The browser voice will be used until it works."; status.className="bad"; }

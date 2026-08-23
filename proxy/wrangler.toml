@@ -1,0 +1,11 @@
+name = "slow-light-proxy"
+main = "worker.js"
+compatibility_date = "2026-08-01"
+
+[vars]
+# Comma-separated origins allowed to use this proxy. Add/remove as needed.
+# Leave empty ("") only while testing — empty means any site may call it.
+ALLOWED_ORIGINS = "https://gdatalabs.github.io,http://localhost:8000,http://localhost:8765"
+
+# The API key is NOT set here (this file is committed).
+# Set it once as an encrypted secret:  wrangler secret put ELEVENLABS_KEY

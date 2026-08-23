@@ -6,3 +6,6 @@ Thumbs.db
 
 # local secrets — never commit
 voice-config.js
+.env
+.env.*
+.vercel/
