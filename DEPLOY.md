@@ -8,7 +8,12 @@ the same idea as a .env file, entered once in the dashboard.
 1. vercel.com → **Add New… → Project** → import `GDataLabs/slow-light`.
    Framework preset: **Other**. Deploy.
 2. Project → **Settings → Environment Variables** → add
-   `ELEVENLABS_KEY` = your ElevenLabs API key. Redeploy (Deployments → ⋯ → Redeploy).
+   `ELEVENLABS_KEY` = your ElevenLabs API key, and
+   `ANTHROPIC_KEY` = your Anthropic (Claude) API key from console.anthropic.com —
+   this powers the orb's mind (`api/orb.js`), which writes every spoken line
+   fresh instead of repeating a script. Optional: `ANTHROPIC_MODEL` to pick a
+   model (default `claude-haiku-4-5`). Redeploy (Deployments → ⋯ → Redeploy).
+   Without `ANTHROPIC_KEY` the orb still works, using its scripted lines.
 3. Done. The site is at `https://<project>.vercel.app`; the proxy in
    `api/eleven/` deploys with it automatically, and `site-config.js` already
    points the orb at `/api/eleven`. Every future `git push` redeploys both.

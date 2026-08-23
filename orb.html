@@ -408,6 +408,48 @@ function elHeaders(extra){
 }
 function elReady(){ return !!(((Voice.cfg&&Voice.cfg.key)||"").trim() || ((Voice.cfg&&Voice.cfg.proxy)||"").trim()); }
 
+/* --------------------------- the orb's mind -------------------------
+   Every line the orb speaks is written fresh by Claude via /api/orb —
+   with the goals, persona and guardrails held server-side. The scripted
+   line each call site passes in is the guaranteed fallback: if the mind
+   is slow, absent, or down, the session never stalls or goes silent. */
+const Brain={
+  down:false, _fails:0, recent:[], crisisFlag:false,
+  base(){
+    const pub=window.SLOWLIGHT_PUBLIC||{};
+    return (pub.brain||"").trim() || "/api/orb";
+  },
+  async line(stage, fallback, extra){
+    if(this.down) return fallback;
+    try{
+      const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(), 8000);
+      const ctx={ stage, recentLines:this.recent.slice(-8), person:{
+        moods:S.moods||[], weather:(S.moods||[]).map(k=>MOODS[k]&&MOODS[k].weather).filter(Boolean),
+        grip:S.grip, gripEnd:S.gripEnd, goalFeel:S.goalFeel||"", people:S.people||1,
+        sceneKey:S.sceneKey||null, released:S.released||[], ...(extra||{}) } };
+      const r=await fetch(this.base(),{method:"POST",signal:ctl.signal,
+        headers:{"Content-Type":"application/json"}, body:JSON.stringify(ctx)});
+      clearTimeout(to);
+      if(!r.ok) throw 0;
+      const j=await r.json();
+      if(!j.line) throw 0;
+      this._fails=0;
+      if(j.crisis) this.crisisFlag=true;
+      this.lastMoods=Array.isArray(j.moods)? j.moods.filter(k=>MOODS[k]) : [];
+      this.recent.push(j.line);
+      return j.line;
+    }catch(e){
+      this._fails++; if(this._fails>=2) this.down=true;   // stop waiting on a dead mind
+      return fallback;
+    }
+  },
+  /* after any line that processed the person's words: honor a crisis flag */
+  async care(){
+    if(this.crisisFlag && !crisisShown){ this.crisisFlag=false; crisisShown=true; await showCare(); }
+    this.crisisFlag=false;
+  }
+};
+
 /* tiny on-device audio cache so repeated lines cost no credits */
 const TTSCache = {
   mem:new Map(), db:null,
@@ -1200,19 +1242,19 @@ const S={ moods:[], grip:5, goalFeel:null, released:[], gripEnd:null, paceMs:[],
 async function run(){
   S.t0=Date.now();
   tintOrb(0x7fd4c1);
-  await Cap.show(pick([
+  await Cap.show(await Brain.line("greet", pick([
     "Hello. I'm glad you came.",
     "Hello. You made it here — that's the hardest part.",
     "Welcome. There's nothing to do here yet."
-  ]));
+  ])));
   await Cap.show("Take one slow breath with me while I look around for you… in… and out.");
   await new Promise(r=>setTimeout(r,1800));
 
   /* Q1 — where are you */
-  await Cap.show(pick([
+  await Cap.show(await Brain.line("ask_feelings", pick([
     "Where are you right now — not the room. Inside. What's the weather like there?",
     "Tell me how it is there right now. A word or two is plenty."
-  ]), "speak, type, or just pick something close");
+  ])), "speak, type, or just pick something close");
   let ans = await Promise.race([
     UI.free("anxious? heavy? okay? your words…", {diarize:true}),
     UI.chips(["wired / anxious","heavy / tired","sad","angry / tense","overwhelmed","numb / far away","okay, mostly","something good"], true)
@@ -1221,39 +1263,48 @@ async function run(){
   let g=guard(ans);
   if(g==="crisis"){ crisisShown=true; await showCare(); S.moods=["heavy"]; }
   else if(g==="dark"){ await Cap.show("I only know how to build gentle places — so I'll hold onto the feeling underneath that instead."); }
-  let wasFree=false;
+  if(Ears.lastSpeakers>1) S.people=Ears.lastSpeakers;
+  let wasFree=false, ackLine=null;
   if(!S.moods.length){
     if(CHIPMAP[ans]) S.moods=[CHIPMAP[ans]];
-    else { wasFree=true; S.moods=readMood(ans); }
+    else {
+      wasFree=true;
+      // the mind reads the feeling in their words AND writes the reply that
+      // proves they were heard — in one thought
+      ackLine=await Brain.line("acknowledge", null, {rawAnswer:ans});
+      if(ackLine && Brain.lastMoods && Brain.lastMoods.length) S.moods=Brain.lastMoods.slice();
+      else { ackLine=null; S.moods=readMood(ans); }   // mind absent or unsure → keywords
+    }
   }
-  // if their words didn't carry a feeling it knows, the orb asks — it never
-  // pretends to have understood
+  // if no feeling could be read, the orb asks — it never pretends
   if(!S.moods.length){
-    await Cap.show(`I heard you — “${ans.trim().slice(0,50)}” — and I want to get the feeling underneath it right. Which of these is closest?`);
+    await Cap.show(await Brain.line("clarify",
+      `I heard you — “${ans.trim().slice(0,50)}” — and I want to get the feeling underneath it right. Which of these is closest?`,
+      {rawAnswer:ans}));
     const pick2=await UI.chips(Object.keys(CHIPMAP));
-    S.moods=[CHIPMAP[pick2]||"neutral"]; wasFree=false;
+    S.moods=[CHIPMAP[pick2]||"neutral"]; wasFree=false; ackLine=null;
   }
   S.moods=S.moods.slice(0,3);
   tintOrb(MOODS[S.moods[0]].swatch);
-  if(Ears.lastSpeakers>1){
-    S.people=Ears.lastSpeakers;
-    await Cap.show("I can hear more than one of you — good. This place is big enough for everyone who came.");
-  }
+  await Brain.care();
   const wx=S.moods.map(k=>MOODS[k].weather);
   const wxLine = wx.length===1? wx[0] : wx.slice(0,-1).join(", ")+" and "+wx[wx.length-1];
   // its reply carries their own words back to them, so being heard is visible
   const echo = wasFree? `“${ans.trim().slice(0,50)}” — ` : "";
-  await Cap.show(`${echo}${pick(["Thank you for saying it.","Good. Naming it already loosens it a little."])} That sounds like ${wxLine}.`);
+  const scriptedAck = `${S.people>1? "I can hear more than one of you — good. " : ""}${echo}${pick(["Thank you for saying it.","Good. Naming it already loosens it a little."])} That sounds like ${wxLine}.`;
+  await Cap.show(ackLine || await Brain.line("acknowledge", scriptedAck, {rawAnswer: wasFree? ans : ""}));
+  await Brain.care();
 
   /* Q2 — how much */
-  await Cap.show("And how much of you is it taking up, right now?", "slide to where it honestly is");
+  await Cap.show(await Brain.line("ask_grip","And how much of you is it taking up, right now?"), "slide to where it honestly is");
   S.grip = await UI.slider("barely there","all of me", 6);
-  await Cap.show(S.grip>=7? "That's a lot to be carrying in. We'll go slowly." :
-                 S.grip>=4? "Enough to feel. We have room for that here." :
-                 "Light enough to work with. Let's keep it that way.");
+  await Cap.show(await Brain.line("grip_response",
+    S.grip>=7? "That's a lot to be carrying in. We'll go slowly." :
+    S.grip>=4? "Enough to feel. We have room for that here." :
+    "Light enough to work with. Let's keep it that way."));
 
   /* Q3 — where to */
-  await Cap.show("If you could drift anywhere from here — not fixed, just… different — how would you want to feel when you arrive?", "pick, speak, or type");
+  await Cap.show(await Brain.line("ask_destination","If you could drift anywhere from here — not fixed, just… different — how would you want to feel when you arrive?"), "pick, speak, or type");
   let feel = await Promise.race([
     UI.free("calmer? grounded? lighter?…"),
     UI.chips(["calmer, quieter","grounded, steadier","lighter, softer"], true)
@@ -1268,20 +1319,21 @@ async function run(){
   const sceneKey = S.goalFeel==="grounded"? "meadow" : S.goalFeel==="lighter"? "dawn" :
                    (domGroup==="wired"||domGroup==="overwhelmed"||domGroup==="tense")? "underwater" : pick(["underwater","meadow"]);
   const sc=SCENES[sceneKey];
+  S.sceneKey=sceneKey;
   // start growing the place's generated sound and scenery now, so they can
   // arrive softly while the person's eyes are closed (all fire-and-forget)
   Media.soundscape(sceneKey);
   Media.backdrop(sceneKey, TINTS[S.moods[0]]||"soft teal");
-  await Cap.show(`Then let me make somewhere for that. ${sc.line}`);
+  await Cap.show(await Brain.line("scene_intro", `Then let me make somewhere for that. ${sc.line}`));
   await Cap.show("Close your eyes for three breaths if you like. When you open them, we'll be there.");
   await fadeSwap(sc.build);
-  await Cap.show(`This place is yours — it didn't exist before tonight, and no one else will ever stand in it.`);
+  await Cap.show(await Brain.line("arrive", `This place is yours — it didn't exist before tonight, and no one else will ever stand in it.`));
 
   /* activity 1 — release */
-  await Cap.show(pick([
+  await Cap.show(await Brain.line("release_invite", pick([
     "Here's the first thing this place can do. Give me something you're carrying — a word or a few — and watch what the water does with it.",
     "Let's set something down. Type or say one thing that came in with you, and let this place take it."
-  ]).replace("water", sceneKey==="underwater"?"water":"dark"), "one small thing at a time");
+  ]).replace("water", sceneKey==="underwater"?"water":"dark")), "one small thing at a time");
   for(let i=0;i<3;i++){
     const w=await UI.free(i===0?"the meeting… her voice… the list…":"anything else? or say 'done'");
     if(/^(done|no|nothing|stop|that's all|nope)\b/i.test(w)) break;
@@ -1289,29 +1341,34 @@ async function run(){
     if(gg==="crisis" && !crisisShown){ crisisShown=true; await showCare(); break; }
     S.released.push(w.slice(0,60));
     releaseVisual();
-    await Cap.show(pick([
+    await Cap.show(await Brain.line("release_response", pick([
       "There it goes. It can float without you holding it.",
       "Released. Notice it needs nothing from you out there.",
       "Watch how slowly it leaves. Nothing here is urgent — not even letting go."
-    ]));
+    ]), {lastReleased:w.slice(0,80)}));
+    await Brain.care();
     if(i===2) break;
   }
 
   /* activity 2 — slow lights (pace sensing framed as visualization) */
-  await Cap.show("Now a slower game. Lights will rise, one at a time. When one feels ready — not before — touch it. There is no clock and no score.","touch each light when it feels right");
+  await Cap.show(await Brain.line("lights_intro","Now a slower game. Lights will rise, one at a time. When one feels ready — not before — touch it. There is no clock and no score."),"touch each light when it feels right");
   await slowLights(4);
   const avg=S.paceMs.length? S.paceMs.reduce((a,b)=>a+b,0)/S.paceMs.length : 4000;
-  await Cap.show(avg<2200? "You met them quickly. There's still some speed in your hands — that's all right, it has somewhere soft to land now." :
-                 avg<5000? "That was an easy rhythm. Your pace is already lower than when you arrived." :
-                 "You let each one wait for you. That's the slowest, kindest pace there is.");
+  await Cap.show(await Brain.line("pace_reflect",
+    avg<2200? "You met them quickly. There's still some speed in your hands — that's all right, it has somewhere soft to land now." :
+    avg<5000? "That was an easy rhythm. Your pace is already lower than when you arrived." :
+    "You let each one wait for you. That's the slowest, kindest pace there is.",
+    {paceAvgMs:Math.round(avg)}));
 
   /* check-out */
-  await Cap.show("Before I let the place hold you a while — where is it now, the thing you carried in?", "same slider as before");
+  await Cap.show(await Brain.line("ask_now","Before I let the place hold you a while — where is it now, the thing you carried in?"), "same slider as before");
   S.gripEnd = await UI.slider("barely there","all of me", S.grip);
   const d=S.grip-S.gripEnd;
-  await Cap.show(d>0? `From ${S.grip} down to ${S.gripEnd}. Nothing outside you changed — that was you.` :
-                 d===0? `Still at ${S.grip}. Honest is better than improved. Some weather needs more than one visit.` :
-                 `It rose — from ${S.grip} to ${S.gripEnd}. Slowing down can uncover what speed was muffling. That's worth telling a person you trust, not just an orb.`);
+  await Cap.show(await Brain.line("close",
+    d>0? `From ${S.grip} down to ${S.gripEnd}. Nothing outside you changed — that was you.` :
+    d===0? `Still at ${S.grip}. Honest is better than improved. Some weather needs more than one visit.` :
+    `It rose — from ${S.grip} to ${S.gripEnd}. Slowing down can uncover what speed was muffling. That's worth telling a person you trust, not just an orb.`));
+  await Brain.care();
   saveOrbSession();
   await Cap.show("I'll remember how this felt on this device, so you can watch your own weather change over time.", "see 'How it's been going' from the close of any session");
   await Cap.show(pick([
@@ -1588,6 +1645,12 @@ function showExit(){
       method:"POST", headers:o.h({"Content-Type":"application/json"}),
       body:JSON.stringify({text:"Hello.", model_id:"eleven_turbo_v2_5"})}));
     row(true,"Listening, scenery & sound","use the same key permissions: Speech to Text, Sound Effects, Image & Video");
+    try{
+      const r=await fetch(Brain.base(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stage:"ping"})});
+      row(r.ok,"Mind (Claude)", r.ok? "writing the orb's lines fresh, with feelings read from your words"
+        : r.status===500? "the ANTHROPIC_KEY environment variable isn't set in Vercel yet — scripted lines are used"
+        : "answered with status "+r.status+" — scripted lines are used");
+    }catch(e){ row(false,"Mind (Claude)","couldn't be reached — the orb speaks its scripted lines instead"); }
     status.textContent="Done. Anything marked ✗ says why — most often the key's endpoint restrictions."; status.className="";
   });
   $("#voxTest").addEventListener("click",async ()=>{
