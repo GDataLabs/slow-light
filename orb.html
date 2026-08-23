@@ -18,7 +18,24 @@ html{-webkit-text-size-adjust:100%}
 html,body{height:100%}
 body{margin:0; background:#04060a; color:var(--ink); font-family:var(--font);
   font-size:clamp(16px,15.2px + .25vw,18px); line-height:1.6; overflow:hidden}
-canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block}
+canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-index:1}
+/* generated scenery sits behind the 3D layer, dimmed and softened so the
+   orb, particles and text stay the foreground */
+#backdrop{position:fixed; inset:0; z-index:0; background:#04060a}
+#backdrop img, #backdrop video{
+  position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+  filter:brightness(.5) saturate(.85); opacity:0; transition:opacity 3.5s ease;
+}
+#backdrop .on{opacity:1}
+#ambBtn{
+  position:fixed; top:calc(14px + env(safe-area-inset-top)); right:66px; z-index:21;
+  width:42px; height:42px; border-radius:50%; border:1px solid rgba(160,190,215,.22);
+  background:rgba(10,18,26,.6); color:rgba(233,242,245,.55); font-size:16px; cursor:pointer;
+  backdrop-filter:blur(8px); transition:all .3s; display:none;
+}
+#ambBtn.show{display:block}
+#ambBtn:hover{color:var(--ink); border-color:rgba(127,212,193,.5)}
+#ambBtn.off{opacity:.45; text-decoration:line-through}
 
 /* ---------- spoken text ---------- */
 #caption{
@@ -101,6 +118,13 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block}
 .panel a{color:var(--accent)}
 #helpVeil .note{border-color:rgba(127,212,193,.35); background:rgba(127,212,193,.07); color:#d7efe7}
 #helpVeil .note a{color:#aef0dd}
+.fineprint{margin-top:16px}
+.fineprint summary{
+  cursor:pointer; font-size:13px; color:var(--ink-faint); list-style:none;
+  text-decoration:underline dotted; width:max-content;
+}
+.fineprint summary::-webkit-details-marker{display:none}
+.fineprint summary:hover{color:var(--ink-dim)}
 
 /* ---------- voice settings ---------- */
 #gearBtn{
@@ -125,9 +149,31 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block}
 .vchoice button[aria-pressed="true"]{border-color:rgba(127,212,193,.6); background:rgba(127,212,193,.14); color:#c9f2e6}
 #voxStatus{font-size:13.5px; color:var(--ink-faint); min-height:20px; margin:4px 0 10px}
 #voxStatus.ok{color:#9fd8a8} #voxStatus.bad{color:#f0b27a}
+.vlchips{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+.vlchips button{
+  border:1px solid rgba(160,190,215,.25); background:rgba(10,18,26,.6); color:var(--ink-dim);
+  border-radius:999px; padding:8px 14px; font-family:inherit; font-size:13px; cursor:pointer; transition:all .3s;
+}
+.vlchips button:hover{color:var(--ink); border-color:rgba(127,212,193,.55)}
+#vlResults{margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto}
+.vlrow{
+  display:flex; align-items:center; gap:10px; border:1px solid rgba(160,190,215,.18);
+  background:rgba(10,18,26,.55); border-radius:14px; padding:10px 12px;
+}
+.vlrow .nm{flex:1; min-width:0}
+.vlrow .nm b{display:block; font-weight:500; font-size:14.5px; color:var(--ink)}
+.vlrow .nm span{display:block; font-size:12px; color:var(--ink-faint); line-height:1.45;
+  overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical}
+.vlrow button{
+  border:1px solid rgba(160,190,215,.25); background:rgba(10,18,26,.7); color:var(--ink-dim);
+  border-radius:999px; padding:8px 14px; font-family:inherit; font-size:13px; cursor:pointer; flex:none;
+}
+.vlrow button:hover{color:var(--ink); border-color:rgba(127,212,193,.55)}
+.vlrow button.use{border-color:rgba(127,212,193,.45); color:#c9f2e6}
 </style>
 </head>
 <body>
+<div id="backdrop"><img id="bdImg" alt=""><video id="bdVid" loop muted playsinline></video></div>
 <canvas id="stage"></canvas>
 <div id="caption" aria-live="polite"></div>
 <div id="subcap"></div>
@@ -152,17 +198,22 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block}
   <div class="panel">
     <h1>Slow&nbsp;Light</h1>
     <h2>The Orb</h2>
-    <p>A quiet guide in a dark, slow space. It will ask where you are and where you'd like to be, and then shape a place around your answers — somewhere to breathe, let a few things drift off, and land somewhere softer. You can answer it out loud, by typing, or with a slider. Nothing you say or type leaves this device.</p>
+    <p>A quiet guide that asks how you are, then shapes a calm place around your answer. Speak, type, or slide — nothing you share leaves this device.</p>
     <div class="note">
-      <b>Before you begin:</b> the orb is an automated guide, not a person and not a clinician. It can misunderstand you and it can say things that are wrong. It is built only for gentle relaxation — it is not therapy, diagnosis, or crisis support, and it is never a substitute for professional help. If things feel heavy more days than not, please bring that to a real person. In the US, call or text <a href="tel:988">988</a> (24/7) or text HOME to 741741; elsewhere <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a> lists local lines. In immediate danger, call your local emergency number.
+      The orb is AI, not a person — it can be wrong, and it isn't therapy or crisis support. If things feel heavy, please reach a real person: in the US call or text <a href="tel:988">988</a>, elsewhere <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a>.
     </div>
     <p><button class="obtn primary" id="beginBtn" style="font-size:17px; padding:15px 34px">I understand — begin</button>
        <a class="obtn" href="index.html" style="text-decoration:none; margin-left:6px">Back to Slow Light</a></p>
-    <p class="tiny">Voice is optional; the mic is used only if you tap it, only while it pulses, and audio is processed by your browser's own speech service. If you switch the orb's voice to ElevenLabs in settings (⚙, top right), only the orb's own lines are sent there to be spoken — nothing you say or type ever is. Motion here is slow and there is no strobing. Your device's reduce-motion setting is respected.</p>
+    <details class="fineprint">
+      <summary>The full details…</summary>
+      <p class="tiny" style="margin-top:10px">The orb is an automated guide, not a clinician. It can misunderstand you and say things that are wrong, and it is built only for gentle relaxation — never a substitute for professional help. If things feel heavy more days than not, bring that to a real person; in the US you can also text HOME to 741741, and in immediate danger call your local emergency number.</p>
+      <p class="tiny">Voice is optional; the mic is used only if you tap it, only while it pulses, and audio is processed by your browser's own speech service. If the orb's voice is set to ElevenLabs (⚙, top right), only the orb's own lines and fixed scene descriptions are sent there — nothing you say or type ever is. Motion here is slow, there is no strobing, and your device's reduce-motion setting is respected.</p>
+    </details>
   </div>
 </div>
 
-<button id="gearBtn" title="Voice settings" aria-label="Voice settings">⚙</button>
+<button id="gearBtn" title="Voice &amp; scenery settings" aria-label="Voice and scenery settings">⚙</button>
+<button id="ambBtn" title="Ambient sound on/off" aria-label="Ambient sound on or off">♪</button>
 
 <!-- ---------- voice settings overlay ---------- -->
 <div class="veil hide" id="voxVeil">
@@ -175,10 +226,6 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block}
     </div>
     <div id="elFields" style="display:none">
       <div class="field">
-        <label for="elKey">ElevenLabs API key</label>
-        <input type="password" id="elKey" autocomplete="off" placeholder="sk_…">
-      </div>
-      <div class="field">
         <label for="elVoice">Voice</label>
         <select id="elVoice">
           <option value="EXAVITQu4vr4xnSDxMaL">Sarah — soft, low, steady</option>
@@ -187,12 +234,43 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block}
           <option value="JBFqnCBsd6RMkjVDRZzb">George — warm, unhurried</option>
           <option value="custom">A voice of my own (paste its ID)</option>
         </select>
+        <button class="obtn" id="elLoadVoices" type="button" style="margin-top:6px; font-size:13.5px; padding:9px 18px">Load the voices from my account</button>
+      </div>
+      <div class="field">
+        <label for="vlSearch">Find a voice in the ElevenLabs library</label>
+        <div style="display:flex; gap:8px">
+          <input type="text" id="vlSearch" autocomplete="off" placeholder="warm, deep, soothing, an accent, a language…" style="flex:1">
+          <button class="obtn" id="vlGo" type="button" style="padding:9px 18px; font-size:14px">Search</button>
+        </div>
+        <div class="vlchips" id="vlChips">
+          <button data-q="african american" data-g="female">African American · female</button>
+          <button data-q="african american" data-g="male">African American · male</button>
+          <button data-q="asian" data-g="female">Asian · female</button>
+          <button data-q="asian" data-g="male">Asian · male</button>
+          <button data-q="latina" data-g="female">Latina · female</button>
+          <button data-q="latino" data-g="male">Latino · male</button>
+        </div>
+        <div id="vlResults"></div>
       </div>
       <div class="field" id="elCustomWrap" style="display:none">
         <label for="elCustom">Voice ID</label>
         <input type="text" id="elCustom" autocomplete="off" placeholder="e.g. 21m00Tcm4TlvDq8ikWAM">
       </div>
-      <p class="tiny">The key stays in this browser only — it is never shown to anyone or sent anywhere except directly to ElevenLabs. Only the orb's own lines are sent there to be spoken; nothing you say or type ever is. Spoken lines are cached on this device so repeat lines don't spend credits. If ElevenLabs can't be reached, the orb falls back to the browser voice mid-session rather than going silent.</p>
+      <h3 style="font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); margin:20px 0 10px">Generated scenery</h3>
+      <label style="display:flex; gap:10px; align-items:flex-start; margin:0 0 12px; cursor:pointer">
+        <input type="checkbox" id="elAmb" style="margin-top:4px; accent-color:#7fd4c1; width:17px; height:17px">
+        <span style="font-size:14.5px; color:var(--ink-dim)"><b style="color:var(--ink); font-weight:500">Ambient sound</b><br><span class="tiny">A soft generated soundscape for each place — water, night air, dawn wind. Looped and cached, so each one is made once.</span></span>
+      </label>
+      <div class="field">
+        <label>Backdrop behind the 3D space</label>
+        <div class="vchoice" role="radiogroup" aria-label="Backdrop" id="bdChoice">
+          <button data-bd="off">Off</button>
+          <button data-bd="image">Still image</button>
+          <button data-bd="video">Living video</button>
+        </div>
+        <p class="tiny" style="margin:2px 0 0">A dreamlike generated image (fast, cheap) or a slowly moving video (slower to arrive, costs more credits) appears softly behind the particles. The scene works fine while it's on its way — or without it.</p>
+      </div>
+      <p class="tiny">Only the orb's own lines, and fixed scene descriptions for sound and scenery, are ever sent to ElevenLabs; nothing you say or type is. Everything generated is cached on this device so repeats don't spend credits. If ElevenLabs can't be reached, the orb falls back to the browser voice and plain scenery rather than stopping.</p>
     </div>
     <div id="voxStatus"></div>
     <p style="margin-top:6px">
@@ -216,6 +294,7 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block}
   </div>
 </div>
 
+<script src="voice-config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 "use strict";
@@ -268,8 +347,22 @@ function readMood(text){
 /* Two engines behind one door: the browser's own voice (default), or an
    ElevenLabs voice the person configures in ⚙ — key kept only in this
    browser, only the orb's lines ever sent, replies cached on-device.   */
+const EL_API="https://api.elevenlabs.io";
 const VoiceCfg = {
-  load(){ try{ return JSON.parse(localStorage.getItem("slowlight.voice")||"null")||{engine:"browser"}; }catch(e){ return {engine:"browser"}; } },
+  load(){
+    let c=null; try{ c=JSON.parse(localStorage.getItem("slowlight.voice")||"null"); }catch(e){}
+    const d=window.SLOWLIGHT_DEFAULTS||{};   // optional voice-config.js on this device (gitignored)
+    if(!c){
+      c={ engine: d.elKey? (d.engine||"eleven") : "browser", key: d.elKey||"",
+          voice: d.voice||"EXAVITQu4vr4xnSDxMaL", customVoice:"",
+          ambience: d.ambience!==false, backdrop: d.backdrop||(d.elKey? "image":"off") };
+    } else {
+      if(!c.key && d.elKey){ c.key=d.elKey; if(c.engine==="browser" && d.engine==="eleven" && !c._engineChosen) c.engine="eleven"; }
+      if(c.ambience===undefined) c.ambience = d.ambience!==false;
+      if(!c.backdrop) c.backdrop = d.backdrop||(c.key? "image":"off");
+    }
+    return c;
+  },
   save(c){ try{ localStorage.setItem("slowlight.voice", JSON.stringify(c)); }catch(e){} }
 };
 
@@ -348,6 +441,139 @@ const Eleven = {
   stop(){ try{ if(this.audio){ this.audio.pause(); this.audio=null; } }catch(e){} }
 };
 
+/* ------------------- generated scenery (ElevenLabs) ----------------- */
+/* Sound, image and video for each place are made from FIXED template
+   prompts below — the person's words never enter a generation prompt,
+   so the scenery can only ever be what these templates describe.      */
+const AMBIENCE={
+  underwater:"Calm deep underwater ambience: soft muffled water movement, slow distant bubbles, low gentle hum of the deep. Peaceful, warm, seamless loop.",
+  meadow:"Quiet night meadow ambience: soft crickets, a gentle breeze through long grass, one distant owl. Peaceful, spacious, seamless loop.",
+  dawn:"Soft desert dawn ambience: a gentle warm wind, faint drifting sand, sparse distant birdsong beginning. Tranquil, warm, seamless loop."
+};
+const BACKDROPS={
+  underwater:"Deep calm underwater scene, gentle teal shafts of light falling through dark blue water, tiny drifting particles, soft silhouettes of kelp far below",
+  meadow:"A wide night meadow under a vast starry sky, a low soft moon, rolling dark hills, a few fireflies",
+  dawn:"Minimal desert dunes just before sunrise, a warm amber glow low on the horizon, fine dust drifting in golden light"
+};
+const TINTS={ wired:"cool aqua", tense:"warm ember", overwhelmed:"soft violet", fearful:"muted indigo",
+  heavy:"slate blue", sad:"gentle rain-blue", numb:"pale silver", frustrated:"warm amber",
+  hopeful:"fresh green", joyful:"soft gold", excited:"warm coral", neutral:"quiet sand" };
+
+const Media={
+  amb:null,
+  key(){ return ((Voice.cfg&&Voice.cfg.key)||"").trim(); },
+  /* ---- ambient soundscape (looped, cached per scene) ---- */
+  async soundscape(sceneKey){
+    if(!Voice.cfg.ambience || !this.key() || !AMBIENCE[sceneKey]) return;
+    try{
+      const ck="amb1|"+sceneKey;
+      let blob=await TTSCache.get(ck);
+      if(!blob){
+        const r=await fetch(EL_API+"/v1/sound-generation?output_format=mp3_44100_128",{
+          method:"POST", headers:{"xi-api-key":this.key(),"Content-Type":"application/json"},
+          body:JSON.stringify({text:AMBIENCE[sceneKey], loop:true, duration_seconds:18, prompt_influence:.35})});
+        if(!r.ok) throw 0;
+        blob=await r.blob(); TTSCache.put(ck, blob);
+      }
+      this.playAmb(blob);
+    }catch(e){}
+  },
+  playAmb(blob){
+    try{
+      this.stopAmb();
+      const a=this.amb=new Audio(URL.createObjectURL(blob));
+      a.loop=true; a.volume=0; a.play().catch(()=>{});
+      const btn=$("#ambBtn"); btn.classList.add("show"); btn.classList.remove("off");
+      let v=0; const fade=setInterval(()=>{ if(!this.amb){ clearInterval(fade); return; }
+        v+=.02; this.amb.volume=Math.min(.3,v); if(v>=.3) clearInterval(fade); },140);
+    }catch(e){}
+  },
+  stopAmb(){ try{ if(this.amb){ this.amb.pause(); this.amb=null; } }catch(e){} },
+  /* ---- generated backdrops (async flows API, polled) ---- */
+  async poll(kind,id,everyMs,maxMs){
+    const t0=Date.now();
+    for(;;){
+      await new Promise(r=>setTimeout(r,everyMs));
+      if(Date.now()-t0>maxMs) throw 0;
+      const r=await fetch(`${EL_API}/v1/flows/${kind}/${id}`,{headers:{"xi-api-key":this.key()}});
+      if(!r.ok) throw 0;
+      const j=await r.json();
+      if(j.status==="completed") return j;
+      if(j.status==="failed") throw 0;
+    }
+  },
+  fetchAsset(url){ return fetch(url).then(r=>r.ok? r.blob():null).catch(()=>null); },
+  prompt(sceneKey,tint){
+    return `${BACKDROPS[sceneKey]}, with a subtle ${tint} tint. Serene, dreamlike, soft focus, cinematic, calming. No people, no faces, no animals in distress, no text, no harsh light.`;
+  },
+  backdrop(sceneKey,tint){
+    const mode=Voice.cfg.backdrop||"off";
+    if(mode==="off" || !this.key() || !BACKDROPS[sceneKey]) return;
+    const p=this.prompt(sceneKey,tint);
+    this.image(sceneKey,tint,p).catch(()=>{});          // fast layer first, always
+    if(mode==="video" && !REDUCED) this.video(sceneKey,tint,p).catch(()=>{});
+  },
+  async image(sceneKey,tint,prompt){
+    const ck="bdimg1|"+sceneKey+"|"+tint;
+    let blob=await TTSCache.get(ck);
+    if(!blob){
+      const r=await fetch(EL_API+"/v1/flows/image",{method:"POST",
+        headers:{"xi-api-key":this.key(),"Content-Type":"application/json"},
+        body:JSON.stringify({model_id:"gemini-3.1-flash-image", prompt, aspect_ratio:"16:9"})});
+      if(!r.ok) throw 0;
+      const j=await r.json();
+      const done=await this.poll("image", j.id, 2500, 120000);
+      blob=await this.fetchAsset(done.content_url);
+      if(blob) TTSCache.put(ck, blob);
+      this.showImage(blob? URL.createObjectURL(blob) : done.content_url);
+      return;
+    }
+    this.showImage(URL.createObjectURL(blob));
+  },
+  async video(sceneKey,tint,prompt){
+    const ck="bdvid1|"+sceneKey+"|"+tint;
+    let blob=await TTSCache.get(ck);
+    if(!blob){
+      const r=await fetch(EL_API+"/v1/flows/video",{method:"POST",
+        headers:{"xi-api-key":this.key(),"Content-Type":"application/json"},
+        body:JSON.stringify({model_id:"veo-3.1-fast-generate-001",
+          prompt:prompt+" Very slow, almost still movement.",
+          duration_secs:8, aspect_ratio:"16:9", resolution:"720p", generate_audio:false})});
+      if(!r.ok) throw 0;
+      const j=await r.json();
+      const done=await this.poll("video", j.id, 10000, 360000);
+      blob=await this.fetchAsset(done.content_url);
+      if(blob) TTSCache.put(ck, blob);
+      this.showVideo(blob? URL.createObjectURL(blob) : done.content_url);
+      return;
+    }
+    this.showVideo(URL.createObjectURL(blob));
+  },
+  showImage(src){
+    if((Voice.cfg.backdrop||"off")==="off") return;
+    if($("#bdVid").classList.contains("on")) return;     // video already up — keep it
+    const img=$("#bdImg");
+    img.onload=()=>{ img.classList.add("on"); if(T) T.scene.background=null; };
+    img.src=src;
+  },
+  showVideo(src){
+    if((Voice.cfg.backdrop||"off")!=="video") return;
+    const v=$("#bdVid");
+    v.oncanplay=()=>{
+      v.play().catch(()=>{});
+      v.classList.add("on"); $("#bdImg").classList.remove("on");
+      if(T) T.scene.background=null;
+    };
+    v.src=src;
+  },
+  clearBackdrop(){ $("#bdImg").classList.remove("on"); $("#bdVid").classList.remove("on"); try{ $("#bdVid").pause(); }catch(e){} }
+};
+$("#ambBtn").addEventListener("click",()=>{
+  if(!Media.amb) return;
+  if(Media.amb.paused){ Media.amb.play().catch(()=>{}); $("#ambBtn").classList.remove("off"); }
+  else { Media.amb.pause(); $("#ambBtn").classList.add("off"); }
+});
+
 const Voice = {
   on:true, v:null, cfg:VoiceCfg.load(), elFailed:false,
   init(){
@@ -409,7 +635,7 @@ let T=null; // {renderer, scene, camera, orb, glow, mats...}
 const HAVE_3D = typeof THREE !== "undefined";
 function initWorld(){
   if(!HAVE_3D){ document.body.style.background="radial-gradient(120% 90% at 50% 20%, #0a1420, #04060a)"; return; }
-  const renderer=new THREE.WebGLRenderer({canvas:$("#stage"), antialias:true, alpha:false});
+  const renderer=new THREE.WebGLRenderer({canvas:$("#stage"), antialias:true, alpha:true});
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));
   const scene=new THREE.Scene();
   scene.fog=new THREE.FogExp2(0x04070c, .055);
@@ -724,8 +950,8 @@ async function run(){
 
   /* Q1 — where are you */
   await Cap.show(pick([
-    "Where are you right now — not the room. Inside. What's the weather like in there?",
-    "Tell me how it is in there right now. A word or two is plenty."
+    "Where are you right now — not the room. Inside. What's the weather like there?",
+    "Tell me how it is there right now. A word or two is plenty."
   ]), "speak, type, or just pick something close");
   let ans = await Promise.race([
     UI.free("anxious? heavy? okay? your words…"),
@@ -770,6 +996,10 @@ async function run(){
   const sceneKey = S.goalFeel==="grounded"? "meadow" : S.goalFeel==="lighter"? "dawn" :
                    (domGroup==="wired"||domGroup==="overwhelmed"||domGroup==="tense")? "underwater" : pick(["underwater","meadow"]);
   const sc=SCENES[sceneKey];
+  // start growing the place's generated sound and scenery now, so they can
+  // arrive softly while the person's eyes are closed (all fire-and-forget)
+  Media.soundscape(sceneKey);
+  Media.backdrop(sceneKey, TINTS[S.moods[0]]||"soft teal");
   await Cap.show(`Then let me make somewhere for that. ${sc.line}`);
   await Cap.show("Close your eyes for three breaths if you like. When you open them, we'll be there.");
   await fadeSwap(sc.build);
@@ -827,7 +1057,11 @@ function fadeSwap(build){
     requestAnimationFrame(()=>veil.style.opacity="1");
     setTimeout(()=>{
       clearScene(); build();
-      if(T){ T.orbTarget.set(0,.5,0); T.camTarget.set(0,0,8.5); }
+      if(T){
+        T.orbTarget.set(0,.5,0); T.camTarget.set(0,0,8.5);
+        // a generated backdrop may already be up — the 3D sky must not cover it
+        if($("#bdImg").classList.contains("on") || $("#bdVid").classList.contains("on")) T.scene.background=null;
+      }
       veil.style.opacity="0";
       setTimeout(()=>{ veil.remove(); res(); },2300);
     },2400);
@@ -912,39 +1146,143 @@ function showExit(){
     $("#vEleven").setAttribute("aria-pressed", engine==="eleven");
     $("#elFields").style.display = engine==="eleven"? "" : "none";
   };
+  const setBdUI=bd=>{ document.querySelectorAll("#bdChoice button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.bd===bd)); };
+  const getBdUI=()=>{ const b=document.querySelector('#bdChoice button[aria-pressed="true"]'); return b? b.dataset.bd : "off"; };
   const formCfg=()=>({
     engine: $("#vEleven").getAttribute("aria-pressed")==="true"? "eleven":"browser",
-    key: $("#elKey").value.trim(),
+    _engineChosen:true,
+    key: (Voice.cfg.key||"").trim(),          // from this device's config, never shown in the UI
     voice: $("#elVoice").value,
-    customVoice: $("#elCustom").value.trim()
+    customVoice: $("#elCustom").value.trim(),
+    ambience: $("#elAmb").checked,
+    backdrop: getBdUI()
   });
   const paint=()=>{
     const c=Voice.cfg;
     setEngineUI(c.engine||"browser");
-    $("#elKey").value=c.key||"";
-    $("#elVoice").value=c.voice||"EXAVITQu4vr4xnSDxMaL";
+    const sel=$("#elVoice");
+    // a saved account voice may not be in the preset list yet — show it anyway
+    if(c.voice && ![...sel.options].some(o=>o.value===c.voice)){
+      const o=document.createElement("option"); o.value=c.voice; o.textContent="Saved voice ("+c.voice.slice(0,8)+"…)";
+      sel.insertBefore(o, sel.firstChild);
+    }
+    sel.value=c.voice||"EXAVITQu4vr4xnSDxMaL";
     $("#elCustom").value=c.customVoice||"";
-    $("#elCustomWrap").style.display = $("#elVoice").value==="custom"? "":"none";
+    $("#elCustomWrap").style.display = sel.value==="custom"? "":"none";
+    $("#elAmb").checked = c.ambience!==false;
+    setBdUI(c.backdrop||"off");
     status.textContent=""; status.className="";
   };
+  document.querySelectorAll("#bdChoice button").forEach(b=>b.addEventListener("click",()=>setBdUI(b.dataset.bd)));
+  $("#elLoadVoices").addEventListener("click", async ()=>{
+    const key=(Voice.cfg.key||"").trim();
+    if(!key){ status.textContent="No ElevenLabs key is set up on this device."; status.className="bad"; return; }
+    status.textContent="Asking ElevenLabs for your voices…"; status.className="";
+    try{
+      const r=await fetch(EL_API+"/v1/voices",{headers:{"xi-api-key":key}});
+      if(!r.ok) throw 0;
+      const j=await r.json();
+      const sel=$("#elVoice"), keep=sel.value;
+      const old=sel.querySelector("optgroup"); if(old) old.remove();
+      const og=document.createElement("optgroup"); og.label="Your voices";
+      (j.voices||[]).forEach(v=>{
+        const o=document.createElement("option"); o.value=v.voice_id;
+        o.textContent=v.name+(v.category&&v.category!=="premade"? " · "+v.category : "");
+        og.appendChild(o);
+      });
+      sel.insertBefore(og, sel.firstChild);
+      sel.value=keep;
+      status.textContent=(j.voices||[]).length+" voices loaded — pick one, hear a line, then save."; status.className="ok";
+    }catch(e){ status.textContent="Couldn't reach ElevenLabs — check the key."; status.className="bad"; }
+  });
   $("#gearBtn").addEventListener("click",()=>{ paint(); veil.classList.remove("hide"); });
   $("#voxClose").addEventListener("click",()=>veil.classList.add("hide"));
   $("#vBrowser").addEventListener("click",()=>setEngineUI("browser"));
   $("#vEleven").addEventListener("click",()=>setEngineUI("eleven"));
   $("#elVoice").addEventListener("change",()=>{ $("#elCustomWrap").style.display = $("#elVoice").value==="custom"? "":"none"; });
+  /* ---- voice library search: find, preview, add to the account ---- */
+  const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+  let vlPrev=null, vlFound=[];
+  const stopPrev=()=>{ try{ if(vlPrev){ vlPrev.pause(); vlPrev=null; } }catch(e){} };
+  async function vlSearch(q, g){
+    const key=(Voice.cfg.key||"").trim();
+    if(!key){ status.textContent="No ElevenLabs key is set up on this device."; status.className="bad"; return; }
+    status.textContent="Searching the voice library…"; status.className="";
+    $("#vlResults").innerHTML="";
+    try{
+      const u=new URL(EL_API+"/v1/shared-voices");
+      u.searchParams.set("page_size","8");
+      if(q) u.searchParams.set("search", q);
+      if(g) u.searchParams.set("gender", g);
+      const r=await fetch(u,{headers:{"xi-api-key":key}});
+      if(!r.ok) throw 0;
+      const j=await r.json();
+      vlFound=j.voices||[];
+      if(!vlFound.length){ status.textContent="Nothing came back for that — try different words."; status.className="bad"; return; }
+      $("#vlResults").innerHTML=vlFound.map((v,i)=>{
+        const tags=[v.gender,v.accent,v.age,v.descriptive||v.use_case].filter(Boolean).join(" · ");
+        return `<div class="vlrow">
+          <div class="nm"><b>${esc(v.name)}</b><span>${esc(tags)}${v.description? " — "+esc(v.description):""}</span></div>
+          ${v.preview_url? `<button data-vl-play="${i}" aria-label="Preview ${esc(v.name)}">▶</button>`:""}
+          <button class="use" data-vl-use="${i}">Use</button>
+        </div>`;
+      }).join("");
+      status.textContent=vlFound.length+" found — press ▶ to hear a sample, then Use to add it to your voices."; status.className="ok";
+    }catch(e){ status.textContent="The voice library didn't answer — try again in a moment."; status.className="bad"; }
+  }
+  $("#vlGo").addEventListener("click",()=>vlSearch($("#vlSearch").value.trim(),""));
+  $("#vlSearch").addEventListener("keydown",e=>{ if(e.key==="Enter") vlSearch($("#vlSearch").value.trim(),""); });
+  $("#vlChips").addEventListener("click",e=>{
+    const b=e.target.closest("button[data-q]"); if(!b) return;
+    $("#vlSearch").value=b.dataset.q;
+    vlSearch(b.dataset.q, b.dataset.g);
+  });
+  $("#vlResults").addEventListener("click", async e=>{
+    const play=e.target.closest("button[data-vl-play]");
+    if(play){
+      const v=vlFound[+play.dataset.vlPlay];
+      if(v&&v.preview_url){ stopPrev(); try{ vlPrev=new Audio(v.preview_url); vlPrev.volume=.85; vlPrev.play().catch(()=>{}); }catch(err){} }
+      return;
+    }
+    const use=e.target.closest("button[data-vl-use]"); if(!use) return;
+    const v=vlFound[+use.dataset.vlUse]; if(!v) return;
+    stopPrev();
+    const key=(Voice.cfg.key||"").trim();
+    status.textContent="Adding “"+v.name+"” to your voices…"; status.className="";
+    try{
+      const r=await fetch(`${EL_API}/v1/voices/add/${encodeURIComponent(v.public_owner_id)}/${encodeURIComponent(v.voice_id)}`,{
+        method:"POST", headers:{"xi-api-key":key,"Content-Type":"application/json"},
+        body:JSON.stringify({new_name:v.name})});
+      if(!r.ok) throw 0;
+      const j=await r.json().catch(()=>({}));
+      const id=j.voice_id||v.voice_id;
+      const sel=$("#elVoice");
+      if(![...sel.options].some(o=>o.value===id)){
+        const o=document.createElement("option"); o.value=id; o.textContent=v.name;
+        sel.insertBefore(o, sel.firstChild);
+      }
+      sel.value=id;
+      status.textContent="“"+v.name+"” added and selected — hear a line, then save."; status.className="ok";
+    }catch(e2){ status.textContent="Couldn't add that voice — some library voices are restricted to certain plans. Try another."; status.className="bad"; }
+  });
+  $("#voxClose").addEventListener("click", stopPrev);
+
   $("#voxSave").addEventListener("click",()=>{
     const c=formCfg();
-    if(c.engine==="eleven" && !c.key){ status.textContent="Add your ElevenLabs API key first (it stays in this browser)."; status.className="bad"; return; }
+    if(c.engine==="eleven" && !c.key){ status.textContent="No ElevenLabs key is set up on this device, so the browser voice will be used."; status.className="bad"; return; }
     Voice.cfg=c; Voice.elFailed=false; Eleven.useSpeed=true; VoiceCfg.save(c);
-    status.textContent="Saved. The orb will use this voice from its next line."; status.className="ok";
+    if(!c.ambience) Media.stopAmb();
+    if(c.backdrop==="off") Media.clearBackdrop();
+    status.textContent="Saved. The orb will use this from its next line."; status.className="ok";
   });
   $("#voxTest").addEventListener("click",async ()=>{
     const c=formCfg();
     status.textContent="Listening for it…"; status.className="";
     if(c.engine==="eleven"){
-      if(!c.key || !Eleven.voiceId(c)){ status.textContent="Add a key and a voice first."; status.className="bad"; return; }
+      if(!c.key){ status.textContent="No ElevenLabs key is set up on this device."; status.className="bad"; return; }
+      if(!Eleven.voiceId(c)){ status.textContent="Pick a voice first."; status.className="bad"; return; }
       try{ await Eleven.say(c, "Hello. This is how I would sound. Take one slow breath with me."); status.textContent="That's the ElevenLabs voice. Save to keep it."; status.className="ok"; }
-      catch(e){ status.textContent="ElevenLabs didn't answer — check the key (and that it has credits). The browser voice will be used until this works."; status.className="bad"; }
+      catch(e){ status.textContent="ElevenLabs didn't answer — it may be out of credits or unreachable. The browser voice will be used until it works."; status.className="bad"; }
     } else {
       await Voice.browserSay("Hello. This is the built-in voice. Take one slow breath with me.");
       status.textContent="That's the browser voice on this device."; status.className="ok";
