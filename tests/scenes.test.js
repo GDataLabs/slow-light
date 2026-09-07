@@ -1,0 +1,15 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');
+function bridge(create){const ctx={create,console:{warn(){}},Promise,App:{simple:false},G:{W:390,H:844,t:4,breath:{level:.5},quality:.8,cv:{dataset:{}}},REDUCED:false,document:{getElementById:()=>({checked:true})}};ctx.window=ctx;ctx.addEventListener=()=>{};vm.runInNewContext(fs.readFileSync('scenes-bridge.js','utf8').replace("import('./scenes-3d.js')",'Promise.resolve({createScenes:create})'),ctx);return ctx;}
+const settle=()=>new Promise(r=>setImmediate(r));
+test('all extra rooms receive the exercise clock and progress',async()=>{let options;const c=bridge(async()=>({draw(ctx,o){options=o;return true;},dispose(){}}));c.Scenes3D.load();await settle();for(const room of ['weather','descent','resonance']){assert.equal(c.Scenes3D.draw({},room,.3,.7),true);assert.equal(options.room,room);assert.equal(options.time,4);assert.equal(options.progress,.3);assert.equal(options.clearing,.7);}c.REDUCED=true;c.Scenes3D.draw({},'weather',0,0);assert.equal(options.reduced,true);});
+test('failed extra scene loads leave illustrated scenery available',async()=>{const c=bridge(async()=>{throw Error('unavailable');});assert.equal(c.Scenes3D.draw({},'weather'),false);await settle();assert.equal(c.Scenes3D.state,'fallback');assert.equal(c.G.cv.dataset.sceneRenderer,'illustrated');});
+test('lost scene context disposes once and falls back',async()=>{let disposed=0;const c=bridge(async()=>({draw(){return false;},dispose(){disposed++;}}));c.Scenes3D.load();await settle();assert.equal(c.Scenes3D.draw({},'descent'),false);c.Scenes3D.release();assert.equal(disposed,1);});
+test('restarting during loading cannot attach an old renderer',async()=>{const pending=[];let disposed=0;const c=bridge(()=>new Promise(r=>pending.push(r)));c.Scenes3D.load();await settle();c.Scenes3D.release();c.Scenes3D.load();await settle();pending[0]({dispose(){disposed++;}});await settle();assert.equal(disposed,1);assert.equal(c.Scenes3D.state,'loading');const current={draw(){return true;},dispose(){}};pending[1](current);await settle();assert.equal(c.Scenes3D.instance,current);});
+test('simple mode avoids loading additional 3D scenes',()=>{let calls=0;const c=bridge(()=>{calls++;});c.App.simple=true;assert.equal(c.Scenes3D.draw({},'resonance'),false);assert.equal(calls,0);assert.equal(c.Scenes3D.state,'idle');});
+
+test('optimized pine assets have valid local buffers and bounded geometry',()=>{
+ const base='assets/trees/',g=JSON.parse(fs.readFileSync(base+'pines.gltf')),buffer=fs.readFileSync(base+g.buffers[0].uri);
+ assert.equal(buffer.length,g.buffers[0].byteLength);assert.ok(buffer.length<2000000);
+ for(const image of g.images)assert.ok(fs.statSync(base+image.uri).size>0);
+ for(const m of g.meshes)for(const p of m.primitives){const a=g.accessors[p.indices],v=g.bufferViews[a.bufferView],vertices=g.accessors[p.attributes.POSITION].count;for(let i=0;i<a.count;i++)assert.ok(buffer.readUInt32LE(v.byteOffset+i*4)<vertices);}
+});

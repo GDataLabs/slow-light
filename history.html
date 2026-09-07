@@ -92,13 +92,14 @@ a{color:#2f7d6b}
 .stat b{display:block; font-family:var(--font-display); font-weight:400; font-size:24px; color:#241f17}
 .stat span{font-size:11.5px; color:#8d8171; text-transform:uppercase; letter-spacing:.12em}
 footer{color:#9c907d; font-size:12.8px; line-height:1.65; margin-top:40px; max-width:64ch}
+body{background:#f6f5ef;color:#293e35}h1,h3{color:#62755b}h2{color:#293e35}.btn{background:#344f3e;border-color:#344f3e;box-shadow:none}.btn.ghost{color:#344f3e}.day.inmonth,.sess,.stat{background:#fcfcf7}.small,footer,.empty{color:#63705d}button:focus-visible,a:focus-visible{outline:3px solid #ad6c38;outline-offset:4px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Slow&nbsp;Light</h1>
   <h2>How it's been going</h2>
-  <p class="small">Every finished session is kept on this device — and only this device — so you can watch your own weather over time. A day's dots are the feelings you arrived with; tap a day to read what happened in it.</p>
+  <p class="small">When saving is on, your finished sensory journeys are kept in this browser so you can reflect over time. A day's dots are the feelings you arrived with; tap a day to read what happened in it.</p>
 
   <div class="statrow" id="stats"></div>
 
@@ -116,7 +117,9 @@ footer{color:#9c907d; font-size:12.8px; line-height:1.65; margin-top:40px; max-w
 
   <p style="margin-top:34px">
     <a class="btn" href="index.html">Another session</a>
-    <a class="btn ghost" href="#" id="copyAll" style="margin-left:8px">Copy this history</a>
+    <button class="btn ghost" id="copyAll" style="margin:8px">Copy this history</button>
+    <button class="btn ghost" id="clearHistory">Clear saved reflections</button>
+    <span id="dataStatus" role="status"></span>
   </p>
 
   <footer>
@@ -139,8 +142,9 @@ const NAME = {
 const $=s=>document.querySelector(s);
 let hist=[];
 try{ hist=JSON.parse(localStorage.getItem("slowlight.history")||"[]"); }catch(e){}
-hist = hist.filter(r=>r && r.t).sort((a,b)=>a.t-b.t);
+hist = (Array.isArray(hist)?hist:[]).filter(r=>r && Number.isFinite(r.t)).sort((a,b)=>a.t-b.t);
 
+const escapeHTML = value => String(value).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const dayKey = t => { const d=new Date(t); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
 const byDay = {};
 for(const r of hist) (byDay[dayKey(r.t)] = byDay[dayKey(r.t)]||[]).push(r);
@@ -213,20 +217,20 @@ function showDay(k){
   $("#dayTitle").textContent=d.toLocaleDateString(undefined,{weekday:"long", month:"long", day:"numeric", year:"numeric"});
   $("#dayDetail").innerHTML = rs.map(r=>{
     const time=new Date(r.t).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
-    const moods=(r.keys||[]).map(kk=>`<span><i style="background:${SWATCH[kk]||"#ccc"}"></i>${NAME[kk]||kk}</span>`).join("");
+    const moods=r.label==="Not sure" ? "<span>Not sure</span>" : (Array.isArray(r.keys)?r.keys:[]).map(kk=>`<span><i style="background:${SWATCH[kk]||"#ccc"}"></i>${escapeHTML(NAME[kk]||kk)}</span>`).join("");
     return `<div class="sess">
-      <div class="when">${time}${r.mins?` · ${r.mins} min`:""}${r.breaths?` · ${r.breaths} breaths`:""}</div>
+      <div class="when">${time}${r.mins?` · ${escapeHTML(r.mins)} min`:""}${r.breaths?` · ${escapeHTML(r.breaths)} pacer cycles`:""}</div>
       <div class="moods">${moods}</div>
-      <div class="grip">${gripLine(r)}</div>
-      ${r.carry? `<p class="quote">“${r.carry}”</p>`:""}
-      ${r.goal? `<p class="small" style="margin:6px 0 0">Goal set: ${r.goal}</p>`:""}
+      <div class="grip">${escapeHTML(gripLine(r))}</div>
+      ${r.carry? `<p class="quote">“${escapeHTML(r.carry)}”</p>`:""}
+      ${r.goal? `<p class="small" style="margin:6px 0 0">Goal set: ${escapeHTML(r.goal)}</p>`:""}
     </div>`;
   }).join("");
   $("#dayTitle").scrollIntoView({behavior:"smooth", block:"nearest"});
 }
 
 if(!hist.length){
-  $("#grid").insertAdjacentHTML("afterend", `<div class="empty" style="margin-top:14px">Nothing here yet. Finish a session and it will appear on this calendar — only on this device.</div>`);
+  $("#grid").insertAdjacentHTML("afterend", `<div class="empty" style="margin-top:14px">No saved reflections yet. Finish a sensory journey with saving on to see it here. Grounding moments are not saved.</div>`);
 } else {
   // open on the most recent session's month and day
   const last=hist[hist.length-1];
@@ -251,6 +255,11 @@ $("#copyAll").addEventListener("click", e=>{
     $("#copyAll").textContent="Copied";
     setTimeout(()=>$("#copyAll").textContent="Copy this history",1800);
   });
+});
+$("#clearHistory").addEventListener("click",()=>{
+  if(!confirm("Clear all saved reflections and your saved goal from this browser? This cannot be undone. Your breathing and privacy preferences will stay.")) return;
+  try{localStorage.removeItem("slowlight.history");localStorage.removeItem("slowlight.goal");location.reload();}
+  catch{$("#dataStatus").textContent="Could not clear saved reflections. Try your browser’s site-data settings.";}
 });
 </script>
 </body>

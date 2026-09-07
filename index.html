@@ -3,7 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Slow Light — a multi-sensory entrainment platform</title>
+<title>Slow Light — a little space to find yourself</title>
+<meta name="description" content="A gentle place to name what you feel, ground yourself, and find a little space. Try a short grounding practice or a personal sensory journey.">
+<meta name="theme-color" content="#f6f5ef">
+<meta property="og:title" content="Slow Light — a little space to find yourself">
+<meta property="og:description" content="Meet yourself where you are. A gentle check-in, a grounding moment, and a little room to breathe.">
+<meta property="og:type" content="website">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&display=swap" rel="stylesheet">
@@ -432,16 +439,31 @@ a{color:var(--accent)}
 .hide{display:none !important}
 @media (max-width:520px){ .card{padding:22px 18px 18px} h2{font-size:28px} body{line-height:1.65} .btn{font-size:17px; padding:15px 34px} }
 </style>
+<link rel="stylesheet" href="arrival.css">
 </head>
 <body>
 <canvas id="stage"></canvas>
 
 <!-- ============================ CHECK-IN ============================ -->
-<section class="screen active" id="scr-checkin">
+<section class="screen active" id="scr-checkin" aria-label="Your check-in">
   <div class="wrap">
-    <h1>Slow&nbsp;Light</h1>
-    <h2>How are you arriving?</h2>
-    <p id="arriveLede">Touch the part of the wheel that feels closest.</p>
+    <header class="site-header">
+      <a class="wordmark" href="index.html" aria-label="Slow Light home"><span class="brand-sun" aria-hidden="true"></span>slow light<span class="brand-dot">.</span></a>
+      <nav aria-label="Main navigation"><a href="history.html">Your reflections</a><button class="plain-link" data-support>Find support <span aria-hidden="true">↗</span></button></nav>
+    </header>
+    <div class="welcome">
+      <div class="welcome-copy">
+        <p class="eyebrow">A SMALL PAUSE. A LITTLE MORE SPACE.</p>
+        <h1>You don’t have to<br>figure it all out.<br><em>Start with Here,<br>and Now.</em></h1>
+        <p>A quiet place to meet yourself where you are.<br>Name a feeling, find your footing, take the next small step.</p>
+        <div class="welcome-actions"><a class="btn" href="#checkin-heading">Check in with yourself <span aria-hidden="true">↘</span></a><button class="plain-link" data-ground>Just help me ground</button></div>
+        <p class="trust-line"><span aria-hidden="true">◌</span> No account. Your pace. Room for every feeling.</p>
+      </div>
+      <div class="landscape" role="img" aria-label="A soft sun rising over layers of quiet green hills"><div class="landscape-sun"></div><div class="hill hill-far"></div><div class="hill hill-mid"></div><div class="hill hill-near"></div><div class="landscape-caption">wherever you are, begin there</div></div>
+    </div>
+    <div class="checkin-heading"><div><p class="eyebrow">01 / NOTICE</p><h2 id="checkin-heading" tabindex="-1">How are you arriving?</h2></div><span class="section-note">No right answer. More than one is okay.</span></div>
+    <div class="checkin-grid"><div class="feeling-panel">
+    <p id="arriveLede">Pick a feeling on the wheel, or use the feeling list below.</p>
 
     <div class="emotion-landscape-wrap">
       <div class="wheel-box" id="wheelBox">
@@ -463,7 +485,7 @@ a{color:var(--accent)}
       <div class="quick-chip-row hide" id="quickChips" title="Quick select list"></div>
     </div>
 
-    <h3>How much is it gripping you right now?</h3>
+    </div><div class="intention-panel"><p class="eyebrow">02 / MAKE A LITTLE ROOM</p><h3>How intense does it feel?</h3>
     <div class="readout"><span id="sudsVal">6</span><span style="font-size:15px;color:var(--ink-faint)"> / 10</span></div>
     <input type="range" id="suds" min="0" max="10" step="1" value="6" aria-label="Distress level right now, 0 to 10">
     <div class="scale"><span>0 · settled</span><span>10 · overwhelming</span></div>
@@ -471,16 +493,24 @@ a{color:var(--accent)}
     <h3>How long do you have?</h3>
     <div class="row" id="lenRow"></div>
 
+    <div class="suggestion" aria-live="polite"><span class="suggestion-label">A GENTLE NEXT STEP</span><h4 id="suggestionTitle">You can start without the words.</h4><p id="suggestionText">Choose what feels closest, or take a grounding moment first.</p><button class="plain-link" data-ground>Try a grounding moment <span aria-hidden="true">↗</span></button></div>
+    <div class="row begin-row"><button class="btn" id="beginBtn">Begin</button></div>
+    <p class="small" id="beginHint">Four rooms, one continuous breath.</p>
+    <button class="plain-link" id="unsureBtn">I’m not sure — start gently</button>
+    </div></div>
+    <details class="preferences"><summary>Make this space yours <span>Sound, scenery &amp; breathing rhythm</span></summary><div class="preferences-body">
     <h3>Let it listen <span style="text-transform:none;letter-spacing:0;color:#3d4a56">— optional</span></h3>
     <div class="toggles">
+      <label class="toggle"><input type="checkbox" id="opt3D" checked><span><b>Detailed 3D scenery</b><span>Explore a sunrise lake, woodland garden, underwater world, and luminous space. Turn off for illustrated scenes. If 3D is unavailable, illustrated scenery appears automatically.</span></span></label>
       <label class="toggle"><input type="checkbox" id="optMic"><span><b>Microphone — hear my breath</b><span>The pace-setter starts at your real breathing rate and walks it down, instead of guessing. Audio never leaves this page.</span></span></label>
       <label class="toggle"><input type="checkbox" id="optCam"><span><b>Camera — watch me breathe <em style="font-style:normal;color:#7a6a4e">(experimental)</em></b><span>Reads the small rise and fall of your chest, and attempts a pulse estimate from skin colour. Video never leaves this page and nothing is recorded.</span></span></label>
-      <label class="toggle"><input type="checkbox" id="optSound" checked><span><b>Sound on</b><span>A generative soundscape built live in the browser. Headphones recommended — part of it is a binaural beat that needs two ears.</span></span></label>
+      <label class="toggle"><input type="checkbox" id="optSound"><span><b>Sound on</b><span>A generative soundscape built live in the browser. Headphones recommended — part of it is a binaural beat that needs two ears.</span></span></label>
       <label class="toggle"><input type="checkbox" id="optSimple"><span><b>Just the breath</b><span>Dims the scenery and keeps only the breathing light, so there is less to look at and nothing to get right. Good if visuals tend to overstimulate you.</span></span></label>
     </div>
 
-    <h3>The rhythm it settles into <span style="text-transform:none;letter-spacing:0;color:#3d4a56">— optional</span></h3>
-    <p class="small">Seconds for each part of the breath, once it has slowed all the way down. The pacer still starts at your speed and glides here — you don't have to hit these numbers, only drift toward them.</p>
+    <button class="btn ghost" id="setupRhythm">Set my breathing flow</button>
+    <h3>The breathing rhythm <span style="text-transform:none;letter-spacing:0;color:#3d4a56">— optional</span></h3>
+    <p class="small">Seconds for each part of your chosen rhythm. Use “Set my breathing flow” to choose exact timing or a gradual approach. The pacer offers a rhythm; it is not a target to achieve. Breathe comfortably, without forcing. You can stop or return to your natural breath at any time.</p>
     <div class="breathpace" id="breathPace">
       <label>Inhale <output id="bpInV">3.5s</output><input type="range" id="bpIn" min="2" max="7" step="0.5" value="3.5" aria-label="Inhale length in seconds"></label>
       <label>Hold <output id="bpHoldV">2s</output><input type="range" id="bpHold" min="0" max="8" step="0.5" value="2" aria-label="Hold length in seconds"></label>
@@ -490,6 +520,7 @@ a{color:var(--accent)}
     <p class="tiny" id="bpSummary"></p>
     <button class="linkish" id="bpReset" type="button">Back to the default rhythm</button>
 
+    </div></details>
     <div id="goalPrev" class="hide">
       <h3>Last time you set a goal</h3>
       <p class="small" id="goalPrevText"></p>
@@ -500,13 +531,8 @@ a{color:var(--accent)}
       <span class="st" id="sensePrevText"><b>Waking the sensors…</b>Breathe normally for a few seconds.</span>
     </div>
 
-    <hr class="hair">
-    <div class="row">
-      <button class="btn" id="beginBtn">Begin</button>
-      <span class="small" id="beginHint">Four rooms, one continuous breath.</span>
-    </div>
-    <p class="small" style="margin-top:14px">Or try <a href="orb.html">the Orb</a> — a quieter, guided preview: a small light in a dark space that asks where you are, listens, and shapes a place around your answer.</p>
-
+    <div class="explore-row"><div><span class="eyebrow">ANOTHER WAY IN</span><h3>A little light to guide you.</h3><p>Prefer a guided experience? Meet the Orb, an optional AI guide with voice.</p></div><a class="btn ghost" href="orb.html">Explore the Orb <span aria-hidden="true">↗</span></a></div>
+    <div class="privacy-note"><span aria-hidden="true">◈</span><p>Your check-ins and notes stay in this browser. <button class="plain-link" id="privacyBtn">Privacy &amp; your data</button><br>The optional Orb uses external AI and voice services.</p></div>
     <footer class="legal">
       Slow Light is a self-guided relaxation tool, not medical treatment, and it does not diagnose or monitor anything. Any pulse figure it shows is a rough visual estimate, not a measurement. If you're in crisis, please reach a person — a friend, a clinician, or a local crisis line. In the US, call or text <a href="tel:988">988</a> (Suicide &amp; Crisis Lifeline, 24/7) or text HOME to 741741; outside the US, <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a> lists local lines. If you are in immediate danger, call your local emergency number. Motion is deliberately slow and there is no strobing, but if you're photosensitive or prone to motion sickness, use the reduce-motion setting on your device; this page follows it.
     </footer>
@@ -517,10 +543,11 @@ a{color:var(--accent)}
 <div id="hud">
   <div class="tl"><span id="roomName">Weathering</span> <em id="roomSub"></em></div>
   <div class="tr">
-    <button class="icon" id="btnSound" title="Sound on/off">♪</button>
-    <button class="icon" id="btnPause" title="Pause">❚❚</button>
-    <button class="icon" id="btnSkip" title="Next room">▶❘</button>
-    <button class="icon" id="btnEnd" title="End session">✕</button>
+    <button class="icon rhythm-button" id="btnRhythm" aria-label="Adjust breathing rhythm" title="Adjust breathing rhythm">Breathing</button>
+    <button class="icon" id="btnSound" aria-label="Toggle sound" title="Sound on/off">♪</button>
+    <button class="icon" id="btnPause" aria-label="Pause session" title="Pause">❚❚</button>
+    <button class="icon" id="btnSkip" aria-label="Next room" title="Next room">▶❘</button>
+    <button class="icon" id="btnEnd" aria-label="End session" title="End session">✕</button>
   </div>
   <div class="bl">
     <span id="senseState" class="hide"></span>
@@ -541,7 +568,7 @@ a{color:var(--accent)}
   <div class="wrap">
     <h1>Slow&nbsp;Light</h1>
     <h2 id="closeTitle">Notice where you are now.</h2>
-    <p id="closeLede">Nothing outside you changed in the last few minutes. Something inside you might have. That's worth checking honestly — including if the answer is "not much".</p>
+    <p id="closeLede">Something may have shifted in the last few minutes. Or it may not have. That's worth checking honestly — including if the answer is "not much".</p>
 
     <p class="small" id="arrivedAs"></p>
     <h3>How much is it gripping you right now?</h3>
@@ -551,6 +578,7 @@ a{color:var(--accent)}
     <div class="deltabar"><i id="deltaFill" style="width:0%"></i></div>
     <p class="small" id="deltaText"></p>
 
+    <button class="btn ghost" data-support>Find human support ↗</button>
     <h3>The session</h3>
     <div class="statgrid" id="statGrid"></div>
 
@@ -560,7 +588,7 @@ a{color:var(--accent)}
     <textarea id="carry" rows="2" placeholder="In your own words…"></textarea>
 
     <h3>A goal for next time</h3>
-    <p class="small">Small and specific works best. It will be waiting for you on the first page next time you open Slow Light on this device.</p>
+    <p class="small">Small and specific works best. If saving is on, this will be waiting for you next time you open Slow Light in this browser.</p>
     <div class="reframes" id="goalList"></div>
     <textarea id="goal" rows="2" placeholder="Next session I'd like to…"></textarea>
 
@@ -570,10 +598,14 @@ a{color:var(--accent)}
       <button class="btn ghost" id="copyBtn">Copy my notes</button>
       <a class="btn ghost" id="historyBtn" href="history.html" style="text-decoration:none">How it's been going</a>
     </div>
-    <p class="small" style="margin-top:10px">This session is kept on this device only, so "How it's been going" can show your feelings over time on a calendar. Nothing is sent anywhere.</p>
+    <p class="small" id="saveNotice" style="margin-top:10px">This session is kept in this browser only. You can manage saving from Privacy &amp; your data on the check-in page.</p>
   </div>
 </section>
 
+<script type="importmap">{"imports":{"three":"./vendor/three/three.module.js"}}</script>
+<script src="garden-bridge.js"></script>
+<script src="scenes-bridge.js"></script>
+<script src="scene-detail.js"></script>
 <script>
 "use strict";
 /* =====================================================================
@@ -1506,35 +1538,49 @@ class Breath {
     this.sessionSec = sessionSec;
     this.tau = Math.max(40, sessionSec*0.28);
     this.ceiling = Math.min(20, this.startRate*1.22);
-    this.phase = 0; this.cycles = 0;
+    this.phase = 0; this.cycles = 0; this.locked=false; this.pendingShape=null; this.transitionStartProgress=null;
+    if(this.fixed) this.startRate=this.rate=this.target;
   }
   // A sensor-measured rate nudges (never snaps) the pacer toward reality.
   observe(measured, confidence, dt){
-    if(this.locked || !measured || !isFinite(measured)) return;
+    if(this.fixed || this.locked || !measured || !isFinite(measured)) return;
     if(measured < 5 || measured > 22) return;
     if(confidence < .34) return;                       // a noisy room must not drive the pacer
     const w = U.clamp((confidence-.34)/.5,0,1) * U.clamp(dt/2.6,0,1);
     // meet the person where they are, but never chase them faster than they arrived
-    this.rate = U.clamp(this.rate + (measured - this.rate)*w, this.target, this.ceiling||20);
+    const lo = Math.min(this.target, this.ceiling||20), hi = Math.max(this.target, this.ceiling||20);
+    this.rate = U.clamp(this.rate + (measured - this.rate)*w, lo, hi);
   }
   update(dt, progress){
+    const rawProgress=progress;
+    if(this.transitionStartProgress!=null) progress=U.clamp((progress-this.transitionStartProgress)/Math.max(.001,1-this.transitionStartProgress),0,1);
     // exponential glide to resonance; tighten the constant so it always arrives
     const remain = Math.max(1, (this.sessionSec||600)*(1-U.clamp(progress,0,1)));
     const tau = U.clamp(Math.min(this.tau, remain/2.6), 22, this.tau);
-    this.rate = U.approach(this.rate, this.target, tau, dt);
+    this.rate = this.fixed ? this.target : U.approach(this.rate, this.target, tau, dt);
+    // Guaranteed arrival: the exponential glide alone can leave the pacer
+    // well short of the chosen rhythm for most of a session, so a schedule
+    // walks it the rest of the way — by ~60% of the session the pacer IS
+    // the rhythm chosen on the check-in (see Breath.setShape).
+    const drive = this.fixed ? 1 : U.smoother(U.clamp((progress||0)/.6, 0, 1));
+    const sched = U.lerp(this.startRate, this.target, drive);
+    this.rate = this.startRate >= this.target ? Math.min(this.rate, sched) : Math.max(this.rate, sched);
     if(progress > .5) this.locked = true;
     const cps = this.rate/60;
     const prev = this.phase;
     this.phase += cps*dt;
-    if(this.phase >= 1){ this.phase -= Math.floor(this.phase); this.cycles++; }
+    if(this.phase >= 1){
+      this.phase -= Math.floor(this.phase); this.cycles++;
+      if(this.pendingShape){ const next=this.pendingShape; this.pendingShape=null; this.setShape(next.shape); this.fixed=next.fixed; if(this.fixed) this.rate=this.target; else { this.startRate=this.rate; this.transitionStartProgress=rawProgress; this.locked=false; } }
+    }
     // segment ratios shift from even to the person's chosen resting shape as
     // we slow. The default resting shape (in 3.5s · hold 2s · out 4.5s ·
     // rest 1s at ~5.5/min) keeps the deliberately long holds from the Aug
     // 2026 feedback; the check-in's "rhythm it settles into" sliders replace
     // it with whatever the person set (see Breath.setShape).
-    const p = U.clamp(U.inv(this.startRate, this.target, this.rate),0,1);
+    const p = this.fixed ? 1 : Math.max(U.clamp(U.inv(this.startRate, this.target, this.rate),0,1), this.transitionStartProgress===rawProgress?0:drive);
     const sh = this.shape || Breath.DEFAULT_SHAPE;
-    const i = U.lerp(.40, sh.i, p), h1 = U.lerp(.10, sh.h1, p), e = U.lerp(.42, sh.e, p);
+    const i = U.lerp(.45, sh.i, p), h1 = U.lerp(0, sh.h1, p), e = U.lerp(.55, sh.e, p);
     const h2 = 1 - i - h1 - e;
     const t = this.phase;
     if(t < i){ this.segment="in";   this.level = U.smoother(t/i); }
@@ -1550,17 +1596,20 @@ class Breath {
   /* The person's resting breath, in seconds per phase. Sets both the target
      tempo (60 / total seconds) and the segment fractions the cycle relaxes
      into. Called before start(). */
+  queueShape(shape, fixed=true){
+    this.pendingShape={shape:{...shape},fixed};
+  }
   setShape(sec){
     const inS=U.clamp(+sec.inS||3.5,1,10), hS=U.clamp(+sec.holdS||0,0,10),
           outS=U.clamp(+sec.outS||4.5,1,12), rS=U.clamp(+sec.restS||0,0,8);
     const tot = inS+hS+outS+rS;
-    this.target = U.clamp(60/tot, 3.5, 10);
+    this.target = U.clamp(60/tot, 2, 12);   // honour the full slider range (5s..28s per breath)
     this.shape = { i:inS/tot, h1:hS/tot, e:outS/tot, h2:rS/tot };
   }
   get bpmText(){ return this.rate.toFixed(1)+" breaths/min"; }
   get avg(){ return this.rateN ? this.rateSum/this.rateN : this.rate; }
 }
-Breath.DEFAULT_SHAPE = { i:.32, h1:.18, e:.41, h2:.09 };   // ≈ 3.5 · 2 · 4.5 · 1 s at 5.5/min
+Breath.DEFAULT_SHAPE = { i:3.5/8, h1:0, e:4.5/8, h2:0 };   // ≈ 3.5 · 2 · 4.5 · 1 s at 5.5/min
 
 /* =====================================================================
    AUDIO — everything synthesised live. No files, no network.
@@ -2149,7 +2198,7 @@ class Weathering extends Room {
     }
   }
   buildClouds(){
-    const w=256,h=128;
+    const w=512,h=256;
     const mk=(inv)=>{
       const c=document.createElement("canvas"); c.width=w; c.height=h;
       const x=c.getContext("2d"), im=x.createImageData(w,h), d=im.data;
@@ -2158,7 +2207,7 @@ class Weathering extends Room {
         // wrap by cross-fading the field with a copy shifted one width over:
         // at i=0 and i=w the value is identical, so the tile joins invisibly
         const t=i/w;
-        const n=U.lerp(U.fbm(i/34, j/26+7.3, 5), U.fbm((i-w)/34, j/26+7.3, 5), t);
+        const n=U.lerp(U.fbm(i/68, j/52+7.3, 5), U.fbm((i-w)/68, j/52+7.3, 5), t);
         let a=U.clamp((n-.44)*2.5,0,1);
         a*= U.smooth(U.clamp(1-(j/h)*1.15,0,1))*.9+.1;
         const k=(j*w+i)*4;
@@ -2185,7 +2234,7 @@ class Weathering extends Room {
     this.p=p;
     const b=G.breath;
     // the sky clears with the room, but the last of it needs the breath
-    const breathProg = U.clamp(U.inv(b.startRate, b.target, b.rate),0,1);
+    const breathProg = b.fixed ? p : U.clamp(U.inv(b.startRate, b.target, b.rate),0,1);
     const target = U.clamp(U.smoother(Math.pow(p,.9))*.78 + breathProg*.30, 0, 1);
     this.c = U.approach(this.c, target, 2.2, dt);
     const c=this.c, cf=this.cfg;
@@ -2260,6 +2309,7 @@ class Weathering extends Room {
             v:U.rnd(cf.spd*1.25, cf.spd*.6), w:U.rnd(1.25,.55), a:U.rnd(.8,.25), l:U.rnd(cf.len*1.4, cf.len*.5)};
   }
   draw(ctx){
+    if(window.Scenes3D && Scenes3D.draw(ctx,"weather",this.p,this.c,this.cfg))return;
     const {W,H}=G, c=this.c, st=G.st, cf=this.cfg, b=G.breath;
     const horizon=this.horizonY(), dtGuess=1/60;
     const sky = st.skyA.map((a,i)=>U.mixHsl(a, st.skyB[i], U.smoother(c)));
@@ -2295,23 +2345,7 @@ class Weathering extends Room {
     // strongest when the cloud is breaking rather than gone: the moment the
     // light first gets through is the one worth drawing
     const rayA = U.smooth(U.inv(.18,.55,c)) * (1-U.smooth(U.inv(.86,1,c))*.55) * (.5+.5*warm);
-    if(rayA>.012){
-      ctx.save(); ctx.globalCompositeOperation="screen";
-      ctx.beginPath(); ctx.rect(0,0,W,horizon); ctx.clip();
-      const g=radial(ctx,sunX,sunY,0,H*1.25,[
-        [0,`rgba(255,238,206,${.16*rayA})`],[.45,`rgba(255,226,180,${.07*rayA})`],[1,"rgba(255,220,170,0)"]]);
-      ctx.fillStyle=g;
-      for(let i=0;i<8;i++){
-        const base = -Math.PI/2 + (i/7-.5)*1.85 + Math.sin(G.t*.035+i*1.7)*.024;
-        const wdt  = (0.020 + 0.026*U.hash(i*3.7,1.1)) * (1+.35*Math.sin(G.t*.09+i));
-        ctx.beginPath();
-        ctx.moveTo(sunX, sunY);
-        ctx.lineTo(sunX+Math.cos(base-wdt)*H*1.6, sunY+Math.sin(base-wdt)*H*1.6);
-        ctx.lineTo(sunX+Math.cos(base+wdt)*H*1.6, sunY+Math.sin(base+wdt)*H*1.6);
-        ctx.closePath(); ctx.fill();
-      }
-      ctx.restore();
-    }
+    if(rayA>.012) SceneDetail.sunRays(ctx,{sunX,sunY,horizon,width:W,height:H,strength:rayA,time:REDUCED?0:G.t});
     // ---------------- clouds ----------------
     const drift=G.t*U.lerp(26,5,c);
     ctx.save();
@@ -2362,6 +2396,7 @@ class Weathering extends Room {
       [0,U.col(wTop)],
       [.28,U.col(U.mixRgb(wTop,wtr[1],.62))],
       [1,U.col(U.scale(wtr[1],.88))]]);
+    SceneDetail.paint(ctx,"weather",{horizon,calm:c});
     // reflection column
     ctx.save(); ctx.globalCompositeOperation="screen";
     const rw = sunR*U.lerp(3.2,7,warm);
@@ -2647,9 +2682,23 @@ class SlowGarden extends Room {
     }
     this.px=px; this.py=py;
   }
+  draw3DInteraction(ctx){
+    ctx.save();ctx.globalCompositeOperation="screen";
+    for(const bloom of this.blooms){
+      const alpha=U.smooth(U.clamp(bloom.age,0,1))*(1-U.clamp((bloom.age-(bloom.life-2))/2,0,1));
+      const radius=Math.max(1,bloom.R*U.clamp(bloom.age/2.4,0,1));
+      ctx.fillStyle=radial(ctx,bloom.x,bloom.y,0,radius,[[0,`rgba(210,235,180,${alpha*.12})`],[1,"rgba(180,230,160,0)"]]);ctx.beginPath();ctx.arc(bloom.x,bloom.y,radius,0,TAU);ctx.fill();
+      ctx.strokeStyle=`rgba(220,238,196,${alpha*.16})`;ctx.lineWidth=1;
+      for(let i=0;i<6;i++){const angle=i*TAU/6;ctx.beginPath();ctx.ellipse(bloom.x+Math.cos(angle)*radius*.25,bloom.y+Math.sin(angle)*radius*.25,radius*.3,radius*.1,angle,0,TAU);ctx.stroke();}
+    }
+    ctx.restore();
+  }
   draw(ctx){
+    if(window.Garden3D && Garden3D.draw(ctx)){ this.draw3DInteraction(ctx); return; }
+    G.cv.dataset.gardenRenderer="illustrated";
     const {W,H}=G, b=G.breath;
     vGrad(ctx,0,0,W,H,[[0,"#070a10"],[1,"#04060a"]]);
+    SceneDetail.paint(ctx,"garden");
     // deep colour drifting behind everything, so the field is never empty
     ctx.save(); ctx.globalCompositeOperation="screen";
     for(let i=0;i<3;i++){
@@ -2833,11 +2882,13 @@ class Descent extends Room {
     if(!this.leafDone && p>.90 && !App.held){ this.leafDone=true; App.defusion(); }
   }
   draw(ctx){
+    if(window.Scenes3D && Scenes3D.draw(ctx,"descent",this.p,this.c))return;
     const {W,H}=G, d=this.d, b=G.breath, st=G.st;
     // water column: the deeper you go the quieter the light
     const top=[U.lerp(196,220,d), U.lerp(.42,.50,d), U.lerp(.30,.105,d)];
     const bot=[U.lerp(212,228,d), U.lerp(.46,.56,d), U.lerp(.13,.052,d)];
     vGrad(ctx,0,0,W,H,[[0,U.hsl(...top)],[.55,U.hsl(U.lerp(top[0],bot[0],.5),U.lerp(top[1],bot[1],.5),U.lerp(top[2],bot[2],.5))],[1,U.hsl(...bot)]]);
+    SceneDetail.paint(ctx,"descent",{depth:d});
     // strata — bands of slightly different water, sliding upward
     ctx.save(); ctx.globalCompositeOperation="screen";
     for(let i=0;i<9;i++){
@@ -3013,9 +3064,10 @@ class Resonance extends Room {
       if(r.a<=0) this.rings.splice(i,1);
     }
     for(const s of this.stars){ s.ph+=dt*.5; s.y -= s.v*dt*.25; if(s.y<-6){s.y=G.H+6; s.x=U.rnd(G.W);} }
-    if(!this.said && p>.05){ this.said=true; App.toast("You can close your eyes now. The sound will keep the pace."); }
+    if(!this.said && p>.05){ this.said=true; App.toast(G.snd.on ? "You can close your eyes now. The sound will keep the pace." : "Let the light guide you, or rest your eyes and breathe naturally."); }
   }
   draw(ctx){
+    if(window.Scenes3D && Scenes3D.draw(ctx,"resonance",this.p,this.c,null,this.hue))return;
     const {W,H}=G, b=G.breath, p=this.p;
     const cx=W*.5, cy=H*.5, R=Math.max(W,H);
     // the field warms and deepens as the tempo settles
@@ -3023,6 +3075,7 @@ class Resonance extends Room {
     const h2=U.lerp(206, 256, U.smoother(p));        // surround: cold blue → indigo
     const lvl=b.level;
     ctx.fillStyle=U.hsl(h2,.34,U.lerp(.040,.028,p),1); ctx.fillRect(0,0,W,H);
+    SceneDetail.paint(ctx,"resonance");
     ctx.save(); ctx.globalCompositeOperation="screen";
     // stars
     for(const s of this.stars){
@@ -3107,7 +3160,7 @@ const params = new URLSearchParams(location.search);
 
 const App = {
   screen:"checkin", running:false, held:false, paused:false,
-  stateKey:"wired", selectedStates:new Set(["wired"]), suds:6, sessionSec:600,
+  stateKey:"wired", selectedStates:new Set(["wired"]), suds:6, sessionSec:360,
   roomIdx:0, roomElapsed:0, elapsed:0, fade:1, fadeDir:-1,
   rooms:[], room:null, thought:"", anchor:"", syncPct:0, syncN:0, syncSum:0,
 
@@ -3166,7 +3219,7 @@ const App = {
 
   getBlendedState(){
     const keys = this.orderedKeys();
-    if(keys.length === 0) return STATES.wired;
+    if(keys.length === 0) return { ...STATES.neutral, keys:["neutral"], labelFull:"Not sure" };
     const ws = keys.map(k => 0.15 + 0.85 * (this.weights[k] ?? INTENSITY_DEFAULT));
     if(keys.length === 1) return { ...STATES[keys[0]], keys, weights: ws, labelFull: STATES[keys[0]].label };
 
@@ -3221,8 +3274,8 @@ const App = {
     const card = $("#blendCard"), lede = $("#arriveLede");
     if(card) card.classList.toggle("hide", keys.length === 0);
     if(lede && !live) lede.textContent = keys.length === 0
-      ? "Touch the part of the wheel that feels closest."
-      : "Name it first — putting a feeling into words lowers its charge. Pull a lit point toward the rim if there's a lot of it.";
+      ? "Pick a feeling on the wheel, or use the feeling list below."
+      : "This is a starting point, not a label. Move a lit point outward if there’s more of it.";
 
     // 1. Badges — one per lit feeling, with how much of it is present
     if(tagsEl){
@@ -3265,22 +3318,20 @@ const App = {
         : "Outward for more, inward for less. The strongest one leads.";
     }
 
-    // 3. Wheel tint, SUDS suggestion and Begin line
+    // 3. Wheel tint and Begin line. Intensity is always self-reported.
     if(keys.length > 0){
       const blended = this.getBlendedState();
       this.stateKey = keys[0];
       if(wheelBox) wheelBox.style.setProperty("--tint", blended.swatch);
-      if(!this._sudsTouched){
-        $("#suds").value = Math.round(U.lerp(4, 9, blended.arousal));
-        $("#sudsVal").textContent = $("#suds").value;
-      }
       if(!live) $("#beginHint").textContent = this.blendLine(keys, 0);
-      if(beginBtn){ beginBtn.disabled = false; beginBtn.textContent = "Begin"; }
+      if(beginBtn){ beginBtn.disabled = false; beginBtn.textContent = "Begin my journey →"; }
     } else {
       if(wheelBox) wheelBox.style.removeProperty("--tint");
       $("#beginHint").textContent = "Light at least one feeling on the wheel.";
       if(beginBtn){ beginBtn.disabled = true; beginBtn.textContent = "Pick a feeling"; }
     }
+
+    if(window.Arrival) window.Arrival.updateSuggestion(keys, +$("#suds").value);
 
     // 4. Quick chips state
     if(chipBox && !live){
@@ -3361,8 +3412,8 @@ const App = {
       });
     }
 
-    const lens=[[360,"6 min"],[600,"10 min"],[960,"16 min"]];
-    $("#lenRow").innerHTML = lens.map(([v,l])=>`<button class="chip" data-v="${v}" aria-pressed="${v===600}">${l}</button>`).join("");
+    const lens=[[180,"3 min"],[360,"6 min"],[600,"10 min"],[960,"16 min"]];
+    $("#lenRow").innerHTML = lens.map(([v,l])=>`<button class="chip" data-v="${v}" aria-pressed="${v===360}">${l}</button>`).join("");
     $("#lenRow").addEventListener("click", e=>{
       const b=e.target.closest(".chip"); if(!b) return;
       this.sessionSec=+b.dataset.v;
@@ -3380,7 +3431,7 @@ const App = {
     $("#btnPause").addEventListener("click", ()=>this.togglePause());
     $("#btnSkip").addEventListener("click", ()=>this.nextRoom(true));
     $("#btnEnd").addEventListener("click", ()=>this.finish());
-    if(params.get("sec")) this.sessionSec = +params.get("sec");
+    if(params.get("sec")){ const sec=Number(params.get("sec")); if(Number.isFinite(sec) && sec>=12 && sec<=3600) this.sessionSec=sec; }
     if(params.get("state") && STATES[params.get("state")]) {
       this.stateKey = params.get("state");
       this.selectedStates = new Set([this.stateKey]);
@@ -3396,7 +3447,7 @@ const App = {
     if(g){ $("#goalPrevText").textContent = "“"+g+"”"; $("#goalPrev").classList.remove("hide"); }
   },
   /* --------- the rhythm the breath settles into (per-phase seconds) ------ */
-  breathDefaults:{ inS:3.5, holdS:2, outS:4.5, restS:1 },
+  breathDefaults:{ inS:3.5, holdS:0, outS:4.5, restS:0 },
   initBreathPace(){
     const ids={inS:"bpIn", holdS:"bpHold", outS:"bpOut", restS:"bpRest"};
     let saved=null; try{ saved=JSON.parse(localStorage.getItem("slowlight.breathShape")||"null"); }catch(e){}
@@ -3408,7 +3459,7 @@ const App = {
         $("#"+ids[k]+"V").textContent=fmt(this.breathShape[k]);
       }
       const t=this.breathShape.inS+this.breathShape.holdS+this.breathShape.outS+this.breathShape.restS;
-      $("#bpSummary").textContent=`One breath ≈ ${fmt(t)} — about ${(60/t).toFixed(1)} breaths a minute at its slowest.`;
+      $("#bpSummary").textContent=`Your chosen rhythm: ${fmt(t)} per breath — ${(60/t).toFixed(1)} breaths a minute.`;
     };
     for(const k in ids){
       $("#"+ids[k]).addEventListener("input", e=>{
@@ -3425,7 +3476,7 @@ const App = {
     paint();
   },
   loadGoal(){ try{ return localStorage.getItem("slowlight.goal")||""; }catch(e){ return ""; } },
-  saveGoal(v){ try{ v? localStorage.setItem("slowlight.goal", v) : localStorage.removeItem("slowlight.goal"); }catch(e){} },
+  saveGoal(v){ try{ if(localStorage.getItem("slowlight.remember")==="false") return; v? localStorage.setItem("slowlight.goal", v) : localStorage.removeItem("slowlight.goal"); }catch(e){} },
 
   /* Permission is requested on the tick, not on Begin — so you can watch the
      trace respond to your own breathing before committing to a session.   */
@@ -3490,6 +3541,8 @@ const App = {
   stopPreview(){ this._prev=false; },
 
   async begin(){
+    if(this._beginning || this.running) return;
+    this._beginning=true;
     const btn=$("#beginBtn"); btn.disabled=true;
     this.suds = +$("#suds").value;
     
@@ -3504,6 +3557,7 @@ const App = {
 
     const wantMic=$("#optMic").checked, wantCam=$("#optCam").checked, wantSnd=$("#optSound").checked;
     this.simple = $("#optSimple").checked;
+    if(!this.simple && $("#opt3D").checked && window.Garden3D) Garden3D.load();
     this.stopPreview();
     Chime.close();
     if(this.emotionGraph) this.emotionGraph.active = false;
@@ -3527,6 +3581,7 @@ const App = {
     // arousal from both the blended state and the reported grip
     const arousal = U.clamp(G.st.arousal*.45 + (this.suds/10)*.55, 0, 1);
     G.breath.setShape(this.breathShape || this.breathDefaults);
+    G.breath.fixed=this.breathFixed!==false;
     G.breath.start(arousal, this.sessionSec);
 
     this.rooms=[new Weathering(), new SlowGarden(), new Descent(), new Resonance()];
@@ -3549,7 +3604,8 @@ const App = {
     }
     this.running=true; this.fade=1; this.screen="session";
     this.enterRoom(this.roomIdx);
-    setTimeout(()=>this.toast(this.pendingToast), 2200);
+    setTimeout(()=>{ if(this.screen==="session") this.toast(this.pendingToast); }, 2200);
+    $("#btnPause").focus();
     if(!this._loop){ this._loop=true; this.last=performance.now(); requestAnimationFrame(t=>this.frame(t)); }
   },
 
@@ -3572,6 +3628,7 @@ const App = {
     this.paused=!this.paused;
     $("#btnPause").textContent=this.paused?"▶":"❚❚";
     $("#btnPause").title=this.paused?"Resume":"Pause";
+    $("#btnPause").setAttribute("aria-label",this.paused?"Resume session":"Pause session");
     // silence, not a duck — a half-volume drone is worse than either state
     G.snd.fade(this.paused ? 0 : (G.snd.on?0.9:0), this.paused?0.7:1.4);
     this._pausedDrawn=false;
@@ -3615,7 +3672,7 @@ const App = {
         const c2=G.ctx; c2.setTransform(G.dpr,0,0,G.dpr,0,0);
         this.room.draw(c2);
         this.drawVeil(c2);
-        if(this.simple || !(this.room instanceof Resonance)) this.drawOrb(c2);
+        this.drawOrb(c2);
         this.drawPaused(c2);
         this._pausedDrawn=true;
       }
@@ -3664,7 +3721,7 @@ const App = {
     ctx.setTransform(G.dpr,0,0,G.dpr,0,0);
     this.room.draw(ctx);
     this.drawVeil(ctx);
-    if(this.simple || !(this.room instanceof Resonance)) this.drawOrb(ctx);
+    this.drawOrb(ctx);
     if(this.fade>0){
       this.fade=Math.max(0,this.fade-dt*.55);
       ctx.fillStyle=`rgba(3,5,8,${U.smooth(this.fade)})`;
@@ -3726,8 +3783,11 @@ const App = {
     ctx.restore();
     const label={in:"breathe in",hold:"hold",out:"let it out",rest:"rest"}[b.segment];
     ctx.save();
-    ctx.font=`300 ${Math.round(Math.min(W,H)*.021)}px ${getComputedStyle(document.body).fontFamily}`;
-    ctx.textAlign="center"; ctx.fillStyle="rgba(230,245,242,.44)";
+    ctx.font=`500 ${Math.max(16,Math.round(Math.min(W,H)*.024))}px ${getComputedStyle(document.body).fontFamily}`;
+    ctx.textAlign="center";
+    const labelY=cy+base*2.5, labelWidth=ctx.measureText(label).width+36;
+    ctx.fillStyle="rgba(8,24,29,.76)";ctx.beginPath();ctx.roundRect(cx-labelWidth/2,labelY-23,labelWidth,34,17);ctx.fill();
+    ctx.fillStyle="#f0faf6";
     ctx.letterSpacing && (ctx.letterSpacing="3px");
     ctx.fillText(label, cx, cy+base*2.5);
     if(simple){
@@ -3837,6 +3897,9 @@ const App = {
     if(this.screen==="close") return;
     this.screen="close"; this.running=false; this.paused=false;
     $("#btnPause").textContent="❚❚";
+    this.finishedDuration = Math.max(0, this.elapsed);
+    if(window.Garden3D) Garden3D.release();
+    if(window.Scenes3D) Scenes3D.release();
     this.closeCard(); this.toast("");
     $("#hud").classList.remove("on");
     this.fadeOut();
@@ -3849,12 +3912,12 @@ const App = {
       try { this.wakeLock.release(); this.wakeLock = null; } catch(e){}
     }
 
-    const b=G.breath, dur=(performance.now()-this.startedAt)/1000;
+    const b=G.breath, dur=this.finishedDuration;
     const sync = this.syncN? Math.round(this.syncSum/this.syncN*100) : null;
     const stats=[
-      ["Started at", b.startRate.toFixed(1), "breaths / min"],
-      ["Ended at", b.rate.toFixed(1), "breaths / min"],
-      ["Breaths taken", String(b.cycles), "whole cycles"],
+      ["Pacer started", b.startRate.toFixed(1), "guided breaths / min"],
+      ["Pacer ended", b.rate.toFixed(1), "guided breaths / min"],
+      ["Pacer cycles", String(b.cycles), "guided cycles"],
       ["Time", U.fmtTime(dur), "with yourself"]
     ];
     if(sync!==null && sync>=5) stats.push(["In sync", sync+"%", "sensors agreed with the pacer"]);
@@ -3871,6 +3934,7 @@ const App = {
     this.buildReframes();
     this.buildGoals();
     $("#scr-close").classList.add("active");
+    $("#closeTitle").setAttribute("tabindex","-1"); $("#closeTitle").focus();
     this._sid = new Date().toISOString()+"~"+Math.random().toString(36).slice(2,7);
     this.updateDelta();
     this.saveSession();
@@ -3884,6 +3948,7 @@ const App = {
      person answers the close-screen questions. */
   saveSession(){
     if(!this._sid) return;
+    try { if(localStorage.getItem("slowlight.remember")==="false") return; } catch { return; }
     try{
       const keys=(G.st&&G.st.keys)||[this.stateKey];
       const rec={
@@ -3891,11 +3956,12 @@ const App = {
         keys, label:(G.st&&G.st.labelFull)||STATES[this.stateKey].label,
         weights:keys.map(k=>+((this.weights&&this.weights[k])??INTENSITY_DEFAULT).toFixed(2)),
         before:this.suds, after:this._suds2Touched? +$("#suds2").value : null,
-        mins:Math.round((performance.now()-this.startedAt)/6000)/10,
+        mins:Math.round(this.finishedDuration/6)/10,
         breaths:G.breath.cycles,
         thought:this.thought||"", carry:$("#carry").value.trim(), goal:$("#goal").value.trim()
       };
-      const all=JSON.parse(localStorage.getItem("slowlight.history")||"[]");
+      const saved=JSON.parse(localStorage.getItem("slowlight.history")||"[]");
+      const all=Array.isArray(saved)?saved:[];
       const i=all.findIndex(r=>r.id===rec.id);
       if(i>=0) all[i]=rec; else all.push(rec);
       localStorage.setItem("slowlight.history", JSON.stringify(all.slice(-400)));
@@ -3914,14 +3980,14 @@ const App = {
       "This feeling is loud, and it is also temporary.",
       "I don't have to believe every sentence my mind produces.",
       "I just slowed myself down on purpose. I can do that again.",
-      "Nothing outside me changed, and I still changed. That's the useful part."
+      "I can choose one small, kind next step."
     ];
     const perStateMap={
-      wired:["Fast thinking isn't the same as important thinking.","The urgency was in my body, not in the facts."],
+      wired:["Fast thinking isn't the same as important thinking.","I can pause before deciding what needs my attention."],
       tense:["I can be angry and still be slow.","The pressure was real. Acting on it right now was optional."],
-      fearful:["Being braced isn't the same as being in danger.","I checked. The ground is still here."],
+      fearful:["I can notice what I need to feel supported.","I checked. The ground is still here."],
       heavy:["Heavy is something I'm carrying, not something I am.","I moved a little. That counted."],
-      numb:["Flat is a state, not a verdict.","Something registered just now. That's a start."],
+      numb:["Flat is a state, not a verdict.","I don’t have to force a feeling to be here."],
       overwhelmed:["It doesn't all have to be carried at once. One thing, then the next.","Too much is a quantity, not a sentence about me."],
       frustrated:["Stuck is a place I'm standing, not who I am.","What isn't moving yet can still move later."],
       sad:["Sadness is something passing through me, not something I have to hurry.","I can be tender with this. It doesn't need fixing today."],
@@ -3939,10 +4005,10 @@ const App = {
 
     const list=[...perState, ...generic].slice(0,6);
     if(t) list.unshift(`“${t.slice(0,90)}” — that was a thought I had, not an instruction I have to follow.`);
-    $("#reframeList").innerHTML=list.map(r=>`<button class="reframe">${r}</button>`).join("");
+    $("#reframeList").replaceChildren(...list.map(r=>{ const button=document.createElement("button"); button.className="reframe"; button.textContent=r; return button; }));
     $("#reframeList").addEventListener("click", e=>{
       const b=e.target.closest(".reframe"); if(!b) return;
-      $("#carry").value=b.textContent;
+      $("#carry").value=b.textContent; this.saveSession();
     });
     if(this.anchor) $("#carry").value=this.anchor;
   },
@@ -3980,10 +4046,10 @@ const App = {
     const thoughtBit = this.thought ? ` You set one thought down on the way — it doesn't have to be picked back up on the way out.` : "";
     if(!this._suds2Touched){
       title.textContent = "Notice where you are now.";
-      lede.textContent = `You came in ${arrived}, in ${this.blendWeatherIn(keys)}. Nothing outside you changed in the last few minutes. Something inside you might have — that's worth checking honestly, including if the answer is "not much".${thoughtBit}`;
+      lede.textContent = `You came in ${arrived}, in ${this.blendWeatherIn(keys)}. Something may have shifted in the last few minutes. Or it may not have — that's worth checking honestly, including if the answer is "not much".${thoughtBit}`;
     } else if(d>=3){
       title.textContent = this.blendLine(keys, 1);
-      lede.textContent = `From ${before} to ${after} is a real distance, and you covered it without anything outside you changing. Worth remembering how the way down felt — it's yours now.${thoughtBit}`;
+      lede.textContent = `You reported a shift from ${before} to ${after}. Notice what felt helpful, if anything. There is no result you have to reproduce next time.${thoughtBit}`;
     } else if(d>0){
       title.textContent = this.blendLine(keys, 1);
       lede.textContent = `Down from ${before} to ${after}. ${cap(domW.out)} hasn't cleared, but you're not standing in it the same way. Small and real is the kind that lasts.${thoughtBit}`;
@@ -3991,8 +4057,8 @@ const App = {
       title.textContent = `${cap(domW.out)} is still here. So are you.`;
       lede.textContent = `Still at ${after}. That isn't a failure — some days the nervous system needs more than one pass, or needs something else entirely. You stayed with it, which is the part that was up to you.${thoughtBit}`;
     } else {
-      title.textContent = `${cap(domW.out)} got louder when you slowed down.`;
-      lede.textContent = `Up from ${before} to ${after} — worth saying honestly. Sometimes slowing down lets you feel what the speed was covering. That's information, not a setback, and it can be worth bringing to someone you trust.${thoughtBit}`;
+      title.textContent = "It feels more intense right now.";
+      lede.textContent = `You reported ${after}, up from ${before}. You can stop here and return to your natural breathing. Consider something familiar around you, or reach out to someone you trust.${thoughtBit}`;
     }
   },
   /* Arrival-weather phrase for one or several feelings: "sleet, with fog underneath". */
@@ -4012,15 +4078,15 @@ const App = {
       ? `Down ${d} point${d>1?"s":""}, from ${before} to ${after}. Small and real beats big and imagined.`
       : d===0
       ? `Unchanged, at ${after}. That happens, and it isn't a failure — some days the nervous system needs more than one pass, or needs something else entirely.`
-      : `Up ${-d}. Worth noticing honestly. Sometimes slowing down lets you feel what the speed was covering. If that's what happened, it may be worth talking to someone about it.`;
+      : `Up ${-d}. Thank you for checking honestly. You can stop practicing and reach out to someone you trust.`;
   },
   copyNotes(){
     const b=G.breath;
     const txt=[
       "Slow Light — session notes",
       "Arrived as: "+((G.st&&G.st.labelFull)||STATES[this.stateKey].label)+"  ·  grip "+this.suds+"/10",
-      "Left at: "+$("#suds2").value+"/10",
-      "Breathing: "+b.startRate.toFixed(1)+" → "+b.rate.toFixed(1)+" breaths/min over "+b.cycles+" cycles",
+      "Left at: "+(this._suds2Touched ? $("#suds2").value+"/10" : "Not recorded"),
+      "Guided rhythm: "+b.startRate.toFixed(1)+" → "+b.rate.toFixed(1)+" breaths/min over "+b.cycles+" cycles",
       this.thought? "Thought set down: "+this.thought : "",
       $("#carry").value? "Carrying out: "+$("#carry").value : "",
       $("#goal").value? "Goal for next time: "+$("#goal").value : ""
@@ -4050,8 +4116,8 @@ const App = {
     if(App.screen!=="session") return;
     const t=e.target;
     const typing = t && (t.tagName==="INPUT" || t.tagName==="TEXTAREA" || t.tagName==="SELECT" || t.isContentEditable);
-    if(e.key==="Escape"){ if(App.held) App.closeCard(); else App.finish(); }
-    if(e.key===" " && !typing){ e.preventDefault(); App.togglePause(); }
+    if(e.key==="Escape" && !document.querySelector("dialog[open]")){ if(App.held) App.closeCard(); else App.finish(); }
+    if(e.key===" " && !typing && t?.tagName!=="BUTTON" && t?.tagName!=="A"){ e.preventDefault(); App.togglePause(); }
   });
 })();
 
@@ -4075,5 +4141,7 @@ App.initCheckin();
   requestAnimationFrame(idle);
 })();
 </script>
+<script src="arrival.js"></script>
+<script src="breathing-controls.js"></script>
 </body>
 </html>
