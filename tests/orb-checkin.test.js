@@ -40,12 +40,12 @@ test('opening and later visual requests retain the initial check-in; opt-out exc
           assert.equal(ctx.person.initialWords,enabled ? 'Too many things on my mind' : '');
           assert.match(payload.system,/WITHIN the established location/);
           assert.match(payload.system,/Missing values mean unknown/);
-          return {ok:true,json:async()=>({content:[{text:JSON.stringify({line:'There is room here.',crisis:false,moods:[],visual:'Soft light rests on the same quiet meadow.'})}]})};
+          return {ok:true,json:async()=>({content:[{text:JSON.stringify({line:'There is room here.',crisis:false,moods:[],clipSeconds:10,visual:'Soft light rests on the same quiet meadow.'})}]})};
         };
         let output;
         await handler({method:'POST',headers:{host:'example.com'},body:{stage,visualEnabled:enabled,person:{initialCheckIn:{feelings:[{key:'overwhelmed',weight:.9},{key:'sad',weight:.4}],intensity:8},initialWords:'Too many things on my mind',sceneKey:'meadow'}}},
           {setHeader(){},status(code){assert.equal(code,200);return this;},json(data){output=data;}});
-        if(enabled) assert.match(verify(output.visual,'test').prompt,/same quiet meadow/);
+        if(enabled) { assert.match(verify(output.visual,'test').prompt,/same quiet meadow/); assert.equal(verify(output.visual,'test').duration,10); }
         else assert.equal(output.visual,null);
       }
     }

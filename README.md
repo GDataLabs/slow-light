@@ -116,13 +116,13 @@ Playback uses muted, five-second 480P clips, preloads the next clip, and fades
 between two video layers. Existing scenery remains while loading; the last
 ready clip holds its final frame while waiting, so the path never loops backward.
 A ready continuation starts after the previous clip finishes with a brief fade. This is buffered clip playback, not a continuous
-Director/WebRTC session or a promise of three-second latency. The opening clip uses text-to-video. Subsequent clips use reference-to-video
-with the first clip as a persistent location anchor and the last displayed clip
-as the motion reference (at most two five-second references). The original
+Director/WebRTC session or a promise of three-second latency. The opening clip uses text-to-video. Subsequent clips use image-to-video with a JPEG of the previous clip’s last
+decoded frame as the starting image. A separate browser decoder extracts it
+without seeking the visible player. The original prompt remains the location anchor. The original
 scene description stays fixed; new answers only steer small atmospheric changes.
 Reference conditioning reduces drift but does not guarantee frame-exact joins.
-Each conversation moment generates up to three linked clips; a session requests at
-most twelve clips. Pause, stop, hidden tabs, reduced motion, care support, and
+Generation continues between answers, with a twelve-clip session limit that
+is explicitly displayed when reached. Pause, stop, hidden tabs, reduced motion, care support, and
 session completion halt new work; in-flight cancellation is best effort and
 already running jobs may still be billed. A provider error ends generation for
 that session while the Orb continues.
@@ -170,3 +170,81 @@ The large 3D Orb, stars and procedural scenery are excluded from that render;
 interactive exercise lights remain. A small Orb indicator sits in the controls,
 and caption contrast is local to its text panel. Stopping video restores the
 procedural view. The opening Orb is smaller to avoid overlapping the question.
+
+Final-frame continuation replaces whole-video referencing. New answers update
+the prompt for the next undispatched clip; there is no three-clips-per-answer
+cutoff. Legacy backdrop videos no longer loop or compete with living video.
+The final-frame JPEG is sent to fal along with the latest signed direction.
+If browser cross-origin media restrictions prevent reading the frame, generation
+stops with a visible message instead of falling back to independent clips.
+Mocked tests validate frame seeking, cleanup, route selection and frame validation.
+Real CDN access, visual seams and generation speed still need deployment testing;
+this is chained clip generation and can hold between segments, not guaranteed
+uninterrupted streaming.
+
+### Orb clip duration and session limit
+
+Living visuals now allow up to 24 generation requests per session. The Orb
+chooses 5, 10, or 15 seconds with each visual direction: a short responsive
+change, a gradual transition, or a sustained quiet observation. If the model
+omits duration, opening defaults to 5 seconds, release to 10, and closing to 15.
+Subsequent clips use the latest direction's duration until another answer updates
+it. Duration is signed with the prompt and validated on the video server.
+Existing tickets without duration retain the 5-second default.
+
+The controls show clip count and requested seconds during generation. Playback
+waits for the actual clip length and still chains from the final frame. The
+24-clip cap counts attempts; pause, stop and session completion can end earlier.
+The per-process IP throttle is 48 submissions per ten minutes, allowing room
+for a previous session without immediately blocking a new 24-clip session.
+Longer clips and a higher limit increase generated seconds and usage. Maximum
+output at 24 × 15 seconds is six minutes, excluding generation waits. No paid
+video generation was performed to validate this update.
+
+### Familiar conversation, varied wording and visible motion
+
+The Orb now rotates among three phrasing styles between visits and varies the
+scripted questions and invitations when AI is unavailable. Only the style index
+is saved locally, and only when saving is enabled; no spoken responses are saved
+for this feature. The current session's recent AI lines still discourage repeats.
+The breathing and scene-settling invitations now use the same stage-based AI
+flow. Conversation order, optional choices and care handling are unchanged.
+Generated language can still repeat; this is variation, not a uniqueness guarantee.
+
+Video prompts now request visible slow natural movement and a continuous, very
+slow forward camera glide, keeping heading and scene landmarks consistent.
+The last-frame handoff remains in place. No turns, roll, zoom or sudden camera
+motion are requested. Reduced motion continues to disable generated video, and
+pause/stop remain available. Prompt behavior and actual camera motion still need
+live visual verification. Deploy `orb-language.js` with the Orb page and APIs.
+
+### Step into this place — World Labs
+
+The living video controls include a 3D section. Create captures the currently
+visible frame, pauses the video, and sends the image plus the latest signed Orb
+scene prompt to World Labs. This prompt already incorporates the conversation's
+feelings and direction; raw transcripts are not added to this request. Generation
+runs asynchronously. Enter opens the generated 100k (or 500k fallback) SPZ world
+inside the page. The user chooses when to transition and can return at any time.
+
+Set `WORLDLABS_KEY` in Vercel, alongside `FAL_KEY`. Optional `WORLDLABS_MODEL`
+defaults to `marble-1.1`. Deploy `api/orb-world.js`, `orb-world.js`,
+`orb-world-viewer.js`, `orb.html`, `orb-visual.js`, and `site-config.js`. The browser
+loads Spark 2.1.0 from sparkjs.dev on entry, using the bundled Three.js 0.180.0.
+Worlds are requested private. Provider asset URLs are sent only to the requesting
+browser, and the app does not save the world locally. World Labs retains the
+created world in the provider account. Closing the page does not cancel an
+already submitted paid generation. The gateway uses signed operation tickets
+and a best-effort two-worlds-per-hour per-process IP throttle, not durable billing
+protection. There are no paid calls in the automated tests.
+
+Controls: WASD or arrow keys translate; drag with mouse or touch to look; hold
+on-screen arrows on mobile. Movement speed is 0.65 scene units/second, bounded
+to three units from the initial viewpoint. Return to start resets orientation
+and position. Escape or Back returns to the Orb. These are bounded exploration
+controls, not collision-aware walking: splat geometry can be crossed. Collider
+integration, source-to-world camera alignment, real asset CORS, visual matching,
+mobile GPU performance and generated-world quality still need live validation.
+A single image cannot determine the unseen environment, so exact visual matching
+is not guaranteed. Loading failure returns to the video; no fake procedural
+world is substituted for a failed World Labs generation.

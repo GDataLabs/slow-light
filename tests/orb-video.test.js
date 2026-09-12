@@ -2,6 +2,7 @@ const { test, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { sign, verify } = require('../lib/orb-visual');
 const handler = require('../api/orb-video');
+const frame = 'data:image/jpeg;base64,/9j/AA==';
 const originalFetch = global.fetch, originalKey = process.env.FAL_KEY;
 afterEach(() => { global.fetch = originalFetch; if (originalKey === undefined) delete process.env.FAL_KEY; else process.env.FAL_KEY = originalKey; });
 async function request(body, origin = 'https://example.com') {
@@ -56,40 +57,40 @@ test('completed job retrieves its signed result URL', async () => {
 test('Orb page and playback scripts compile', () => {
   const fs = require('node:fs'), vm = require('node:vm');
   new vm.Script(fs.readFileSync('orb-visual.js','utf8'));
-  for (const m of fs.readFileSync('orb.html','utf8').matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new vm.Script(m[1]);
+  for (const m of fs.readFileSync('orb.html','utf8').matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) { if(m[1].includes('importmap')) JSON.parse(m[2]); else new vm.Script(m[2]); }
 });
-test('continuations keep the opening anchor and both original and latest video references', async () => {
+test('continuations keep the opening anchor and start from the supplied endpoint frame', async () => {
   process.env.FAL_KEY = 'test';
   const first = 'https://v3.fal.media/first.mp4', latest = 'https://v3.fal.media/latest.mp4';
   const continuity = sign({kind:'continuity',anchor:'One meadow with a willow on the left',first,latest},'test');
   global.fetch = async (url, options) => {
-    assert.equal(url,'https://queue.fal.run/minimax/h3-max/reference-to-video');
+    assert.equal(url,'https://queue.fal.run/minimax/h3-max/image-to-video');
     const input = JSON.parse(options.body);
-    assert.deepEqual(input.reference_video_urls,[first,latest]);
+    assert.equal(input.image_url,frame); assert.equal(input.reference_video_urls,undefined);
     assert.match(input.prompt,/willow on the left/);
     assert.match(input.prompt,/mist settles/);
     assert.match(input.prompt,/No new location/);
     return {ok:true,json:async()=>({status_url:'https://queue.fal.run/minimax/job/status',response_url:'https://queue.fal.run/minimax/job/result',cancel_url:'https://queue.fal.run/minimax/job/cancel'})};
   };
-  const result = await request({action:'submit',ticket:sign({kind:'prompt',prompt:'The mist settles'},'test'),continuity});
+  const result = await request({action:'submit',ticket:sign({kind:'prompt',prompt:'The mist settles'},'test'),continuity,frame});
   assert.equal(result.code,200);
   const job = verify(result.data.ticket,'test');
   assert.equal(job.anchor,'One meadow with a willow on the left');
   assert.equal(job.first,first);
 });
-test('first continuation sends only one reference and rejects unsigned continuity', async () => {
+test('continuation requires a frame and rejects unsigned continuity', async () => {
   process.env.FAL_KEY = 'test';
   const first = 'https://v3.fal.media/first.mp4';
   let calls = 0;
   global.fetch = async (_url, options) => {
     calls++;
-    assert.deepEqual(JSON.parse(options.body).reference_video_urls,[first]);
+    assert.equal(JSON.parse(options.body).image_url,frame);
     return {ok:true,json:async()=>({status_url:'https://queue.fal.run/minimax/job/status',response_url:'https://queue.fal.run/minimax/job/result',cancel_url:'https://queue.fal.run/minimax/job/cancel'})};
   };
   const ticket = sign({kind:'prompt',prompt:'Soft light'},'test');
   assert.equal((await request({action:'submit',ticket,continuity:'tampered'})).code,400);
   assert.equal(calls,0);
-  assert.equal((await request({action:'submit',ticket,continuity:sign({kind:'continuity',anchor:'Meadow',first,latest:first},'test')})).code,200);
+  assert.equal((await request({action:'submit',ticket,continuity:sign({kind:'continuity',anchor:'Meadow',first,latest:first},'test'),frame})).code,200);
 });
 test('completed continuation advances latest clip while preserving the original place', async () => {
   process.env.FAL_KEY = 'test';
@@ -99,4 +100,29 @@ test('completed continuation advances latest clip while preserving the original 
   const result = await request({action:'status',ticket});
   const continuity = verify(result.data.continuity,'test');
   assert.equal(continuity.first,first); assert.equal(continuity.latest,latest); assert.equal(continuity.anchor,'A single meadow');
+});
+
+test('a missing or remote endpoint frame never starts a fresh scene',async()=>{
+  process.env.FAL_KEY='test';
+  global.fetch=()=>{throw Error('Must not generate');};
+  const continuity=sign({kind:'continuity',anchor:'Meadow',first:'https://v3.fal.media/a.mp4',latest:'https://v3.fal.media/a.mp4'},'test');
+  const ticket=sign({kind:'prompt',prompt:'Mist lifts'},'test');
+  for(const frame of [undefined,'https://example.com/image.jpg','data:image/jpeg;base64,broken!']) {
+    assert.equal((await request({action:'submit',ticket,continuity,frame})).code,400);
+  }
+});
+test('opening and continuation support signed durations while rejecting arbitrary overrides',async()=>{
+  process.env.FAL_KEY='test';
+  const continuity=sign({kind:'continuity',anchor:'Meadow',first:'https://v3.fal.media/a.mp4',latest:'https://v3.fal.media/a.mp4'},'test');
+  for(const continued of [false,true]) {
+    for(const duration of [5,10,15,999]) {
+      const expected=duration===999?5:duration;
+      global.fetch=async (_url,options)=>{
+        assert.equal(JSON.parse(options.body).duration,expected);
+        return {ok:true,json:async()=>({status_url:'https://queue.fal.run/minimax/job/status',response_url:'https://queue.fal.run/minimax/job/result',cancel_url:'https://queue.fal.run/minimax/job/cancel'})};
+      };
+      const result=await request({action:'submit',ticket:sign({kind:'prompt',prompt:'Mist lifts',duration},'test'),duration:999,...(continued?{continuity,frame}:{})});
+      assert.equal(result.code,200);assert.equal(result.data.duration,expected);
+    }
+  }
 });

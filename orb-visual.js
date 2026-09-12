@@ -1,15 +1,16 @@
-/* Optional buffered five-second clips. No transcripts or media are stored here. */
+/* Optional buffered clips of varying duration. No transcripts or media are stored here. */
 (() => {
+  const MAX_CLIPS = 24;
   const $ = id => document.getElementById(id);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let epoch = 0, busy = false, prompt = null, continuity = null, job = null;
-  let perMoment = 0;
+  let finalFrame = null;
   let timer, controller, videos = [], active = -1, count = 0, paused = false, ended = false, onShow;
   const status = text => { $('livingStatus').textContent = text; };
-  const api = async (action, ticket, signal, previous) => {
+  const api = async (action, ticket, signal, previous, frame) => {
     const r = await fetch(window.SLOWLIGHT_PUBLIC?.video || '/api/orb-video', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, ticket, ...(previous ? { continuity: previous } : {}) }), signal: signal || AbortSignal.timeout(15000)
+      body: JSON.stringify({ action, ticket, ...(previous ? { continuity: previous, frame } : {}) }), signal: signal || AbortSignal.timeout(15000)
     });
     const data = await r.json();
     if (!r.ok) throw Error(data.error || 'Visuals are unavailable.');
@@ -21,8 +22,43 @@
   }
   function schedule() {
     clearTimeout(timer);
-    if (view.enabled && !paused && !ended && prompt && count < 12 && perMoment < 3)
+    if (view.enabled && !paused && !ended && prompt && count < MAX_CLIPS)
       timer = setTimeout(pump, 1200);
+  }
+  async function extractFinalFrame(url, signal) {
+    const decoder = document.createElement('video');
+    decoder.crossOrigin = 'anonymous'; decoder.muted = true; decoder.preload = 'auto';
+    try {
+      return await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => done(Error('The final frame could not load.')), 20000);
+        const abort = () => done(Error('Stopped'));
+        const done = (error, data) => {
+          clearTimeout(timeout); signal.removeEventListener('abort', abort);
+          decoder.onloadeddata = decoder.onseeked = decoder.onerror = null;
+          error ? reject(error) : resolve(data);
+        };
+        signal.addEventListener('abort', abort, {once:true});
+        if(signal.aborted) { abort(); return; }
+        decoder.onerror = () => done(Error('The final frame could not load.'));
+        decoder.onloadeddata = () => {
+          decoder.onloadeddata = null;
+          if(!Number.isFinite(decoder.duration) || decoder.duration <= 0) return done(Error('Invalid clip duration.'));
+          decoder.currentTime = Math.max(0, decoder.duration - .001);
+        };
+        decoder.onseeked = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const scale = Math.min(1, 960 / decoder.videoWidth);
+            canvas.width = Math.round(decoder.videoWidth * scale);
+            canvas.height = Math.round(decoder.videoHeight * scale);
+            if(!canvas.width || !canvas.height) throw Error('No final frame.');
+            canvas.getContext('2d').drawImage(decoder, 0, 0, canvas.width, canvas.height);
+            done(null, canvas.toDataURL('image/jpeg', .9));
+          } catch(e) { done(Error('The final frame could not be read.')); }
+        };
+        decoder.src = url; decoder.load();
+      });
+    } finally { decoder.pause(); decoder.removeAttribute('src'); decoder.load(); }
   }
   async function play(url, generation) {
     const next = (active + 1) % 2;
@@ -43,7 +79,7 @@
     const previous = videos[active];
     if (previous && !previous.ended) {
       await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => done(Error('Playback did not finish.')), 20000);
+        const timeout = setTimeout(() => done(Error('Playback did not finish.')), Math.max(20000, (previous.duration + 10) * 1000));
         const done = error => {
           clearTimeout(timeout);
           previous.removeEventListener('ended', complete);
@@ -69,18 +105,19 @@
     active = next; view.showing = true;
   }
   async function pump() {
-    if (busy || !view.enabled || paused || ended || !prompt || count >= 12 || document.hidden) return;
+    if (busy || !view.enabled || paused || ended || !prompt || count >= MAX_CLIPS || document.hidden) return;
     busy = true;
     const generation = epoch, ticket = prompt;
     controller = new AbortController();
     const deadline = setTimeout(() => controller.abort(), 120000);
     try {
       status(view.showing ? 'Your next scene is taking shape…' : 'Making a place from your answers…');
-      count++; perMoment++;
+      count++;
       // Do not abort submission: retain its job ticket so stop can cancel it.
-      const submitted = await api('submit', ticket, undefined, continuity);
+      const submitted = await api('submit', ticket, undefined, continuity, finalFrame);
       if (epoch !== generation) { cancel(submitted.ticket); return; }
       job = submitted.ticket;
+      status(`Creating clip ${count} of ${MAX_CLIPS} · ${submitted.duration || 5} seconds`);
       let result;
       do {
         await new Promise(resolve => setTimeout(resolve, 1200));
@@ -90,13 +127,15 @@
       job = null;
       if (epoch !== generation) return;
       if (!result.continuity) throw Error("The place could not be continued.");
+      const frame = await extractFinalFrame(result.url, controller.signal);
+      if(epoch !== generation) return;
       await play(result.url, generation);
-      if (epoch === generation) continuity = result.continuity;
-      if (epoch === generation) status(count >= 12 ? 'Your place is ready. Rest here as long as you like.' : 'Living scene · shaped by your answers');
+      if (epoch === generation) { continuity = result.continuity; finalFrame = frame; }
+      if (epoch === generation) status(count >= MAX_CLIPS ? `${MAX_CLIPS}-clip session limit reached · holding the final view` : 'Living scene · moving forward from the previous frame');
     } catch (e) {
       if (epoch === generation) {
         cancel(job); job = null; ended = true;
-        status('Visuals are resting. Your Orb can continue.');
+        status('Video continuation stopped. Holding the current view; your Orb can continue.');
       }
     } finally {
       clearTimeout(deadline); busy = false; schedule();
@@ -104,6 +143,15 @@
   }
   const view = window.OrbVisual = {
     enabled: false, showing: false,
+    snapshot() {
+      if(active<0 || !prompt) throw Error('Wait for a video to appear first.');
+      const v=videos[active], canvas=document.createElement('canvas');
+      canvas.width=v.videoWidth; canvas.height=v.videoHeight;
+      canvas.getContext('2d').drawImage(v,0,0);
+      const frame=canvas.toDataURL('image/jpeg',.85);
+      if(!paused) $('livingPause').click();
+      return {frame,ticket:prompt};
+    },
     start(options) {
       onShow = options.onShow;
       if (!options.enabled) return;
@@ -112,7 +160,7 @@
       this.enabled = true;
       videos = [0, 1].map(() => {
         const v = document.createElement('video');
-        v.muted = true; v.loop = false; v.style.transition = 'opacity .7s ease'; v.playsInline = true; v.preload = 'auto';
+        v.crossOrigin = 'anonymous'; v.muted = true; v.loop = false; v.style.transition = 'opacity .7s ease'; v.playsInline = true; v.preload = 'auto';
         v.setAttribute('aria-hidden', 'true'); $('backdrop').appendChild(v); return v;
       });
       $('livingPause').onclick = () => {
@@ -123,14 +171,14 @@
         else { if (active >= 0 && !videos[active].ended) videos[active].play().catch(() => {}); status('Living scene'); schedule(); }
       };
     },
-    update(ticket) { if (!this.enabled || ended) return; prompt = ticket; perMoment = 0; schedule(); },
+    update(ticket) { if (!this.enabled || ended) return; prompt = ticket; schedule(); },
     unavailable() { if (this.enabled && !prompt) status("Living visuals are unavailable. Your Orb can continue."); },
     finish() { ended = true; invalidate(); status('Your place is ready. Rest here as long as you like.'); },
     stop() {
       document.body.classList.remove("living-video");
       this.enabled = false; this.showing = false; ended = true; invalidate();
       videos.forEach(v => { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); });
-      videos = []; active = -1; continuity = null; $('livingControls').hidden = true;
+      videos = []; active = -1; continuity = null; finalFrame = null; $('livingControls').hidden = true;
     }
   };
   // Controls are later in the parsed page; wire them after DOM completion.

@@ -43,24 +43,27 @@ module.exports = async (req, res) => {
               ![continuity.first, continuity.latest].every(u => typeof u === 'string' && new URL(u).protocol === 'https:')) throw Error();
         } catch { return res.status(400).json({ error: 'This place cannot be continued. Please keep the current scene.' }); }
       }
+      if (continuity && (typeof body.frame !== 'string' || body.frame.length > 1500000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(body.frame)))
+        return res.status(400).json({ error: 'The previous final frame is required to continue.' });
       const ip = String(req.headers['x-forwarded-for'] || 'unknown').split(',')[0];
       const now = Date.now();
       for (const [id, b] of buckets) if (now - b.time > 600000) buckets.delete(id);
       const b = buckets.get(ip) || { time: now, count: 0 };
-      if (b.count >= 24) return res.status(429).json({ error: 'Visuals are resting. Please try again later.' });
+      if (b.count >= 48) return res.status(429).json({ error: 'Visuals are resting. Please try again later.' });
       b.count++; buckets.set(ip, b);
+      const duration = [5, 10, 15].includes(ticket.duration) ? ticket.duration : 5;
       const anchor = continuity ? continuity.anchor : ticket.prompt;
-      const references = continuity ? [...new Set([continuity.first, continuity.latest])] : [];
+
       const direction = continuity
-        ? `Continue the same place shown in Video ${references.length}, from its ending. Video 1 anchors the original location and visual identity. Preserve the exact terrain, landmarks, vegetation, palette, time of day, camera position and viewing direction. One continuous nearly still shot. No new location, scene reset, cut or camera jump. Original place: ${anchor} Only gently evolve light, mist, water or drifting particles in response to this direction, ignoring any proposed change of setting: ${ticket.prompt}`
+        ? `Start exactly from the supplied image, the final frame of the previous segment. Advance the action forward from this moment; never replay or reverse the previous action. Preserve the exact terrain, landmarks, vegetation, palette, time of day, viewing direction and slow forward camera speed. Continue one unhurried forward glide from the supplied frame; never return to an earlier camera position. Include visible gentle natural movement, with no turns, roll, zoom or acceleration. No new location, scene reset, cut or camera jump. Original place: ${anchor} Gently advance swaying vegetation, drifting mist, flowing water or moving sand along with the slow camera glide in response to this direction, ignoring any proposed change of setting: ${ticket.prompt}`
         : ticket.prompt;
-      const j = await call(queue + 'minimax/h3-max/' + (continuity ? 'reference-to-video' : 'text-to-video'), 'POST', {
-        ...(continuity ? { reference_video_urls: references } : {}),
-        prompt: direction, duration: 5, resolution: '480P', aspect_ratio: '16:9',
+      const j = await call(queue + 'minimax/h3-max/' + (continuity ? 'image-to-video' : 'text-to-video'), 'POST', {
+        ...(continuity ? { image_url: body.frame } : { aspect_ratio: '16:9' }),
+        prompt: direction, duration, resolution: '480P',
         enable_safety_checker: true, prompt_expansion_mode: 'balanced'
       });
       const job = { kind: 'job', anchor, first: continuity?.first || null, status: safeURL(j.status_url), result: safeURL(j.response_url), cancel: safeURL(j.cancel_url) };
-      return res.status(200).json({ ticket: sign(job, key) });
+      return res.status(200).json({ ticket: sign(job, key), duration });
     }
     if (ticket.kind !== 'job') return res.status(400).json({ error: 'Invalid job.' });
     if (body.action === 'cancel') {

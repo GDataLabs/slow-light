@@ -31,6 +31,12 @@ body.living-video #backdrop video{filter:none}
 body.living-video #vignette{display:none}
 body.living-video #caption{background:rgba(4,10,16,.68);border-radius:18px;padding:12px 18px;text-shadow:0 2px 6px #000}
 body.living-video #livingStatus::before{content:"";display:inline-block;width:15px;height:15px;margin-right:9px;border-radius:50%;background:#b6f4e5;box-shadow:0 0 12px #7fd4c1;vertical-align:middle}
+#worldView{position:fixed;inset:0;z-index:30;background:#080d12}
+#worldView[hidden]{display:none}
+#worldView canvas{display:block}
+.world-toolbar{position:absolute;top:12px;left:12px;right:12px;z-index:1;background:#09121cdd;padding:10px;border-radius:14px}
+.world-directions{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);text-align:center;touch-action:none}
+body.world-active #answers,body.world-active #caption{visibility:hidden}
 #micStatus{font-size:13px;text-align:center;color:#e1eee9;min-height:1.5em}
 
 /* a soft darkening toward the edges — the depth the flat render was missing */
@@ -206,7 +212,7 @@ body.living-video #livingStatus::before{content:"";display:inline-block;width:15
 </style>
 </head>
 <body>
-<div id="backdrop"><img id="bdImg" alt=""><video id="bdVid" loop muted playsinline></video></div>
+<div id="backdrop"><img id="bdImg" alt=""><video id="bdVid" muted playsinline></video></div>
 <canvas id="stage"></canvas>
 <div id="vignette"></div>
 <div id="caption" aria-live="polite"></div>
@@ -254,8 +260,15 @@ body.living-video #livingStatus::before{content:"";display:inline-block;width:15
   <span id="livingStatus" role="status" style="display:block;font-size:13px">Waiting for your place</span>
   <button class="obtn" id="livingPause" aria-pressed="false">Pause visuals</button>
   <button class="obtn" id="livingStop">Stop visuals</button>
+  <details><summary>Step into this place · 3D</summary><p class="tiny">Create an explorable world from this video frame and its scene description. These go to World Labs when you press Create. Generation can take several minutes; the video pauses to keep your starting view.</p><button class="obtn" id="worldCreate">Create my 3D place</button><button class="obtn" id="worldEnter" hidden>Enter my 3D place</button><p id="worldStatus" role="status" class="tiny"></p></details>
 </div>
+<script type="importmap">{"imports":{"three":"./vendor/three/three.module.js"}}</script>
 <script src="orb-visual.js"></script>
+<script src="orb-world.js"></script>
+<section id="worldView" hidden aria-label="Explore your 3D place">
+  <div class="world-toolbar"><p id="worldLoading" role="status"></p><button class="obtn" data-reset>Return to start</button> <button class="obtn" id="worldExit">Back to the Orb</button></div>
+  <div class="world-directions" aria-label="Movement controls"><button class="obtn" data-move="w" aria-label="Move forward">↑</button><br><button class="obtn" data-move="a" aria-label="Move left">←</button><button class="obtn" data-move="s" aria-label="Move backward">↓</button><button class="obtn" data-move="d" aria-label="Move right">→</button></div>
+</section>
 <button id="gearBtn" title="Voice &amp; scenery settings" aria-label="Voice and scenery settings">⚙</button>
 <button id="ambBtn" title="Ambient sound on/off" aria-label="Ambient sound on or off">♪</button>
 
@@ -347,6 +360,7 @@ body.living-video #livingStatus::before{content:"";display:inline-block;width:15
 
 <script src="site-config.js"></script>
 <script src="orb-checkin.js"></script>
+<script src="orb-language.js"></script>
 <script src="voice-config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -447,10 +461,11 @@ const Brain={
     return (pub.brain||"").trim() || "/api/orb";
   },
   async line(stage, fallback, extra){
+    fallback=window.OrbLanguage.line(stage,fallback);
     if(this.down) return fallback;
     try{
       const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(), 8000);
-      const ctx={ stage, visualEnabled:window.OrbVisual.enabled, recentLines:this.recent.slice(-8), person:{
+      const ctx={ stage, voiceVariation:window.OrbLanguage.variation, visualEnabled:window.OrbVisual.enabled, recentLines:this.recent.slice(-8), person:{
         initialCheckIn:window.OrbVisual.enabled ? S.initialCheckIn : null,
         initialWords:window.OrbVisual.enabled ? S.initialWords||"" : "",
         rawAnswer:window.OrbVisual.enabled && stage==="scene_intro" ? S.visualAnswer||"" : "",
@@ -629,6 +644,7 @@ const Media={
     return `${BACKDROPS[sceneKey]}, with a subtle ${tint} tint. Serene, dreamlike, soft focus, cinematic, calming. No people, no faces, no animals in distress, no text, no harsh light.`;
   },
   backdrop(sceneKey,tint){
+    if(window.OrbVisual.enabled) return;
     const mode=Voice.cfg.backdrop||"off";
     if(mode==="off" || !elReady() || !BACKDROPS[sceneKey]) return;
     const p=this.prompt(sceneKey,tint);
@@ -679,6 +695,7 @@ const Media={
     img.src=src;
   },
   showVideo(src){
+    if(window.OrbVisual.enabled) return;
     if((Voice.cfg.backdrop||"off")!=="video") return;
     const v=$("#bdVid");
     v.oncanplay=()=>{
@@ -1149,7 +1166,7 @@ function initWorld(){
 let breathPhase=0;
 function tick(){
   requestAnimationFrame(tick);
-  if(!T) return;
+  if(!T || window.OrbWorld.active) return;
   const dt=1/60; T.t+=dt;
   // orb breathes at ~6/min — always, everywhere; it is the pacer
   breathPhase=(breathPhase+dt/10)%1;
@@ -1322,6 +1339,7 @@ const SCENES={ underwater:{build:buildUnderwater, name:"deep water", line:"Somew
 /* ----------------------- dialogue engine --------------------------- */
 const Cap={
   async show(text, sub){
+    await window.OrbWorld.waitUntilClosed();
     const c=$("#caption");
     // let the last line dissolve back into smoke before the next condenses
     if(c.classList.contains("on")){ c.classList.remove("on"); await new Promise(r=>setTimeout(r,650)); }
@@ -1399,6 +1417,7 @@ $("#micBtn").addEventListener("click",()=>{
 /* care overlay */
 let crisisShown=false;
 function showCare(){
+  if(window.OrbWorld.active) window.OrbWorld.close();
   window.OrbVisual.stop();
   return new Promise(res=>{
     $("#helpVeil").classList.remove("hide");
@@ -1425,7 +1444,7 @@ async function run(){
     "Hello. You made it here — that's the hardest part.",
     "Welcome. There's nothing to do here yet."
   ])));
-  await Cap.show("Take one slow breath with me while I look around for you… in… and out.");
+  await Cap.show(await Brain.line("breathe", "Take one comfortable breath, if you like."));
   await new Promise(r=>setTimeout(r,1800));
 
   /* Q1 — where are you */
@@ -1505,7 +1524,7 @@ async function run(){
   Media.soundscape(sceneKey);
   if(!window.OrbVisual.enabled) Media.backdrop(sceneKey, TINTS[S.moods[0]]||"soft teal");
   await Cap.show(await Brain.line("scene_intro", `Then let me make somewhere for that. ${sc.line}`));
-  await Cap.show("Close your eyes for three breaths if you like. When you open them, we'll be there.");
+  await Cap.show(await Brain.line("settle", "Let this place come into view at your own pace."));
   await fadeSwap(sc.build);
   await Cap.show(await Brain.line("arrive", `This place is yours — it didn't exist before tonight, and no one else will ever stand in it.`));
 
@@ -1852,6 +1871,7 @@ function showExit(){
 /* ----------------------- boot -------------------------------------- */
 initWorld();
 Voice.init();
+addEventListener("orb-world-enter",()=>{Ears.cancel();Voice.stop();});
 $("#beginBtn").addEventListener("click", async ()=>{
   window.OrbVisual.start({ enabled:$("#livingOptIn").checked, onShow:()=>{ Media.clearBackdrop(); if(T) T.scene.background=null; } });
   $("#introVeil").classList.add("hide");
