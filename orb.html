@@ -759,6 +759,17 @@ const Ears = {
     const c=["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/ogg;codecs=opus"];
     return (window.MediaRecorder && c.find(m=>MediaRecorder.isTypeSupported(m)))||"";
   },
+  async resumeAudio(ac){
+    let timer;
+    try {
+      await Promise.race([ac.resume(), new Promise((_,reject)=>{ timer=setTimeout(()=>reject(new Error("Audio needs a tap")),3000); })]);
+      if(ac.state!=="running") throw new Error("Audio needs a tap");
+    } catch(e) {
+      ac.close().catch(()=>{});
+      this.notice("Tap speak to enable microphone audio in this browser.");
+      throw e;
+    } finally { clearTimeout(timer); }
+  },
   async ensureStream(){
     if(this.stream && this.stream.getAudioTracks().some(t=>t.readyState==="live")) return this.stream;
     this.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true}});
@@ -789,7 +800,7 @@ const Ears = {
      API key still never reaches the browser. The server's voice-activity
      detection decides when a thought is complete and commits it.          */
   async _rtToken(){
-    const r=await fetch(elBase()+"/v1/single-use-tokens/realtime_scribe",{method:"POST",headers:elHeaders(),signal:AbortSignal.timeout(8000)});
+    const r=await fetch(elBase()+"/v1/single-use-token/realtime_scribe",{method:"POST",headers:elHeaders(),signal:AbortSignal.timeout(8000)});
     if(!r.ok) throw 0;
     const j=await r.json().catch(()=>null);
     const t=(j && (j.token||j.single_use_token||j.value)) || null;
@@ -800,7 +811,7 @@ const Ears = {
     const tok=await this._rtToken();
     if(token!==this._token) return;
     const ac=new (window.AudioContext||window.webkitAudioContext)();
-    await ac.resume();
+    await this.resumeAudio(ac);
     if(token!==this._token){ await ac.close(); return; }
     const src=ac.createMediaStreamSource(stream);
     const an=ac.createAnalyser(); an.fftSize=1024; src.connect(an);
@@ -812,7 +823,7 @@ const Ears = {
       +"&token="+encodeURIComponent(tok);
     const ws=new WebSocket(url);
     const live=$("#liveTx");
-    this.listening=true; this.setBtn("listening"); this.notice("Listening — speak, then pause. Tap listening to send.");
+    this.listening=true; this.setBtn("listening"); this.notice("Connecting speech recognition…");
     Media.duck(true);
     const stopVu=this._vuStart(an, ac);
     let ended=false, committed="", gotAny=false;
@@ -856,6 +867,8 @@ const Ears = {
     ws.onerror=()=>fallback();
     ws.onclose=()=>{ if(!ended){ if(committed) cleanup(true); else fallback(); } };
     ws.onopen=()=>{
+      if(ended || token!==this._token) return;
+      this.notice("Listening — speak, then pause. Your words will appear here.");
       proc.onaudioprocess=e=>{
         if(ended || ws.readyState!==1) return;
         const f=e.inputBuffer.getChannelData(0);
@@ -911,7 +924,7 @@ const Ears = {
   },
   async _scribeListen(stream, onText, token, opts){
     const ac=new (window.AudioContext||window.webkitAudioContext)();
-    await ac.resume();
+    await this.resumeAudio(ac);
     if(token!==this._token){ await ac.close(); return; }
     const src=ac.createMediaStreamSource(stream);
     const an=ac.createAnalyser(); an.fftSize=1024; src.connect(an);
