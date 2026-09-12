@@ -1318,18 +1318,23 @@ class EmotionGraph {
       const isAct = act === b.key;
       const col = EmotionGraph.hex(SECTORS[b.key].color);
       // when a region is open its word settles inward, leaving the rim to the feelings
-      const k = 1 - 0.28 * bloom;
+      const k = 1 - 0.10 * bloom;
       const x = cx + (b.x - cx) * k, y = cy + (b.y - cy) * k;
       const dim = act && !isAct ? 0.45 : 1;
-      ctx.font = `300 ${Math.round(17 - 3 * bloom)}px ${fam}`;
-      ctx.letterSpacing && (ctx.letterSpacing = "2.5px");
+      // Fit both side labels to equal slots, reserving the hub and rim.
+      const slot = R * .74;
+      let size = Math.min(15, R * .125) - bloom;
+      if("letterSpacing" in ctx) ctx.letterSpacing = `${Math.min(1.5, R * .008)}px`;
+      ctx.font = `500 ${size}px ${fam}`;
+      const widest = Math.max(ctx.measureText("RADIANCE").width, ctx.measureText("GUARDED").width);
+      if(widest > slot){ size *= slot / widest; ctx.font = `500 ${size}px ${fam}`; }
       ctx.fillStyle = `rgba(255, 253, 248, ${0.75 * dim})`;
       ctx.fillText(b.word.toUpperCase(), x + 1, y + 1);
       const ink = U.mixRgb([96, 80, 58], U.scale(col, .62), bloom);
-      ctx.fillStyle = U.col(ink, (0.62 + 0.38 * bloom) * dim);
+      ctx.fillStyle = U.col(ink, (0.78 + 0.22 * bloom) * dim);
       ctx.fillText(b.word.toUpperCase(), x, y);
-      if(bloom > 0.3){
-        ctx.font = `400 11px ${fam}`;
+      if(bloom > 0.3 && R >= 145){
+        ctx.font = `400 10px ${fam}`;
         ctx.letterSpacing && (ctx.letterSpacing = "1px");
         ctx.fillStyle = `rgba(90, 76, 56, ${(bloom - .3) / .7 * 0.8})`;
         ctx.fillText(b.sub, x, y + 15);

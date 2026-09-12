@@ -13,3 +13,18 @@ test('optimized pine assets have valid local buffers and bounded geometry',()=>{
  for(const image of g.images)assert.ok(fs.statSync(base+image.uri).size>0);
  for(const m of g.meshes)for(const p of m.primitives){const a=g.accessors[p.indices],v=g.bufferViews[a.bufferView],vertices=g.accessors[p.attributes.POSITION].count;for(let i=0;i<a.count;i++)assert.ok(buffer.readUInt32LE(v.byteOffset+i*4)<vertices);}
 });
+
+test('descent travels downward and forward, stays above sand, and holds for reduced motion',()=>{
+ const source=fs.readFileSync('scenes-3d.js','utf8');
+ const movement=source.slice(source.indexOf('const depth=o.reduced?'),source.indexOf('      kelpTime.value=t;'));
+ function pose(p,reduced=false){
+  let position;
+  const color={setRGB(){},copy(){}};
+  vm.runInNewContext(movement,{p,o:{reduced},t:0,drift:0,camera:{position:{set(...v){position=v;}},lookAt(){}},under:{fog:{color},background:color},oceanLight:{},shafts:[]});
+  return position;
+ }
+ let previous=pose(0);assert.equal(previous[1],9);
+ for(let i=1;i<=100;i++){const current=pose(i/100);assert.ok(current[1]<previous[1]);assert.ok(current[2]<previous[2]);assert.ok(current[1]>-4+2);previous=current;}
+ assert.equal(previous[1],-1.5);
+ assert.deepEqual(pose(0,true),pose(1,true));
+});

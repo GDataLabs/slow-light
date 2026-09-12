@@ -124,7 +124,9 @@ export async function createGarden(){
     if(w!==width||h!==height||desiredRatio!==ratio){width=w;height=h;ratio=desiredRatio;renderer.setPixelRatio(ratio);renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
     const t=reduced?0:time;
     waterMaterial.uniforms.time.value=t;dust.position.y=Math.sin(t*.12)*.18;
-    camera.position.x=reduced?0:Math.sin(t*.025)*.10;camera.lookAt(.1,1.4,-12);
+    const travel=(1-Math.cos(t*.025))*1.25;
+    camera.position.set(Math.sin(t*.035)*.55,2.8+Math.sin(t*.04)*.06,10-travel);
+    camera.lookAt(.1+Math.sin(t*.035)*.2,1.4,-12-travel*.4);
     renderer.render(scene,camera);ctx.drawImage(renderer.domElement,0,0,w,h);return true;
   }
   function dispose(){
