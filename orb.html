@@ -228,20 +228,27 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
   <div class="panel">
     <h1>Slow&nbsp;Light</h1>
     <h2>The Orb</h2>
-    <p>A quiet guide that asks how you are, then shapes a calm place around your answer. Speak, type, or slide — nothing you share leaves this device.</p>
+    <p>A quiet guide that asks how you are, then shapes a calm place around your answer. Speak, type, or slide. Answers are sent to our AI service to guide the conversation; optional voice services also process speech.</p>
     <div class="note">
       The orb is AI, not a person — it can be wrong, and it isn't therapy or crisis support. If things feel heavy, please reach a real person: in the US call or text <a href="tel:988">988</a>, elsewhere <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a>.
     </div>
+    <p><label><input type="checkbox" id="livingOptIn"> Create living visualizations from my answers</label><br><span class="tiny">Optional AI video: an abstract scene description goes to fal to create short clips. Your starting feelings and your answers help shape it. Any check-in carried from the previous page is included only if you turn this on. You can pause or stop at any time.</span></p>
     <p><button class="obtn primary" id="beginBtn" style="font-size:17px; padding:15px 34px">I understand — begin</button>
        <a class="obtn" href="index.html" style="text-decoration:none; margin-left:6px">Back to Slow Light</a></p>
     <details class="fineprint">
       <summary>The full details…</summary>
       <p class="tiny" style="margin-top:10px">The orb is an automated guide, not a clinician. It can misunderstand you and say things that are wrong, and it is built only for gentle relaxation — never a substitute for professional help. If things feel heavy more days than not, bring that to a real person; in the US you can also text HOME to 741741, and in immediate danger call your local emergency number.</p>
-      <p class="tiny">Voice is optional. After each question the orb listens for a few seconds — a small waveform shows exactly when it can hear you, and typing or sliding always works instead. When ElevenLabs is set up (⚙, top right), your short voice answers are sent there to be turned into text, and the orb's own lines and fixed scene descriptions are sent there to be spoken and drawn; otherwise your browser's own speech service is used. This page keeps nothing on any server. Motion here is slow, there is no strobing, and your device's reduce-motion setting is respected.</p>
+      <p class="tiny">Voice is optional. After each question the orb listens for a few seconds — a small waveform shows exactly when it can hear you, and typing or sliding always works instead. When ElevenLabs is set up (⚙, top right), your short voice answers are sent there to be turned into text, and the orb's own lines and fixed scene descriptions are sent there to be spoken and drawn; otherwise your browser's own speech service is used. AI and voice providers process the content sent to them under their own retention policies. Session reflections are saved in this browser. Motion here is slow, there is no strobing, and your device's reduce-motion setting is respected.</p>
     </details>
   </div>
 </div>
 
+<div id="livingControls" hidden style="position:fixed;top:64px;left:16px;right:16px;z-index:7;max-width:360px;padding:10px;border-radius:16px;background:rgba(4,6,10,.8)">
+  <span id="livingStatus" role="status" style="display:block;font-size:13px">Waiting for your place</span>
+  <button class="obtn" id="livingPause" aria-pressed="false">Pause visuals</button>
+  <button class="obtn" id="livingStop">Stop visuals</button>
+</div>
+<script src="orb-visual.js"></script>
 <button id="gearBtn" title="Voice &amp; scenery settings" aria-label="Voice and scenery settings">⚙</button>
 <button id="ambBtn" title="Ambient sound on/off" aria-label="Ambient sound on or off">♪</button>
 
@@ -332,6 +339,7 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
 </div>
 
 <script src="site-config.js"></script>
+<script src="orb-checkin.js"></script>
 <script src="voice-config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -435,7 +443,10 @@ const Brain={
     if(this.down) return fallback;
     try{
       const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(), 8000);
-      const ctx={ stage, recentLines:this.recent.slice(-8), person:{
+      const ctx={ stage, visualEnabled:window.OrbVisual.enabled, recentLines:this.recent.slice(-8), person:{
+        initialCheckIn:window.OrbVisual.enabled ? S.initialCheckIn : null,
+        initialWords:window.OrbVisual.enabled ? S.initialWords||"" : "",
+        rawAnswer:window.OrbVisual.enabled && stage==="scene_intro" ? S.visualAnswer||"" : "",
         moods:S.moods||[], weather:(S.moods||[]).map(k=>MOODS[k]&&MOODS[k].weather).filter(Boolean),
         grip:S.grip, gripEnd:S.gripEnd, goalFeel:S.goalFeel||"", people:S.people||1,
         sceneKey:S.sceneKey||null, released:S.released||[], ...(extra||{}) } };
@@ -446,11 +457,14 @@ const Brain={
       const j=await r.json();
       if(!j.line) throw 0;
       this._fails=0;
-      if(j.crisis) this.crisisFlag=true;
+      if(j.crisis) { this.crisisFlag=true; window.OrbVisual.stop(); }
+      else if(j.visual) window.OrbVisual.update(j.visual);
+      else if(stage==="scene_intro") window.OrbVisual.unavailable();
       this.lastMoods=Array.isArray(j.moods)? j.moods.filter(k=>MOODS[k]) : [];
       this.recent.push(j.line);
       return j.line;
     }catch(e){
+      if(stage==="scene_intro") window.OrbVisual.unavailable();
       this._fails++; if(this._fails>=2) this.down=true;   // stop waiting on a dead mind
       return fallback;
     }
@@ -1342,6 +1356,7 @@ $("#micBtn").addEventListener("click",()=>{
 /* care overlay */
 let crisisShown=false;
 function showCare(){
+  window.OrbVisual.stop();
   return new Promise(res=>{
     $("#helpVeil").classList.remove("hide");
     Voice.stop();
@@ -1355,7 +1370,9 @@ function guard(text){
 }
 
 /* ----------------------- the session ------------------------------- */
-const S={ moods:[], grip:5, goalFeel:null, released:[], gripEnd:null, paceMs:[], t0:0 };
+const S={ initialCheckIn:null, initialWords:"", moods:[], grip:5, goalFeel:null, released:[], gripEnd:null, paceMs:[], t0:0 };
+
+try { S.initialCheckIn = window.OrbCheckIn.take(sessionStorage); } catch {}
 
 async function run(){
   S.t0=Date.now();
@@ -1429,6 +1446,8 @@ async function run(){
   ]);
   g=guard(feel);
   if(g==="crisis" && !crisisShown){ crisisShown=true; await showCare(); }
+  S.initialWords = guard(ans)==="ok" ? ans.slice(0,300) : "";
+  S.visualAnswer = guard(ans)==="ok" && guard(feel)==="ok" ? (ans+"; hoping for "+feel).slice(0,300) : "";
   const f=(feel||"").toLowerCase();
   S.goalFeel = /ground|stead|safe|solid|earth/.test(f)? "grounded" : /light|soft|hope|bright|warm|morning/.test(f)? "lighter" : "calmer";
 
@@ -1441,7 +1460,7 @@ async function run(){
   // start growing the place's generated sound and scenery now, so they can
   // arrive softly while the person's eyes are closed (all fire-and-forget)
   Media.soundscape(sceneKey);
-  Media.backdrop(sceneKey, TINTS[S.moods[0]]||"soft teal");
+  if(!window.OrbVisual.enabled) Media.backdrop(sceneKey, TINTS[S.moods[0]]||"soft teal");
   await Cap.show(await Brain.line("scene_intro", `Then let me make somewhere for that. ${sc.line}`));
   await Cap.show("Close your eyes for three breaths if you like. When you open them, we'll be there.");
   await fadeSwap(sc.build);
@@ -1487,6 +1506,7 @@ async function run(){
     d===0? `Still at ${S.grip}. Honest is better than improved. Some weather needs more than one visit.` :
     `It rose — from ${S.grip} to ${S.gripEnd}. Slowing down can uncover what speed was muffling. That's worth telling a person you trust, not just an orb.`));
   await Brain.care();
+  window.OrbVisual.finish();
   saveOrbSession();
   await Cap.show("I'll remember how this felt on this device, so you can watch your own weather change over time.", "see 'How it's been going' from the close of any session");
   await Cap.show(pick([
@@ -1507,7 +1527,7 @@ function fadeSwap(build){
       if(T){
         T.orbTarget.set(0,.5,0); T.camTarget.set(0,0,8.5);
         // a generated backdrop may already be up — the 3D sky must not cover it
-        if($("#bdImg").classList.contains("on") || $("#bdVid").classList.contains("on")) T.scene.background=null;
+        if(window.OrbVisual.showing || $("#bdImg").classList.contains("on") || $("#bdVid").classList.contains("on")) T.scene.background=null;
       }
       veil.style.opacity="0";
       setTimeout(()=>{ veil.remove(); res(); },2300);
@@ -1790,6 +1810,7 @@ function showExit(){
 initWorld();
 Voice.init();
 $("#beginBtn").addEventListener("click", async ()=>{
+  window.OrbVisual.start({ enabled:$("#livingOptIn").checked, onShow:()=>{ Media.clearBackdrop(); if(T) T.scene.background=null; } });
   $("#introVeil").classList.add("hide");
   if(!HAVE_3D){
     $("#caption").textContent="The 3D space couldn't load here — but the words and breathing still work.";
@@ -1797,6 +1818,7 @@ $("#beginBtn").addEventListener("click", async ()=>{
     await new Promise(r=>setTimeout(r,2200));
   }
   run().catch(()=>{ /* never strand the person on an error */
+    window.OrbVisual.stop();
     Cap.show("Something in me stumbled — but nothing is lost. Breathe once more, and use the door below whenever you like.");
     showExit();
   });

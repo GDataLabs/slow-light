@@ -94,3 +94,66 @@ the source glTF using the pinned meshoptimizer authoring dependency. Underwater
 plants use curved fronds with gentle vertex motion that freezes under reduced
 motion. The breathing light and high-contrast phase label now appear in every
 room, including Resonance.
+
+## Orb living visualizations
+
+The Orb opening screen now offers optional living visuals. After the person
+chooses a destination, and after each release response, Claude can supply an
+abstract nature metaphor based on the conversation. Only that generated prompt
+goes to fal's `minimax/h3-max/text-to-video`; the fal key stays on the server.
+These prompts can still reflect personal information, so the opening explains
+the external processing and requires a separate opt-in each session.
+
+Set `FAL_KEY` alongside the existing `ANTHROPIC_KEY` in the Vercel environment,
+and deploy `api/orb.js`, `api/orb-video.js`, `lib/orb-visual.js`, `orb-visual.js`,
+`orb.html`, and `site-config.js` together. For GitHub Pages, include the exact
+Pages origin in `ALLOWED_ORIGINS`. A plain static localhost server cannot run
+these functions; `site-config.js` currently points local Orb calls to Vercel.
+No key belongs in the public config. No deployment or paid generation was
+performed as part of implementation.
+
+Playback uses muted, five-second 480P clips, preloads the next clip, and fades
+between two video layers. Existing scenery remains while loading; the last
+ready clip holds its final frame while waiting, so the path never loops backward.
+A ready continuation starts after the previous clip finishes with a brief fade. This is buffered clip playback, not a continuous
+Director/WebRTC session or a promise of three-second latency. The opening clip uses text-to-video. Subsequent clips use reference-to-video
+with the first clip as a persistent location anchor and the last displayed clip
+as the motion reference (at most two five-second references). The original
+scene description stays fixed; new answers only steer small atmospheric changes.
+Reference conditioning reduces drift but does not guarantee frame-exact joins.
+Each conversation moment generates up to three linked clips; a session requests at
+most twelve clips. Pause, stop, hidden tabs, reduced motion, care support, and
+session completion halt new work; in-flight cancellation is best effort and
+already running jobs may still be billed. A provider error ends generation for
+that session while the Orb continues.
+
+The endpoint accepts signed, expiring prompts from the Orb and signed job URLs.
+Its IP throttle is per server process, not a durable account-wide spending cap.
+Configure provider spending controls before enabling a public deployment;
+shared rate limiting/authentication is needed for stronger abuse protection.
+The current tests mock provider requests and check ticket validation, fixed
+parameters, origin rejection, failure handling and script compilation. Real
+fal latency, clip quality, crossfades and mobile playback still need an enabled
+deployment/device check.
+
+Continuity advances only after a clip is displayed. An answer arriving during
+generation steers the next clip without discarding the one currently in flight.
+Pause/resume keeps the last displayed reference; stop clears it. Invalid or
+expired continuity fails without falling back to a newly invented scene.
+Reference-video output quality and seam behavior still require live validation.
+
+Starting feelings now travel from the main check-in to the Orb through a
+one-use, tab-scoped sessionStorage handoff, expiring after 15 minutes. It contains
+only selected feeling keys, relative weights and explicitly answered intensity;
+it never reads reflection history. The Orb keeps its initial spoken/typed
+feeling answer in memory as well. Both accompany every visual prompt request
+when living visuals are enabled. With visuals off, those additional fields are
+excluded from the AI context. A direct Orb visit still uses its own check-in.
+The person can describe changed feelings during the conversation.
+
+The visual instructions blend the starting feelings into composition, texture,
+contrast and gentle motion, while keeping the original place and video
+references. They do not infer improvement or treat intensity as a diagnosis.
+Deploy `orb-checkin.js` with the app and API changes; it is also used by the
+server to validate incoming check-in data. Tests cover one-use handoff, expiry,
+unknown intensity, opt-out and retained context across later visual requests.

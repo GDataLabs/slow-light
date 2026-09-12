@@ -4146,6 +4146,20 @@ App.initCheckin();
   requestAnimationFrame(idle);
 })();
 </script>
+<script src="orb-checkin.js"></script>
+<script>
+// Transfer only this check-in when the person chooses the Orb.
+document.querySelectorAll('a[href="orb.html"]').forEach(link => {
+  link.addEventListener('click', () => {
+    try {
+      OrbCheckIn.save(sessionStorage, {
+        feelings: App.orderedKeys().map(key => ({key, weight: App.weights[key] ?? INTENSITY_DEFAULT})),
+        intensity: App._sudsTouched ? Number(document.querySelector('#suds').value) : null
+      });
+    } catch {}
+  });
+});
+</script>
 <script src="arrival.js"></script>
 <script src="breathing-controls.js"></script>
 </body>

@@ -10,6 +10,7 @@
     // ElevenLabs proxy: same-site on Vercel; the GitHub Pages copy borrows Vercel's.
     proxy: /github\.io$/.test(location.hostname) ? vercel + "/api/eleven" : "/api/eleven",
     // The orb's mind: same-site on Vercel; everywhere else (github.io, localhost) borrows Vercel's.
+    video: onVercel ? "/api/orb-video" : vercel + "/api/orb-video",
     brain: onVercel ? "/api/orb" : vercel + "/api/orb"
   };
 })();

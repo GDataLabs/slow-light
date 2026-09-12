@@ -10,6 +10,8 @@
  * server so a visitor can never talk the orb out of character.
  */
 
+const { sign } = require("../lib/orb-visual");
+const { clean: cleanCheckIn } = require("../orb-checkin");
 const MODEL_DEFAULT = "claude-haiku-4-5";
 const RATE_LIMIT_PER_MIN = 40;
 const bucket = new Map();
@@ -50,6 +52,8 @@ STAGES — the app controls the flow; you only voice the current stage:
 - pace_reflect: person.paceAvgMs is the average time before they touched each light (under ~2200 quick, over ~5000 unhurried); reflect it kindly, never as judgment.
 - ask_now: ask where the feeling is now (the slider returns).
 - close: person.grip was arrival, person.gripEnd is now. Respond honestly — lower: the credit is theirs; unchanged: honest beats improved, some weather needs more than one visit; higher: slowing down can uncover what speed was covering, worth telling someone they trust. End with one short sentence they can carry out.
+
+VISUALS: When visualEnabled is true and stage is scene_intro, release_response, or close, also return "visual": a 40–70 word cinematic nature scene prompt. For scene_intro establish one specific place in person.sceneKey. For release_response and close describe only a small change in light, mist, water or drifting particles within that SAME place; do not invent new terrain, landmarks, vegetation, time of day, camera angle or destination. Keep person.sceneKey as the same location and palette across turns. Use person.initialCheckIn (feelings selected on the app's entry page, their relative weights, and optional self-reported intensity), person.initialWords (their original Orb answer), person.moods and person.grip as the starting emotional context for EVERY visual prompt, including later release responses. These are self-reports, not diagnoses. If the person describes a different feeling now, follow that update without erasing where they started. Blend multiple starting feelings; do not reduce everything to the first mood. Missing values mean unknown, never neutral or zero. For anxious/overwhelmed feelings use spacious composition and sparse, predictable movement; for heavy/sad feelings use soft warmth and supported, grounded forms; for numb feelings use gentle visible texture and a clear nearby point of focus; for frustration use unhurried flowing motion; for hopeful/joyful feelings preserve gentle warmth. Adapt these qualities WITHIN the established location. Higher reported intensity means fewer moving elements and softer contrast, never more dramatic weather. Do not prescribe a guaranteed emotional progression or assume improvement. Translate the meaning of their words and goal into a gentle, abstract natural metaphor; never include names, literal personal events, text, people, or frightening imagery. Slow nearly still motion, a fixed camera, no cuts or flashes. Do not claim to measure or change their mental state. On crisis return no visual. Otherwise omit visual.
 
 OUTPUT: strict JSON only, nothing else: {"line": string, "crisis": boolean, "moods": array (only for acknowledge, else [])}`;
 
@@ -95,8 +99,11 @@ module.exports = async (req, res) => {
   const person = body.person || {};
   const ctx = {
     stage,
+    visualEnabled: body.visualEnabled === true,
     recentLines: [].concat(body.recentLines || []).slice(-8).map(s => clip(s, 200)),
     person: {
+      initialCheckIn: body.visualEnabled === true ? cleanCheckIn(person.initialCheckIn) : null,
+      initialWords: body.visualEnabled === true ? clip(person.initialWords, 300) : "",
       rawAnswer: clip(person.rawAnswer, 300),
       moods: [].concat(person.moods || []).filter(m => MOOD_KEYS.includes(m)).slice(0, 3),
       weather: [].concat(person.weather || []).slice(0, 3).map(s => clip(s, 30)),
@@ -121,7 +128,7 @@ module.exports = async (req, res) => {
       },
       body: JSON.stringify({
         model: process.env.ANTHROPIC_MODEL || MODEL_DEFAULT,
-        max_tokens: 300,
+        max_tokens: 550,
         system: ORB_MIND,
         messages: [{ role: "user", content: "Voice this moment of the session:\n" + JSON.stringify(ctx) }]
       })
@@ -139,7 +146,12 @@ module.exports = async (req, res) => {
       // the model spoke plainly — accept its words rather than fail
       out = { line: text.trim().slice(0, 400), crisis: false, moods: [] };
     }
+    const visual = body.visualEnabled === true && !out.crisis &&
+      ["scene_intro", "release_response", "close"].includes(stage) &&
+      typeof out.visual === "string" && out.visual.trim() && process.env.FAL_KEY
+      ? sign({kind: "prompt", prompt: out.visual.slice(0, 900) + " Gentle nature only. Fixed camera, very slow movement, no people, text, flashes or abrupt cuts."}, process.env.FAL_KEY) : null;
     res.status(200).json({
+      visual,
       line: String(out.line).slice(0, 500),
       crisis: !!out.crisis,
       moods: [].concat(out.moods || []).filter(m => MOOD_KEYS.includes(m)).slice(0, 3)
