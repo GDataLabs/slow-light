@@ -126,3 +126,15 @@ test('opening and continuation support signed durations while rejecting arbitrar
     }
   }
 });
+test('sunrise direction is not overridden by the original nighttime anchor',async()=>{
+  process.env.FAL_KEY='test';
+  const continuity=sign({kind:'continuity',anchor:'A meadow at night under moonlight',first:'https://v3.fal.media/a.mp4',latest:'https://v3.fal.media/a.mp4'},'test');
+  global.fetch=async(_url,options)=>{
+    const prompt=JSON.parse(options.body).prompt;
+    assert.match(prompt,/sun visibly rises/);
+    assert.match(prompt,/old lighting and time of day do not override/);
+    assert.doesNotMatch(prompt,/Preserve the exact[^.]*time of day/);
+    return {ok:true,json:async()=>({status_url:'https://queue.fal.run/minimax/job/status',response_url:'https://queue.fal.run/minimax/job/result',cancel_url:'https://queue.fal.run/minimax/job/cancel'})};
+  };
+  assert.equal((await request({action:'submit',ticket:sign({kind:'prompt',prompt:'The sun visibly rises over the same meadow horizon.',duration:15},'test'),continuity,frame})).code,200);
+});

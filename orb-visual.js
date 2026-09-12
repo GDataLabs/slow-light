@@ -186,7 +186,7 @@
         else { if (active >= 0 && !videos[active].ended) videos[active].play().catch(() => {}); status('Living scene'); schedule(); }
       };
     },
-    update(ticket) { if (!this.enabled || ended) return; prompt = ticket; schedule(); },
+    update(ticket) { if (!this.enabled || ended || count>=MAX_CLIPS) return false; prompt = ticket; schedule(); return true; },
     unavailable() { if (this.enabled && !prompt) status("Living visuals are unavailable. Your Orb can continue."); },
     finish() {
       // The conversation can finish while the environment continues evolving.

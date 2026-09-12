@@ -30,12 +30,13 @@ test('opening and later visual requests retain the initial check-in; opt-out exc
   const oldAnthropic = process.env.ANTHROPIC_KEY, oldFal = process.env.FAL_KEY;
   process.env.ANTHROPIC_KEY = 'test'; process.env.FAL_KEY = 'test';
   try {
-    for (const stage of ['scene_intro','release_response']) {
+    for (const stage of ['scene_intro','release_response','scene_update']) {
       for (const enabled of [true,false]) {
         global.fetch = async (_url, options) => {
           const payload = JSON.parse(options.body);
           const ctx = JSON.parse(payload.messages[0].content.split('\n').slice(1).join('\n'));
           assert.equal(ctx.stage,stage);
+          assert.equal(ctx.person.sceneRequest,enabled?'Let the sun rise':'');
           assert.deepEqual(ctx.person.initialCheckIn,enabled ? {feelings:[{key:'overwhelmed',weight:.9},{key:'sad',weight:.4}],intensity:8} : null);
           assert.equal(ctx.person.initialWords,enabled ? 'Too many things on my mind' : '');
           assert.match(payload.system,/WITHIN the established location/);
@@ -43,7 +44,7 @@ test('opening and later visual requests retain the initial check-in; opt-out exc
           return {ok:true,json:async()=>({content:[{text:JSON.stringify({line:'There is room here.',crisis:false,moods:[],clipSeconds:10,visual:'Soft light rests on the same quiet meadow.'})}]})};
         };
         let output;
-        await handler({method:'POST',headers:{host:'example.com'},body:{stage,visualEnabled:enabled,person:{initialCheckIn:{feelings:[{key:'overwhelmed',weight:.9},{key:'sad',weight:.4}],intensity:8},initialWords:'Too many things on my mind',sceneKey:'meadow'}}},
+        await handler({method:'POST',headers:{host:'example.com'},body:{stage,visualEnabled:enabled,person:{sceneRequest:'Let the sun rise',initialCheckIn:{feelings:[{key:'overwhelmed',weight:.9},{key:'sad',weight:.4}],intensity:8},initialWords:'Too many things on my mind',sceneKey:'meadow'}}},
           {setHeader(){},status(code){assert.equal(code,200);return this;},json(data){output=data;}});
         if(enabled) { assert.match(verify(output.visual,'test').prompt,/same quiet meadow/); assert.equal(verify(output.visual,'test').duration,10); }
         else assert.equal(output.visual,null);

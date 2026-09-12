@@ -262,6 +262,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
   <button class="obtn" id="livingPause" aria-pressed="false">Pause visuals</button>
   <button class="obtn" id="livingStop">Stop visuals</button>
   <button class="obtn" id="livingRetry" hidden>Retry continuation</button>
+  <details><summary>Shape this scene</summary><label class="tiny" for="sceneRequest">What would you like to change?</label><input id="sceneRequest" maxlength="300" placeholder="Let the sun rise…" style="width:100%;box-sizing:border-box"><button class="obtn" id="sceneSend">Apply to next clip</button><button class="obtn" id="sceneSpeak">Speak a scene request</button><p id="sceneRequestStatus" role="status" class="tiny"></p></details>
   <details><summary>Step into this place · 3D</summary><p class="tiny">Create an explorable world from this video frame and its scene description. These go to World Labs when you press Create. Generation can take several minutes; the video pauses to keep your starting view.</p><button class="obtn" id="worldCreate">Create my 3D place</button><button class="obtn" id="worldEnter" hidden>Enter my 3D place</button><p id="worldStatus" role="status" class="tiny"></p></details>
 </div>
 <script type="importmap">{"imports":{"three":"./vendor/three/three.module.js"}}</script>
@@ -463,11 +464,13 @@ const Brain={
     return (pub.brain||"").trim() || "/api/orb";
   },
   async line(stage, fallback, extra){
+    this.lastVisual=null;
     fallback=window.OrbLanguage.line(stage,fallback);
-    if(this.down) return fallback;
+    if(this.down && stage!=="scene_update") return fallback;
     try{
       const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(), 8000);
       const ctx={ stage, voiceVariation:window.OrbLanguage.variation, visualEnabled:window.OrbVisual.enabled, recentLines:this.recent.slice(-8), person:{
+        sceneRequest:window.OrbVisual.enabled ? S.sceneRequest||"" : "",
         initialCheckIn:window.OrbVisual.enabled ? S.initialCheckIn : null,
         initialWords:window.OrbVisual.enabled ? S.initialWords||"" : "",
         rawAnswer:window.OrbVisual.enabled && stage==="scene_intro" ? S.visualAnswer||"" : "",
@@ -482,7 +485,7 @@ const Brain={
       if(!j.line) throw 0;
       this._fails=0;
       if(j.crisis) { this.crisisFlag=true; window.OrbVisual.stop(); }
-      else if(j.visual) window.OrbVisual.update(j.visual);
+      else if(j.visual) { if(window.OrbVisual.update(j.visual)) this.lastVisual=j.visual; }
       else if(stage==="scene_intro") window.OrbVisual.unavailable();
       this.lastMoods=Array.isArray(j.moods)? j.moods.filter(k=>MOODS[k]) : [];
       this.recent.push(j.line);
@@ -1381,7 +1384,7 @@ const UI={
     // a spoken number answers too ("about seven" → 7)
     UI._lastListen={ fn:t=>{
       const n=spokenNumber(t);
-      if(n===null) return;
+      if(n===null){ applySceneRequest(t); return; }
       $("#oSlider").value=n; $("#sliderVal").textContent=n;
       const r=UI._sliderResolve; UI.hide(); r && r(n);
     }, opts:{patienceMs:14000} };
@@ -1435,9 +1438,34 @@ function guard(text){
 }
 
 /* ----------------------- the session ------------------------------- */
-const S={ initialCheckIn:null, initialWords:"", moods:[], grip:5, goalFeel:null, released:[], gripEnd:null, paceMs:[], t0:0 };
+const S={ sceneRequest:"", initialCheckIn:null, initialWords:"", moods:[], grip:5, goalFeel:null, released:[], gripEnd:null, paceMs:[], t0:0 };
 
 try { S.initialCheckIn = window.OrbCheckIn.take(sessionStorage); } catch {}
+
+let sceneRequestBusy=false;
+async function applySceneRequest(text){
+  const status=$("#sceneRequestStatus");
+  if(sceneRequestBusy)return;
+  if(!window.OrbVisual.enabled || !S.sceneKey){status.textContent="Wait for your living scene to begin, then try this request.";return;}
+  text=String(text||"").trim().slice(0,300);if(!text)return;
+  if(guard(text)==="crisis"){await showCare();return;}
+  if(guard(text)!=="ok"){status.textContent="Try a gentle change to light, weather or movement.";return;}
+  sceneRequestBusy=true;$("#sceneSend").disabled=true;
+  status.textContent="Sending your scene request…";
+  try{
+    const line=await Brain.line("scene_update",null,{sceneRequest:text});
+    if(Brain.lastVisual){S.sceneRequest=text;status.textContent="Requested: “"+text+"”. It will guide the next clip that has not started generating yet.";}
+    else status.textContent="The scene request could not be sent. Please try again.";
+    await Brain.care();
+  }finally{sceneRequestBusy=false;$("#sceneSend").disabled=false;}
+}
+$("#sceneSend").onclick=()=>applySceneRequest($("#sceneRequest").value);
+$("#sceneRequest").addEventListener("keydown",e=>{if(e.key==="Enter")applySceneRequest(e.target.value);});
+$("#sceneSpeak").onclick=()=>{
+  Ears.cancel();Voice.stop();Ears.denied=false;
+  $("#sceneRequestStatus").textContent="Speak your scene request, then pause.";
+  Ears.listen(text=>{$("#sceneRequest").value=text;applySceneRequest(text);});
+};
 
 async function run(){
   S.t0=Date.now();

@@ -264,3 +264,20 @@ it is separate from the opt-in evolving video sequence.
 Sequence tests simulate three successive clips, changed direction, conversation
 completion and a transient polling failure. They verify the chain and scheduling,
 not actual provider speed, output continuity, or gap-free playback.
+
+### Explicit scene direction
+
+Shape this scene accepts typed or spoken requests between guided questions.
+Requests are processed through the Orb's safety-constrained scene_update stage;
+accepted directions stay in session context for subsequent visual prompts.
+The receipt says a direction is queued, not that the generated result already
+matches it. In-flight clips finish before the new direction can be generated.
+Non-numeric speech at the intensity slider is routed to this scene request path
+when living visuals have started; it does not invent an intensity answer.
+
+Continuity now preserves terrain and landmarks while allowing explicit changes
+to time of day, light and weather. An old night-scene anchor must not override a
+new sunrise request. Scene-update prompts describe a visible sun rising where
+the viewpoint permits, rather than just a vague warming of light. Model adherence
+still requires live evaluation; the tests verify request delivery and removal
+of the conflicting prompt constraints, not that every generated sun will rise.
