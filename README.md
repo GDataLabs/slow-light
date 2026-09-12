@@ -248,3 +248,19 @@ mobile GPU performance and generated-world quality still need live validation.
 A single image cannot determine the unseen environment, so exact visual matching
 is not guaranteed. Loading failure returns to the video; no fake procedural
 world is substituted for a failed World Labs generation.
+
+### Continuation lifecycle fixes
+
+Completing the conversation no longer cancels the video producer. Living visuals
+continue until pause/stop, the 24-attempt budget, an error, reduced-motion, or page
+exit. There is no extra delay before dispatching the next clip after playback
+starts. A failed status check is retried twice against the same provider job;
+submission is not automatically retried, avoiding duplicate paid jobs after an
+ambiguous response. Failures now identify the step and offer Retry continuation,
+which starts another request from the last displayed endpoint. The legacy
+ElevenLabs scenery setting is labeled Single video clip and displays a notice;
+it is separate from the opt-in evolving video sequence.
+
+Sequence tests simulate three successive clips, changed direction, conversation
+completion and a transient polling failure. They verify the chain and scheduling,
+not actual provider speed, output continuity, or gap-free playback.

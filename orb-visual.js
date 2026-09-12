@@ -12,8 +12,8 @@
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, ticket, ...(previous ? { continuity: previous, frame } : {}) }), signal: signal || AbortSignal.timeout(15000)
     });
-    const data = await r.json();
-    if (!r.ok) throw Error(data.error || 'Visuals are unavailable.');
+    const data = await r.json().catch(()=>({}));
+    if (!r.ok) { const error=Error(data.error || `Video service returned ${r.status}.`); error.status=r.status; throw error; }
     return data;
   };
   const cancel = ticket => { if (ticket) api('cancel', ticket).catch(() => {}); };
@@ -23,7 +23,7 @@
   function schedule() {
     clearTimeout(timer);
     if (view.enabled && !paused && !ended && prompt && count < MAX_CLIPS)
-      timer = setTimeout(pump, 1200);
+      timer = setTimeout(pump, 0);
   }
   async function extractFinalFrame(url, signal) {
     const decoder = document.createElement('video');
@@ -110,6 +110,7 @@
     const generation = epoch, ticket = prompt;
     controller = new AbortController();
     const deadline = setTimeout(() => controller.abort(), 120000);
+    let phase="submitting the next clip";
     try {
       status(view.showing ? 'Your next scene is taking shape…' : 'Making a place from your answers…');
       count++;
@@ -118,24 +119,34 @@
       if (epoch !== generation) { cancel(submitted.ticket); return; }
       job = submitted.ticket;
       status(`Creating clip ${count} of ${MAX_CLIPS} · ${submitted.duration || 5} seconds`);
-      let result;
+      phase="waiting for generation";
+      let result, pollFailures=0;
       do {
         await new Promise(resolve => setTimeout(resolve, 1200));
         if (epoch !== generation) return;
-        result = await api('status', job, controller.signal);
+        try { result = await api('status', job, controller.signal); pollFailures=0; }
+        catch(error) {
+          if(controller.signal.aborted || (error.status && error.status<500) || ++pollFailures>2) throw error;
+          status(`Clip ${count}: connection interrupted; checking the same request again…`);
+          result={status:'PENDING'};
+        }
       } while (result.status !== 'COMPLETED');
       job = null;
       if (epoch !== generation) return;
       if (!result.continuity) throw Error("The place could not be continued.");
+      phase="reading the final frame";
+      status(`Preparing clip ${count} · preserving its final frame…`);
       const frame = await extractFinalFrame(result.url, controller.signal);
       if(epoch !== generation) return;
+      phase="playing the next clip";
       await play(result.url, generation);
       if (epoch === generation) { continuity = result.continuity; finalFrame = frame; }
       if (epoch === generation) status(count >= MAX_CLIPS ? `${MAX_CLIPS}-clip session limit reached · holding the final view` : 'Living scene · moving forward from the previous frame');
     } catch (e) {
       if (epoch === generation) {
         cancel(job); job = null; ended = true;
-        status('Video continuation stopped. Holding the current view; your Orb can continue.');
+        status(`Stopped while ${phase}: ${e.name==='AbortError' ? 'The request timed out.' : e.message} Your current view is held.`);
+        $('livingRetry').hidden=false;
       }
     } finally {
       clearTimeout(deadline); busy = false; schedule();
@@ -163,6 +174,10 @@
         v.crossOrigin = 'anonymous'; v.muted = true; v.loop = false; v.style.transition = 'opacity .7s ease'; v.playsInline = true; v.preload = 'auto';
         v.setAttribute('aria-hidden', 'true'); $('backdrop').appendChild(v); return v;
       });
+      $('livingRetry').onclick=()=>{
+        if(count>=MAX_CLIPS) {status(`${MAX_CLIPS}-clip session limit reached · holding the final view`);return;}
+        ended=false;$('livingRetry').hidden=true;schedule();
+      };
       $('livingPause').onclick = () => {
         paused = !paused;
         $('livingPause').textContent = paused ? 'Resume visuals' : 'Pause visuals';
@@ -173,7 +188,11 @@
     },
     update(ticket) { if (!this.enabled || ended) return; prompt = ticket; schedule(); },
     unavailable() { if (this.enabled && !prompt) status("Living visuals are unavailable. Your Orb can continue."); },
-    finish() { ended = true; invalidate(); status('Your place is ready. Rest here as long as you like.'); },
+    finish() {
+      // The conversation can finish while the environment continues evolving.
+      // Only pause, stop, reduced motion, errors or the clip budget halt it.
+      schedule();
+    },
     stop() {
       document.body.classList.remove("living-video");
       this.enabled = false; this.showing = false; ended = true; invalidate();

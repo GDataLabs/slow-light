@@ -256,10 +256,12 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
   </div>
 </div>
 
+<div id="singleVideoNotice" hidden style="position:fixed;top:70px;left:16px;z-index:7;max-width:340px;padding:12px;background:#09121cee;border-radius:14px" role="status">Single-clip scenery. For evolving video, <a href="orb.html">begin again</a> and enable “Create living visualizations from my answers.”</div>
 <div id="livingControls" hidden style="position:fixed;top:64px;left:16px;right:16px;z-index:7;max-width:360px;padding:10px;border-radius:16px;background:rgba(4,6,10,.8)">
   <span id="livingStatus" role="status" style="display:block;font-size:13px">Waiting for your place</span>
   <button class="obtn" id="livingPause" aria-pressed="false">Pause visuals</button>
   <button class="obtn" id="livingStop">Stop visuals</button>
+  <button class="obtn" id="livingRetry" hidden>Retry continuation</button>
   <details><summary>Step into this place · 3D</summary><p class="tiny">Create an explorable world from this video frame and its scene description. These go to World Labs when you press Create. Generation can take several minutes; the video pauses to keep your starting view.</p><button class="obtn" id="worldCreate">Create my 3D place</button><button class="obtn" id="worldEnter" hidden>Enter my 3D place</button><p id="worldStatus" role="status" class="tiny"></p></details>
 </div>
 <script type="importmap">{"imports":{"three":"./vendor/three/three.module.js"}}</script>
@@ -328,7 +330,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
         <div class="vchoice" role="radiogroup" aria-label="Backdrop" id="bdChoice">
           <button data-bd="off">Off</button>
           <button data-bd="image">Still image</button>
-          <button data-bd="video">Living video</button>
+          <button data-bd="video">Single video clip</button>
         </div>
         <p class="tiny" style="margin:2px 0 0">A dreamlike generated image (fast, cheap) or a slowly moving video (slower to arrive, costs more credits) appears softly behind the particles. The scene works fine while it's on its way — or without it.</p>
       </div>
@@ -701,11 +703,12 @@ const Media={
     v.oncanplay=()=>{
       v.play().catch(()=>{});
       v.classList.add("on"); $("#bdImg").classList.remove("on");
+      $("#singleVideoNotice").hidden=false;
       if(T) T.scene.background=null;
     };
     v.src=src;
   },
-  clearBackdrop(){ $("#bdImg").classList.remove("on"); $("#bdVid").classList.remove("on"); try{ $("#bdVid").pause(); }catch(e){} }
+  clearBackdrop(){ $("#singleVideoNotice").hidden=true; $("#bdImg").classList.remove("on"); $("#bdVid").classList.remove("on"); try{ $("#bdVid").pause(); }catch(e){} }
 };
 $("#ambBtn").addEventListener("click",()=>{
   if(!Media.amb) return;

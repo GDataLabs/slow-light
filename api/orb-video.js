@@ -29,7 +29,7 @@ module.exports = async (req, res) => {
   try { ticket = verify(body.ticket, key); } catch { return res.status(400).json({ error: 'This visualization has expired.' }); }
   const call = async (url, method, input) => {
     const r = await fetch(url, { method, redirect: 'error', signal: AbortSignal.timeout(12000), headers: { Authorization: 'Key ' + key, 'Content-Type': 'application/json' }, ...(input ? { body: JSON.stringify(input) } : {}) });
-    if (!r.ok) throw Error('Video service unavailable');
+    if (!r.ok) { const error=Error('Video service returned '+r.status);error.upstreamStatus=r.status;throw error; }
     return r.status === 204 ? {} : r.json();
   };
   try {
@@ -79,7 +79,7 @@ module.exports = async (req, res) => {
     return res.status(200).json({ status: 'COMPLETED', url: url.href,
       continuity: sign({ kind: 'continuity', anchor: ticket.anchor, first: ticket.first || url.href, latest: url.href }, key)
     });
-  } catch {
-    return res.status(502).json({ error: 'The visualization could not finish. Your Orb is still here.' });
+  } catch (error) {
+    return res.status(502).json({ error: error.upstreamStatus ? `The video provider returned ${error.upstreamStatus} during ${body.action}.` : 'The video provider could not complete this request.' });
   }
 };
