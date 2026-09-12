@@ -4,7 +4,9 @@
   const $ = id => document.getElementById(id);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let epoch = 0, busy = false, prompt = null, continuity = null, job = null;
-  let finalFrame = null;
+  let finalFrame = null, displayedPrompt=null;
+  const waiters=new Set();
+  const notify=(ticket)=>{for(const fn of [...waiters])fn(ticket);};
   let timer, controller, videos = [], active = -1, count = 0, paused = false, ended = false, onShow;
   const status = text => { $('livingStatus').textContent = text; };
   const api = async (action, ticket, signal, previous, frame) => {
@@ -140,11 +142,11 @@
       if(epoch !== generation) return;
       phase="playing the next clip";
       await play(result.url, generation);
-      if (epoch === generation) { continuity = result.continuity; finalFrame = frame; }
+      if (epoch === generation) { continuity = result.continuity; finalFrame = frame; displayedPrompt=ticket; notify(ticket); }
       if (epoch === generation) status(count >= MAX_CLIPS ? `${MAX_CLIPS}-clip session limit reached · holding the final view` : 'Living scene · moving forward from the previous frame');
     } catch (e) {
       if (epoch === generation) {
-        cancel(job); job = null; ended = true;
+        cancel(job); job = null; ended = true; notify(null);
         status(`Stopped while ${phase}: ${e.name==='AbortError' ? 'The request timed out.' : e.message} Your current view is held.`);
         $('livingRetry').hidden=false;
       }
@@ -154,6 +156,15 @@
   }
   const view = window.OrbVisual = {
     enabled: false, showing: false,
+    waitFor(ticket) {
+      if(!ticket || !this.enabled || ended || count>=MAX_CLIPS && !busy) return Promise.resolve(false);
+      if(displayedPrompt===ticket) return Promise.resolve(true);
+      return new Promise(resolve=>{
+        const done=value=>{clearTimeout(timeout);waiters.delete(check);resolve(value);};
+        const check=value=>{if(value===ticket)done(true);else if(value===null)done(false);};
+        const timeout=setTimeout(()=>done(false),60000);waiters.add(check);
+      });
+    },
     snapshot() {
       if(active<0 || !prompt) throw Error('Wait for a video to appear first.');
       const v=videos[active], canvas=document.createElement('canvas');
@@ -195,7 +206,7 @@
     },
     stop() {
       document.body.classList.remove("living-video");
-      this.enabled = false; this.showing = false; ended = true; invalidate();
+      this.enabled = false; this.showing = false; ended = true; invalidate(); notify(null);
       videos.forEach(v => { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); });
       videos = []; active = -1; continuity = null; finalFrame = null; $('livingControls').hidden = true;
     }

@@ -281,3 +281,22 @@ new sunrise request. Scene-update prompts describe a visible sun rising where
 the viewpoint permits, rather than just a vague warming of light. Model adherence
 still requires live evaluation; the tests verify request delivery and removal
 of the conflicting prompt constraints, not that every generated sun will rise.
+
+### Guided scene conversation cadence
+
+With living visuals enabled, the middle of the session is now a scene-guidance
+cycle instead of the release exercise and slow-lights game: one explicit
+question, the person's answer, confirmation/correction, generation, a checkpoint
+for the matching displayed clip, and an explicit Ready action before the next
+question. It asks what would match the person's present feelings, what would
+move toward their desired feeling, and what they would keep or change. Saying
+done proceeds to the closing check-in. The procedural-only path retains its
+exercises, with a fresh question before each additional release answer.
+
+A scene checkpoint waits for the exact prompt ticket to reach playback, never
+just for any new clip. It offers Continue without waiting and a bounded wait
+with an honest pending/failure message. Seeing the generated clip is not proof
+that the model fulfilled the instruction; the person is asked to assess it.
+Question controls state the expected input. Slider speech that isn't a number
+now asks for clarification instead of silently routing it elsewhere. The slider
+has a microphone retry button. Listening is cancelled before a caption is spoken.

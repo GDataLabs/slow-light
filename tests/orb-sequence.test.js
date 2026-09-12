@@ -50,3 +50,20 @@ test('a transient status failure retries the existing job without duplicate subm
     assert.ok(f.plays()>=2);
   }finally{f.cleanup();}
 });
+test('scene checkpoint resolves only when its own requested clip is displayed',async()=>{
+  const f=fixture();try{
+    f.view.start({enabled:true});f.view.update('opening');
+    await until(()=>f.plays()>=1);
+    f.view.update('confirmed sunrise');
+    const displayed=await f.view.waitFor('confirmed sunrise');
+    assert.equal(displayed,true);
+    assert.ok(f.submissions.some(s=>s.ticket==='confirmed sunrise'));
+  }finally{f.cleanup();}
+});
+test('stopping releases a waiting conversation checkpoint',async()=>{
+  const f=fixture();try{
+    f.view.start({enabled:true});
+    const waiting=f.view.waitFor('not yet generated');f.view.stop();
+    assert.equal(await waiting,false);
+  }finally{f.cleanup();}
+});
