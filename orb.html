@@ -27,6 +27,12 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
   filter:brightness(.5) saturate(.85); opacity:0; transition:opacity 3.5s ease;
 }
 #backdrop .on{opacity:1}
+body.living-video #backdrop video{filter:none}
+body.living-video #vignette{display:none}
+body.living-video #caption{background:rgba(4,10,16,.68);border-radius:18px;padding:12px 18px;text-shadow:0 2px 6px #000}
+body.living-video #livingStatus::before{content:"";display:inline-block;width:15px;height:15px;margin-right:9px;border-radius:50%;background:#b6f4e5;box-shadow:0 0 12px #7fd4c1;vertical-align:middle}
+#micStatus{font-size:13px;text-align:center;color:#e1eee9;min-height:1.5em}
+
 /* a soft darkening toward the edges — the depth the flat render was missing */
 #vignette{
   position:fixed; inset:0; z-index:2; pointer-events:none;
@@ -209,6 +215,7 @@ canvas#stage{position:fixed; inset:0; width:100%; height:100%; display:block; z-
 <div id="answers">
   <canvas id="vu" width="300" height="46" aria-hidden="true"></canvas>
   <div id="liveTx" aria-live="polite"></div>
+  <div id="micStatus" role="status"></div>
   <div id="sliderWrap">
     <div id="sliderVal">5</div>
     <input type="range" id="oSlider" min="0" max="10" step="1" value="5" aria-label="Answer, 0 to 10">
@@ -742,6 +749,7 @@ const Ears = {
     if(window.SpeechRecognition||window.webkitSpeechRecognition) return "webspeech";
     return null;
   },
+  notice(text){ const el=$("#micStatus"); if(el) el.textContent=text; },
   setBtn(state){
     const b=$("#micBtn"); if(!b) return;
     b.classList.toggle("listening", state==="listening");
@@ -752,7 +760,7 @@ const Ears = {
     return (window.MediaRecorder && c.find(m=>MediaRecorder.isTypeSupported(m)))||"";
   },
   async ensureStream(){
-    if(this.stream) return this.stream;
+    if(this.stream && this.stream.getAudioTracks().some(t=>t.readyState==="live")) return this.stream;
     this.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true}});
     return this.stream;
   },
@@ -760,19 +768,20 @@ const Ears = {
   async listen(onText, opts={}){
     if(this.listening||this.thinking||this.denied) return;
     this.lastSpeakers=1;
-    const m=this.mode(); if(!m) return;
+    this.notice("Connecting microphone…");
+    const m=this.mode(); if(!m){ this.notice("Voice is unavailable here. You can type your answer."); return; }
     const token=++this._token;
     if(m==="webspeech"){ this._webListen(onText, token); return; }
     let stream;
     try{ stream=await this.ensureStream(); }
-    catch(e){ this.denied=true; $("#micBtn").style.display="none"; return; }
+    catch(e){ this.denied=e.name==="NotAllowedError"; this.notice(this.denied ? "Microphone access is blocked. Allow it in your browser’s site settings, then tap speak." : "Could not open the microphone. Check your input device, then tap speak."); return; }
     if(token!==this._token) return;
     if(m==="realtime"){
       try{ await this._realtimeListen(stream, onText, token, opts); }
-      catch(e){ if(token===this._token){ this.rtDown=true; try{ this._scribeListen(stream, onText, token, opts); }catch(e2){ this.cancel(); } } }
+      catch(e){ if(token===this._token){ this.rtDown=true; try{ await this._scribeListen(stream, onText, token, opts); }catch(e2){ this.cancel(); this.notice("Tap speak to retry the microphone."); } } }
       return;
     }
-    try{ this._scribeListen(stream, onText, token, opts); }catch(e){ this.cancel(); }
+    try{ await this._scribeListen(stream, onText, token, opts); }catch(e){ this.cancel(); this.notice("Tap speak to retry the microphone."); }
   },
   /* ---- the realtime ear: words appear as they're spoken -------------------
      Streams mic audio over a WebSocket to ElevenLabs Scribe v2 Realtime.
@@ -780,7 +789,7 @@ const Ears = {
      API key still never reaches the browser. The server's voice-activity
      detection decides when a thought is complete and commits it.          */
   async _rtToken(){
-    const r=await fetch(elBase()+"/v1/single-use-tokens/realtime_scribe",{method:"POST",headers:elHeaders()});
+    const r=await fetch(elBase()+"/v1/single-use-tokens/realtime_scribe",{method:"POST",headers:elHeaders(),signal:AbortSignal.timeout(8000)});
     if(!r.ok) throw 0;
     const j=await r.json().catch(()=>null);
     const t=(j && (j.token||j.single_use_token||j.value)) || null;
@@ -791,6 +800,8 @@ const Ears = {
     const tok=await this._rtToken();
     if(token!==this._token) return;
     const ac=new (window.AudioContext||window.webkitAudioContext)();
+    await ac.resume();
+    if(token!==this._token){ await ac.close(); return; }
     const src=ac.createMediaStreamSource(stream);
     const an=ac.createAnalyser(); an.fftSize=1024; src.connect(an);
     const proc=ac.createScriptProcessor(4096,1,1);
@@ -801,7 +812,7 @@ const Ears = {
       +"&token="+encodeURIComponent(tok);
     const ws=new WebSocket(url);
     const live=$("#liveTx");
-    this.listening=true; this.setBtn("listening");
+    this.listening=true; this.setBtn("listening"); this.notice("Listening — speak, then pause. Tap listening to send.");
     Media.duck(true);
     const stopVu=this._vuStart(an, ac);
     let ended=false, committed="", gotAny=false;
@@ -820,6 +831,12 @@ const Ears = {
     };
     this._cleanup=()=>cleanup(false);
     this._finishNow=()=>{ try{ ws.send(JSON.stringify({message_type:"input_audio_chunk", audio_base_64:"", commit:true})); }catch(e){} setTimeout(()=>cleanup(true), 900); };
+    const fallback=()=>{
+      if(ended || token!==this._token) return;
+      cleanup(false); this.rtDown=true;
+      this.notice("Reconnecting the microphone…");
+      this._scribeListen(stream,onText,token,opts).catch(()=>{ this.cancel(); this.notice("Voice could not connect. Tap speak to retry, or type."); });
+    };
     ws.onmessage=ev=>{
       let m=null; try{ m=JSON.parse(ev.data); }catch(e){ return; }
       const t=m.message_type||m.type||"";
@@ -831,13 +848,13 @@ const Ears = {
         if(m.text){ gotAny=true; committed=(committed+" "+m.text).trim(); live.textContent=committed; live.classList.add("on"); }
         // a completed thought followed by the VAD's silence — that's the answer
         if(t.startsWith("committed") && committed) setTimeout(()=>cleanup(true), 250);
-      } else if(t==="auth_error"||t==="quota_exceeded"||t==="rate_limited"){
+      } else if(t.includes("error")||t==="quota_exceeded"||t==="rate_limited"){
         this.rtDown = (t!=="rate_limited");
-        cleanup(false);
+        fallback();
       }
     };
-    ws.onerror=()=>{ if(!gotAny) this.rtDown=true; cleanup(false); };
-    ws.onclose=()=>{ if(!ended) cleanup(!!committed); };
+    ws.onerror=()=>fallback();
+    ws.onclose=()=>{ if(!ended){ if(committed) cleanup(true); else fallback(); } };
     ws.onopen=()=>{
       proc.onaudioprocess=e=>{
         if(ended || ws.readyState!==1) return;
@@ -857,7 +874,7 @@ const Ears = {
     const watch=setInterval(()=>{
       if(ended){ clearInterval(watch); return; }
       const elapsed=performance.now()-started;
-      if(!gotAny && elapsed>patience){ clearInterval(watch); cleanup(false); }
+      if(!gotAny && elapsed>patience){ clearInterval(watch); fallback(); }
       else if(elapsed>45000){ clearInterval(watch); cleanup(!!committed); }
     }, 500);
   },
@@ -892,15 +909,17 @@ const Ears = {
     draw();
     return ()=>{ run=false; cv.classList.remove("on"); };
   },
-  _scribeListen(stream, onText, token, opts){
+  async _scribeListen(stream, onText, token, opts){
     const ac=new (window.AudioContext||window.webkitAudioContext)();
+    await ac.resume();
+    if(token!==this._token){ await ac.close(); return; }
     const src=ac.createMediaStreamSource(stream);
     const an=ac.createAnalyser(); an.fftSize=1024; src.connect(an);
     const buf=new Uint8Array(an.fftSize);
     const rec=new MediaRecorder(stream, this.mime()? {mimeType:this.mime()} : undefined);
     const chunks=[]; rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
     rec.start(250);
-    this.listening=true; this.setBtn("listening");
+    this.listening=true; this.setBtn("listening"); this.notice("Listening — speak, then pause. Tap listening to send.");
     Media.duck(true);
     const stopVu=this._vuStart(an);
     const t0=performance.now();
@@ -908,8 +927,8 @@ const Ears = {
     const finish=(transcribe)=>{
       if(ended) return; ended=true;
       clearInterval(iv); stopVu();
+      if(!transcribe && token===this._token) this.notice("Tap speak when you’re ready to answer.");
       this.listening=false; this._finishNow=null;
-      try{ rec.state!=="inactive" && rec.stop(); }catch(e){}
       let onstopRan=false;
       rec.onstop=async ()=>{
         if(onstopRan) return; onstopRan=true;
@@ -933,15 +952,18 @@ const Ears = {
           this.lastSpeakers=Math.max(1, ids.size||1);
           this.thinking=false; this.setBtn("idle");
           if(text && token===this._token) onText(text);
+          else if(token===this._token) this.notice("No words were detected. Tap speak to try again.");
         }catch(e){
           this.thinking=false; this.setBtn("idle");
           // two failed transcriptions in a row → stop recording pointlessly and
           // fall back to the browser's own recognition (or typing) instead
+          if(token===this._token) this.notice("Transcription could not connect. Tap speak to retry, or type.");
           this._sttFails=(this._sttFails||0)+1;
           if(this._sttFails>=2) this.sttDown=true;
         }
       };
-      if(rec.state==="inactive" && rec.onstop) rec.onstop();
+      // Wait for the final dataavailable event before transcribing.
+      if(rec.state!=="inactive") rec.stop(); else rec.onstop();
     };
     this._cleanup=()=>{ finish(false); };
     this._finishNow=()=>finish(true);
@@ -962,10 +984,10 @@ const Ears = {
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     try{
       this.rec=new SR(); this.rec.lang="en-US"; this.rec.interimResults=false; this.rec.maxAlternatives=1;
-      this.rec.onresult=e=>{ this.cancel(); if(token===this._token) onText(e.results[0][0].transcript||""); };
-      this.rec.onerror=()=>this.cancel();
-      this.rec.onend=()=>{ if(this.listening) this.cancel(); };
-      this.rec.start(); this.listening=true; this.setBtn("listening");
+      this.rec.onresult=e=>{ if(token!==this._token) return; const text=e.results[0][0].transcript||""; this.cancel(); if(text.trim()) onText(text); };
+      this.rec.onerror=e=>{ if(token!==this._token) return; this.cancel(); this.notice(e.error==="not-allowed" ? "Allow microphone access in site settings, then tap speak." : "Could not hear an answer. Tap speak to retry."); };
+      this.rec.onend=()=>{ if(token===this._token && this.listening){ this.cancel(); this.notice("Tap speak when you’re ready to answer."); } };
+      this.rec.start(); this.listening=true; this.setBtn("listening"); this.notice("Listening — speak your answer.");
     }catch(e){ this.cancel(); }
   },
   /* the person taps 🎙 while it's listening: "I'm done — send it now" */
@@ -1085,6 +1107,7 @@ function initWorld(){
   halo.scale.set(13,13,1);
   const light=new THREE.PointLight(0x9fe8d8, 1.6, 60, 1.8);
   orbGroup.add(core, glow, halo, light);
+  orbGroup.scale.setScalar(.65);
   scene.add(orbGroup);
   scene.add(new THREE.AmbientLight(0x33465a, .5));
 
@@ -1143,7 +1166,14 @@ function tick(){
     d.mesh.material.opacity*=.9985; d.life-=dt;
     if(d.life<=0){ T.scene.remove(d.mesh); T.drift.splice(i,1); }
   }
+  // Video owns the environment. Keep only interactive exercise lights over it.
+  const hidden = window.OrbVisual.showing ? [T.orbGroup,T.stars,...T.sceneObjs.map(o=>o.obj)] : [];
+  const visibility = hidden.map(o=>o.visible), background=T.scene.background;
+  hidden.forEach(o=>o.visible=false);
+  if(window.OrbVisual.showing) T.scene.background=null;
   T.renderer.render(T.scene,T.camera);
+  hidden.forEach((o,i)=>o.visible=visibility[i]);
+  T.scene.background=background;
 }
 
 /* orb color eases toward a mood-blend; always stays in soothing range */
@@ -1295,11 +1325,11 @@ const Cap={
   }
 };
 const UI={
-  hide(){ Ears.cancel(); $("#answers").classList.remove("on"); $("#sliderWrap").classList.remove("on"); $("#chips").innerHTML=""; $("#freeRow").style.display="none"; },
+  hide(){ Ears.cancel(); Ears.notice(""); $("#answers").classList.remove("on"); $("#sliderWrap").classList.remove("on"); $("#chips").innerHTML=""; $("#freeRow").style.display="none"; },
   free(placeholder, opts){
     $("#answers").classList.add("on"); $("#freeRow").style.display="flex";
     $("#txtIn").value=""; $("#txtIn").placeholder=placeholder||"…or type it here";
-    $("#micBtn").style.display = (Ears.supported && !Ears.denied)? "" : "none";
+    $("#micBtn").style.display = (Ears.supported)? "" : "none";
     // the orb listens on its own — speaking is just one of the open doors
     UI._lastListen={ fn:t=>{ $("#txtIn").value=t; submitText(t); }, opts:opts||{} };
     Ears.listen(UI._lastListen.fn, UI._lastListen.opts);
@@ -1350,7 +1380,7 @@ $("#micBtn").addEventListener("click",()=>{
   if(Ears.listening){ Ears.finishNow(); return; }     // "I'm done" — send what it heard
   if(Ears.thinking) return;
   const h=UI._lastListen;                              // re-open the ear for this question
-  if(h) Ears.listen(h.fn, h.opts);
+  if(h){ Ears.denied=false; Ears.listen(h.fn, h.opts); }
 });
 
 /* care overlay */

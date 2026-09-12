@@ -157,3 +157,16 @@ references. They do not infer improvement or treat intensity as a diagnosis.
 Deploy `orb-checkin.js` with the app and API changes; it is also used by the
 server to validate incoming check-in data. Tests cover one-use handoff, expiry,
 unknown intensity, opt-out and retained context across later visual requests.
+
+Orb microphone fixes: browser recognition now delivers a valid result before
+cancelling that listening session, and stale callbacks cannot stop the next
+question. Audio contexts explicitly resume; realtime connection failures fall
+back to recorded transcription. Recording waits for its final audio chunk.
+Permission, connection and no-speech states now offer a visible retry message.
+Real microphone permissions and provider availability require a device check.
+
+When a living video is displayed, its colors and brightness are unfiltered.
+The large 3D Orb, stars and procedural scenery are excluded from that render;
+interactive exercise lights remain. A small Orb indicator sits in the controls,
+and caption contrast is local to its text panel. Stopping video restores the
+procedural view. The opening Orb is smaller to avoid overlapping the question.

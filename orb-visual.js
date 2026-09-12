@@ -59,6 +59,7 @@
     if (epoch !== generation) return;
     await video.play();
     if (epoch !== generation) { video.pause(); return; }
+    document.body.classList.add("living-video");
     onShow?.();
     video.classList.add('on');
     if (active >= 0) {
@@ -126,6 +127,7 @@
     unavailable() { if (this.enabled && !prompt) status("Living visuals are unavailable. Your Orb can continue."); },
     finish() { ended = true; invalidate(); status('Your place is ready. Rest here as long as you like.'); },
     stop() {
+      document.body.classList.remove("living-video");
       this.enabled = false; this.showing = false; ended = true; invalidate();
       videos.forEach(v => { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); });
       videos = []; active = -1; continuity = null; $('livingControls').hidden = true;
