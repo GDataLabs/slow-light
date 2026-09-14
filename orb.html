@@ -604,8 +604,8 @@ const Eleven = {
     }
     if(!r.ok){
       let code="";try{const j=await r.json();code=j.detail?.status||j.error?.code||"";}catch{}
-      const reason=/quota|credit/.test(code)?"ElevenLabs credits or quota are exhausted.":r.status===401||r.status===403?"ElevenLabs rejected the voice credentials or permissions.":r.status===429?"ElevenLabs is busy or has reached a rate limit.":r.status===404?"The selected ElevenLabs voice is unavailable.":"ElevenLabs could not generate this line ("+r.status+").";
-      throw new Error(reason);
+      const reason=/quota|credit/.test(code)?"ElevenLabs reports a quota limit for the API key in use. Your dashboard may show a different account, workspace, or key allowance.":r.status===401||r.status===403?"ElevenLabs rejected the voice credentials or permissions.":r.status===429?"ElevenLabs is busy or has reached a rate limit.":r.status===404?"The selected ElevenLabs voice is unavailable.":"ElevenLabs could not generate this line ("+r.status+").";
+      throw new Error(reason+ (k?" This request used the key saved on this device.":" This request used the website’s configured key."));
     }
     return await r.blob();
   },

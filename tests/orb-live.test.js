@@ -196,3 +196,19 @@ test('session endpoint fixes startup settings, protects close tickets, validates
     if(previous.enabled===undefined)delete process.env.ORB_LIVE_ENABLED;else process.env.ORB_LIVE_ENABLED=previous.enabled;
   }
 });
+
+test('live startup explains upstream failures without exposing raw errors or credentials',async()=>{
+  for(const [status,code,expected] of [[401,'invalid_api_key',/rejected.*API key/],[403,'model_not_found',/cannot access GPT-Live/],[429,'insufficient_quota',/insufficient API quota/],[400,'invalid_request_error',/configuration/]]){
+    const logs=[],result={};
+    const context=vm.createContext({module:{exports:{}},require,Buffer,URL,AbortSignal,
+      process:{env:{OPENAI_API_KEY:'private-test-key',ORB_LIVE_ENABLED:'true'}},
+      console:{warn:(...args)=>logs.push(args)},
+      fetch:async()=>({ok:false,status,headers:{get:()=> 'req_test'},json:async()=>({error:{code,param:'session.audio',message:'private-test-key secret raw details'}})})});
+    vm.runInContext(fs.readFileSync('api/orb-live.js','utf8'),context);
+    await context.module.exports({method:'POST',headers:{host:'example.com',origin:'https://example.com'},body:{action:'start',sdp:'v=0'}},
+      {setHeader(){},status(code){result.status=code;return this;},json(body){result.body=body;}});
+    assert.equal(result.status,502);assert.match(result.body.error,expected);
+    assert.equal(result.body.diagnostic.code,code);assert.equal(result.body.diagnostic.requestId,'req_test');
+    assert.doesNotMatch(JSON.stringify([result,logs]),/private-test-key|secret raw details/);
+  }
+});

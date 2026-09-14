@@ -39,3 +39,18 @@ test('blocked preferred audio rejects and releases its media resources',async()=
   await assert.rejects(context.eleven.play({}),/browser blocked/);
   assert.deepEqual(revoked,['blob:voice']);assert.equal(audio[0].paused,true);assert.equal(context.eleven.audio,null);
 });
+
+test('quota errors identify the credential source without claiming all account credits are gone',async()=>{
+  for(const key of ['', 'private-device-key']){
+    const context={EL_API:'https://api.elevenlabs.io',elBase:()=>'/api/eleven',elHeaders:x=>x,AbortSignal,
+      fetch:async()=>({ok:false,status:401,json:async()=>({detail:{status:'quota_exceeded'}})})};
+    vm.createContext(context);
+    const start=html.indexOf('const Eleven = {'),end=html.indexOf('\n};',start)+3;
+    vm.runInContext(html.slice(start,end)+';globalThis.eleven=Eleven;',context);
+    await assert.rejects(context.eleven.fetchClip({key,voice:'preferred'},'Welcome'),error=>{
+      assert.match(error.message,/quota limit for the API key/);
+      assert.match(error.message,key?/saved on this device/:/website’s configured key/);
+      assert.doesNotMatch(error.message,/private-device-key|are exhausted/);return true;
+    });
+  }
+});

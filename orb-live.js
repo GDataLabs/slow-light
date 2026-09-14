@@ -216,7 +216,7 @@
         const result = await response.json();
         if (!response.ok || !result.enabled) throw new Error('unavailable');
         checkbox.disabled = false;
-        document.getElementById('liveAvailability').textContent = 'Available for this visit. Leave unchecked to compare with the usual voice.';
+        document.getElementById('liveAvailability').textContent = 'Configured on this website; connection is checked when you begin. Select this option to try GPT-Live.';
       } catch {
         checkbox.checked = false; checkbox.disabled = true;
         document.getElementById('liveAvailability').textContent = location.hostname === '127.0.0.1' || location.hostname === 'localhost' ? 'Live voice is unavailable in this local preview. Your Vercel settings apply at slow-light.vercel.app/orb.html.' : 'Live voice isn’t available here yet. The usual check-in is ready.';

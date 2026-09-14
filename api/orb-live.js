@@ -80,7 +80,21 @@ module.exports = async (req, res) => {
       }, transport: { type: 'webrtc', sdp: body.sdp } }),
       signal: AbortSignal.timeout(20000)
     });
-    if (!upstream.ok) return res.status(502).json({ error: 'Live voice could not connect. Please use the usual check-in.' });
+    if (!upstream.ok) {
+      const detail = await upstream.json().catch(() => ({}));
+      const code = typeof detail.error?.code === 'string' ? detail.error.code : '';
+      const reason = code === 'insufficient_quota' ? 'The OpenAI project used by this website has insufficient API quota.'
+        : upstream.status === 401 ? 'OpenAI rejected the website’s API key.'
+        : upstream.status === 403 || code === 'model_not_found' ? 'The website’s OpenAI project cannot access GPT-Live 1.'
+        : upstream.status === 429 ? 'OpenAI temporarily limited live session requests. Please try again shortly.'
+        : upstream.status === 400 ? 'OpenAI rejected the live session configuration.'
+        : 'OpenAI could not start the live session.';
+      // Only bounded diagnostic identifiers, never keys, SDP, transcripts, or raw errors.
+      const safe = value => typeof value === 'string' && /^[a-zA-Z0-9_.-]{1,120}$/.test(value) ? value : null;
+      const diagnostic = { status: upstream.status, code: safe(code), parameter: safe(detail.error?.param), requestId: safe(upstream.headers?.get('x-request-id')) };
+      console.warn('Orb live startup rejected', diagnostic);
+      return res.status(502).json({ error: reason + ' (HTTP ' + upstream.status + '). The usual check-in is still available.', diagnostic });
+    }
     const result = await upstream.json();
     if (!result.session?.id || !result.transport?.sdp) throw new Error('Invalid Live response');
     return res.status(201).json({ sdp: result.transport.sdp, ticket: closeTicket(result.session.id, key), maxSeconds: 180 });
