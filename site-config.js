@@ -12,6 +12,8 @@
     // The orb's mind: same-site on Vercel; everywhere else (github.io, localhost) borrows Vercel's.
     world: onVercel ? "/api/orb-world" : vercel + "/api/orb-world",
     video: onVercel ? "/api/orb-video" : vercel + "/api/orb-video",
+    // Live voice uses a local function for local development; Pages borrows Vercel's.
+    live: /github\.io$/.test(location.hostname) ? vercel + "/api/orb-live" : "/api/orb-live",
     brain: onVercel ? "/api/orb" : vercel + "/api/orb"
   };
 })();

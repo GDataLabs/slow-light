@@ -4,6 +4,7 @@
   "private": true,
   "description": "Slow Light — a multi-sensory relaxation space. Static site plus the ElevenLabs proxy function in api/.",
   "scripts": {
+    "dev": "node scripts/dev.cjs",
     "start": "python3 -m http.server 8765 --bind 127.0.0.1",
     "test": "node --test tests/*.test.js",
     "vendor:three": "node scripts/vendor-three.cjs"

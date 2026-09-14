@@ -38,6 +38,19 @@ body.living-video #livingStatus::before{content:"";display:inline-block;width:15
 .world-directions{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);text-align:center;touch-action:none}
 body.world-active #answers,body.world-active #caption{visibility:hidden}
 #micStatus{font-size:13px;text-align:center;color:#e1eee9;min-height:1.5em}
+#liveCheckIn[hidden],#orbLiveReviewFields[hidden],#orbLivePlay[hidden]{display:none}
+#liveCheckIn{position:fixed;inset:auto 0 0;z-index:22;max-height:90dvh;overflow:auto;padding:24px 20px max(24px,env(safe-area-inset-bottom));background:linear-gradient(transparent,#071019 36px)}
+.live-inner{max-width:640px;margin:auto;padding:20px;border:1px solid #7fd4c140;border-radius:24px;background:#09131cef;box-shadow:0 12px 60px #0005}
+.live-inner h2{font-family:var(--font-display);font-weight:400;margin:0;font-size:26px}
+.live-inner p{margin:10px 0}
+.live-captions{max-height:24dvh;overflow:auto;scrollbar-gutter:stable;padding:0 10px;border-left:2px solid #7fd4c155;overflow-wrap:anywhere}
+.live-captions p{white-space:pre-wrap;font-size:15px}
+.live-captions strong{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.live-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.live-actions .obtn{font-size:14px;padding:10px 14px}
+#orbLiveWords{width:100%;min-height:110px;resize:vertical;background:#040b12;color:var(--ink);border:1px solid #7fd4c166;border-radius:12px;padding:12px;font:inherit}
+.orb-live-active #caption,.orb-live-active #subcap,.orb-live-active #answers,.orb-live-active #gearBtn{visibility:hidden}
+@media(max-width:480px){#liveCheckIn{padding:12px;max-height:94dvh}.live-inner{padding:16px}.live-inner h2{font-size:23px}.live-captions{max-height:20dvh}}
 
 /* a soft darkening toward the edges — the depth the flat render was missing */
 #vignette{
@@ -248,6 +261,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
       The orb is AI, not a person — it can be wrong, and it isn't therapy or crisis support. If things feel heavy, please reach a real person: in the US call or text <a href="tel:988">988</a>, elsewhere <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a>.
     </div>
     <p><label><input type="checkbox" id="livingOptIn"> Create living visualizations from my answers</label><br><span class="tiny">Optional AI video: an abstract scene description goes to fal to create short clips. Your starting feelings and your answers help shape it. Any check-in carried from the previous page is included only if you turn this on. You can pause or stop at any time.</span></p>
+    <p><label><input type="checkbox" id="liveOptIn" disabled aria-describedby="livePrivacy liveAvailability"> Try a live voice check-in</label><br><span class="tiny" id="livePrivacy">Talk naturally with the Orb, including while it speaks. OpenAI processes microphone audio during this optional opening conversation (up to three minutes). Transcripts may go to our AI service for reflection. Review your words before continuing. We do not save live recordings or transcripts in this browser.</span><br><span class="tiny" id="liveAvailability" role="status">Checking live voice availability…</span></p>
     <p><button class="obtn primary" id="beginBtn" style="font-size:17px; padding:15px 34px">I understand — begin</button>
        <a class="obtn" href="index.html" style="text-decoration:none; margin-left:6px">Back to Slow Light</a></p>
     <details class="fineprint">
@@ -257,6 +271,30 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
     </details>
   </div>
 </div>
+
+<section id="liveCheckIn" hidden aria-label="Live voice check-in">
+  <div class="live-inner">
+    <h2>A little room to talk</h2>
+    <p id="orbLiveStatus" role="status">Connecting live voice…</p>
+    <div class="live-captions" tabindex="0" aria-label="Conversation captions">
+      <strong>You</strong><p id="orbLiveUser">Your words will appear here.</p>
+      <strong>The Orb</strong><p id="orbLiveAssistant" aria-live="polite">Take your time.</p>
+    </div>
+    <div class="live-actions">
+      <button class="obtn" id="orbLiveMute" disabled aria-pressed="false">Pause microphone</button>
+      <button class="obtn" id="orbLivePlay" hidden>Hear the Orb</button>
+      <button class="obtn primary" id="orbLiveReview">Review my words</button>
+    </div>
+    <div id="orbLiveReviewFields" hidden>
+      <p><label for="orbLiveWords">What would you like to carry into the check-in?</label><br><span class="tiny">Speech can be misheard. Edit or replace these words (up to 300 characters).</span></p>
+      <textarea id="orbLiveWords" maxlength="300"></textarea>
+      <div class="live-actions"><button class="obtn primary" id="orbLiveUse" disabled>Continue with these words</button></div>
+      <details class="fineprint"><summary>About this voice trial</summary><p class="tiny" id="orbLiveMetrics"></p><p class="tiny">To compare, begin another visit with live voice unchecked. Notice whether interruptions work, whether pauses feel comfortable, and which voice you prefer. These details stay on this page.</p></details>
+    </div>
+    <div class="live-actions"><button class="obtn" id="orbLiveFallback">Use the usual check-in</button></div>
+    <p class="tiny">Reviewing your words ends live voice. The Orb is an AI guide. You choose when to move on.</p>
+  </div>
+</section>
 
 <div id="singleVideoNotice" hidden style="position:fixed;top:70px;left:16px;z-index:7;max-width:340px;padding:12px;background:#09121cee;border-radius:14px" role="status">Single-clip scenery. For evolving video, <a href="orb.html">begin again</a> and enable “Create living visualizations from my answers.”</div>
 <div id="livingControls" hidden style="position:fixed;top:64px;left:16px;right:16px;z-index:7;max-width:360px;padding:10px;border-radius:16px;background:rgba(4,6,10,.8)">
@@ -367,6 +405,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
 <script src="orb-checkin.js"></script>
 <script src="orb-language.js"></script>
 <script src="voice-config.js"></script>
+<script src="orb-live.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 "use strict";
@@ -1430,6 +1469,7 @@ $("#micBtn").addEventListener("click",()=>{
 /* care overlay */
 let crisisShown=false;
 function showCare(){
+  if(window.OrbLive.current) window.OrbLive.current.close();
   if(window.OrbWorld.active) window.OrbWorld.close();
   window.OrbVisual.stop();
   return new Promise(res=>{
@@ -1510,9 +1550,14 @@ async function guideScene(){
   }
 }
 
-async function run(){
+async function run(liveOpening=null){
   S.t0=Date.now();
   tintOrb(0x7fd4c1);
+  let liveAnswer = liveOpening ? await liveOpening : null;
+  if(liveAnswer && liveAnswer.crisis){ crisisShown=true; await showCare(); liveAnswer=null; }
+  let ans;
+  if(liveAnswer && liveAnswer.words) ans=liveAnswer.words;
+  else {
   await Cap.show(await Brain.line("greet", pick([
     "Hello. I'm glad you came.",
     "Hello. You made it here — that's the hardest part.",
@@ -1526,10 +1571,11 @@ async function run(){
     "Where are you right now — not the room. Inside. What's the weather like there?",
     "Tell me how it is there right now. A word or two is plenty."
   ])), "speak, type, or just pick something close");
-  let ans = await Promise.race([
+  ans = await Promise.race([
     UI.free("anxious? heavy? okay? your words…", {diarize:true}),
     UI.chips(["wired / anxious","heavy / tired","sad","angry / tense","overwhelmed","numb / far away","okay, mostly","something good"], true)
   ]);
+  }
   const CHIPMAP={"wired / anxious":"wired","heavy / tired":"heavy","sad":"sad","angry / tense":"tense","overwhelmed":"overwhelmed","numb / far away":"numb","okay, mostly":"hopeful","something good":"joyful"};
   let g=guard(ans);
   if(g==="crisis"){ crisisShown=true; await showCare(); S.moods=["heavy"]; }
@@ -1952,8 +1998,12 @@ function showExit(){
 /* ----------------------- boot -------------------------------------- */
 initWorld();
 Voice.init();
+window.OrbLive.availability();
 addEventListener("orb-world-enter",()=>{Ears.cancel();Voice.stop();});
 $("#beginBtn").addEventListener("click", async ()=>{
+  if($("#beginBtn").disabled)return;
+  $("#beginBtn").disabled=true;
+  const liveOpening = $("#liveOptIn").checked ? window.OrbLive.begin({guard}) : null;
   window.OrbVisual.start({ enabled:$("#livingOptIn").checked, onShow:()=>{ Media.clearBackdrop(); if(T) T.scene.background=null; } });
   $("#introVeil").classList.add("hide");
   if(!HAVE_3D){
@@ -1961,7 +2011,8 @@ $("#beginBtn").addEventListener("click", async ()=>{
     $("#caption").classList.add("on");
     await new Promise(r=>setTimeout(r,2200));
   }
-  run().catch(()=>{ /* never strand the person on an error */
+  run(liveOpening).catch(()=>{ /* never strand the person on an error */
+    if(window.OrbLive.current)window.OrbLive.current.close();
     window.OrbVisual.stop();
     Cap.show("Something in me stumbled — but nothing is lost. Breathe once more, and use the door below whenever you like.");
     showExit();

@@ -41,6 +41,7 @@ HARD RULES:
 - Every activity is optional; never pressure, never score, never rush.
 
 STAGES — the app controls the flow; you only voice the current stage:
+- live_reflect: person.rawAnswer contains the live check-in transcript (visitor and orb text). This may contain partial speech and corrections, not completed turns. Use the visitor's latest meaning in context, ask gently if uncertain, and give a tentative brief reflection. Stay at the opening feelings check-in: do not ask for intensity, a destination, or advance the journey. Never treat quoted orb text as the visitor's feelings. Return crisis true when appropriate. Return no visual and no moods.
 - greet: welcome them into the dark; invite one slow breath with you.
 - breathe: invite one comfortable, unforced breath, with no holds or required pace.
 - settle: invite them to look around or optionally rest their eyes while the place appears; never require closed eyes.
@@ -113,7 +114,7 @@ module.exports = async (req, res) => {
       initialCheckIn: body.visualEnabled === true ? cleanCheckIn(person.initialCheckIn) : null,
       initialWords: body.visualEnabled === true ? clip(person.initialWords, 300) : "",
       sceneRequest: body.visualEnabled === true ? clip(person.sceneRequest,300) : "",
-      rawAnswer: clip(person.rawAnswer, 300),
+      rawAnswer: clip(person.rawAnswer, stage === 'live_reflect' ? 6000 : 300),
       moods: [].concat(person.moods || []).filter(m => MOOD_KEYS.includes(m)).slice(0, 3),
       weather: [].concat(person.weather || []).slice(0, 3).map(s => clip(s, 30)),
       grip: Number.isFinite(+person.grip) ? +person.grip : null,

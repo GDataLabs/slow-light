@@ -300,3 +300,15 @@ that the model fulfilled the instruction; the person is asked to assess it.
 Question controls state the expected input. Slider speech that isn't a number
 now asks for clarification instead of silently routing it elsewhere. The slider
 has a microphone retry button. Listening is cancelled before a caption is spoken.
+# Optional live Orb check-in
+
+The Orb now includes an opt-in GPT-Live 1 opening conversation. It supports
+interruptions, captions, microphone pause, and an editable review before the
+usual journey continues. Live voice ends before the quiet exercises.
+
+Run `npm run dev` for the local site and API. Enable the trial with the
+server-only `OPENAI_API_KEY` and `ORB_LIVE_ENABLED=true` settings described in
+[DEPLOY.md](DEPLOY.md#GPT-Live-opening-check-in-optional-prototype). Without them,
+the usual voice remains available. Automated tests cover the connection lifecycle,
+late responses, transcript handling, review, and recovery; live voice quality and
+account access still require a real microphone session.
