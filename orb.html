@@ -366,7 +366,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
       <h3 style="font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); margin:20px 0 10px">Generated scenery</h3>
       <label style="display:flex; gap:10px; align-items:flex-start; margin:0 0 12px; cursor:pointer">
         <input type="checkbox" id="elAmb" style="margin-top:4px; accent-color:#7fd4c1; width:17px; height:17px">
-        <span style="font-size:14.5px; color:var(--ink-dim)"><b style="color:var(--ink); font-weight:500">Ambient sound</b><br><span class="tiny">A soft generated soundscape for each place — water, night air, dawn wind. Looped and cached, so each one is made once.</span></span>
+        <span style="font-size:14.5px; color:var(--ink-dim)"><b style="color:var(--ink); font-weight:500">Ambient sound</b><br><span class="tiny">Environmental sound from your video, with a quiet looping ambience underneath.</span></span>
       </label>
       <div class="field">
         <label>Backdrop behind the 3D space</label>
@@ -519,7 +519,7 @@ const Brain={
         rawAnswer:window.OrbVisual.enabled && stage==="scene_intro" ? S.visualAnswer||"" : "",
         moods:S.moods||[], weather:(S.moods||[]).map(k=>MOODS[k]&&MOODS[k].weather).filter(Boolean),
         grip:S.grip, gripEnd:S.gripEnd, goalFeel:S.goalFeel||"", people:S.people||1,
-        sceneKey:S.sceneKey||null, soundscape:Media.ambKey||null, released:S.released||[], ...(extra||{}) } };
+        sceneDescription:S.sceneDescription||"", sceneKey:S.sceneKey||null, soundscape:Media.ambKey||null, released:S.released||[], ...(extra||{}) } };
       const r=await fetch(this.base(),{method:"POST",signal:ctl.signal,
         headers:{"Content-Type":"application/json"}, body:JSON.stringify(ctx)});
       clearTimeout(to);
@@ -530,7 +530,10 @@ const Brain={
       if(j.crisis) { this.crisisFlag=true; window.OrbVisual.stop(); }
       else if(j.visual) {
         Media.queueSound(j.visual,j.soundscape || (stage==="scene_intro" ? S.sceneKey : "quiet"));
-        if(window.OrbVisual.update(j.visual)) this.lastVisual=j.visual;
+        if(window.OrbVisual.update(j.visual)) {
+          this.lastVisual=j.visual;
+          if(typeof j.sceneDescription==="string")S.sceneDescription=j.sceneDescription.slice(0,900);
+        }
       }
       else if(stage==="scene_intro") window.OrbVisual.unavailable();
       this.lastMoods=Array.isArray(j.moods)? j.moods.filter(k=>MOODS[k]) : [];
@@ -1711,9 +1714,10 @@ async function run(liveOpening=null){
 
   /* choose + build the space */
   const domGroup = S.moods[0];
-  const sceneKey = S.goalFeel==="grounded"? "meadow" : S.goalFeel==="lighter"? "dawn" :
+  const sceneKey = window.OrbVisual.enabled ? "bespoke" : S.goalFeel==="grounded"? "meadow" : S.goalFeel==="lighter"? "dawn" :
                    (domGroup==="wired"||domGroup==="overwhelmed"||domGroup==="tense")? "underwater" : pick(["underwater","meadow"]);
-  const sc=SCENES[sceneKey];
+  const sc=sceneKey==="bespoke" ? {build:()=>{},line:"Let a place take shape from what you imagined."} : SCENES[sceneKey];
+  S.sceneDescription="";
   S.sceneKey=sceneKey;
   // start growing the place's generated sound and scenery now, so they can
   // arrive softly while the person's eyes are closed (all fire-and-forget)
@@ -1723,7 +1727,7 @@ async function run(liveOpening=null){
   const openingTicket=Brain.lastVisual;
   await Cap.show(await Brain.line("settle", "Let this place come into view at your own pace."));
   await fadeSwap(sc.build);
-  await Cap.show(await Brain.line("arrive", `This place is yours — it didn't exist before tonight, and no one else will ever stand in it.`));
+  await Cap.show(await Brain.line("arrive", `Take a moment to notice what draws your attention here.`));
 
   if(window.OrbVisual.enabled){
     await sceneCheckpoint(openingTicket);
