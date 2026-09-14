@@ -272,6 +272,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
   </div>
 </div>
 
+<div id="voiceRecovery" hidden style="position:fixed;top:60px;left:16px;right:16px;max-width:560px;z-index:25;padding:14px;border-radius:16px;background:#09131cf5;border:1px solid #7fd4c166"><p id="voiceError" role="status"></p><p id="voiceRecoveryLine"></p><button class="obtn" id="voiceRetry">Retry preferred voice</button> <button class="obtn" id="voiceBrowser">Use browser voice</button> <button class="obtn" id="voiceRead">Continue without this audio</button></div>
 <div id="voiceModeStatus" role="status" style="position:fixed;top:14px;left:16px;z-index:23;max-width:65vw;font-size:13px;color:#c9f2e6;pointer-events:none"></div>
 <section id="liveCheckIn" hidden aria-label="Live voice check-in">
   <div class="live-inner">
@@ -596,34 +597,49 @@ const Eleven = {
       if(withSpeed) vs.speed=.87;                      // unhurried; retried without if the model refuses it
       return JSON.stringify({text, model_id:"eleven_turbo_v2_5", voice_settings:vs});
     };
-    let r=await fetch(url,{method:"POST",headers:hdr({"Content-Type":"application/json"}),body:body(this.useSpeed)});
+    let r=await fetch(url,{method:"POST",headers:hdr({"Content-Type":"application/json"}),body:body(this.useSpeed),signal:AbortSignal.timeout(15000)});
     if(!r.ok && this.useSpeed && (r.status===400||r.status===422)){
       this.useSpeed=false;
-      r=await fetch(url,{method:"POST",headers:hdr({"Content-Type":"application/json"}),body:body(false)});
+      r=await fetch(url,{method:"POST",headers:hdr({"Content-Type":"application/json"}),body:body(false),signal:AbortSignal.timeout(15000)});
     }
-    if(!r.ok) throw new Error("elevenlabs "+r.status);
+    if(!r.ok){
+      let code="";try{const j=await r.json();code=j.detail?.status||j.error?.code||"";}catch{}
+      const reason=/quota|credit/.test(code)?"ElevenLabs credits or quota are exhausted.":r.status===401||r.status===403?"ElevenLabs rejected the voice credentials or permissions.":r.status===429?"ElevenLabs is busy or has reached a rate limit.":r.status===404?"The selected ElevenLabs voice is unavailable.":"ElevenLabs could not generate this line ("+r.status+").";
+      throw new Error(reason);
+    }
     return await r.blob();
   },
   async say(cfg, text){
+    const epoch=this.epoch||0;
     const k=await this.hash(this.voiceId(cfg)+"|"+(this.useSpeed?"s":"n")+"|"+text);
     let blob=await TTSCache.get(k);
     if(!blob){ blob=await this.fetchClip(cfg, text); TTSCache.put(k, blob); }
-    await this.play(blob);
+    if(epoch===(this.epoch||0))await this.play(blob);
   },
   play(blob){
-    return new Promise(res=>{
+    this.stop();
+    return new Promise((resolve,reject)=>{
+      let url,a,timer,done=false;
+      const finish=error=>{
+        if(done)return;done=true;clearTimeout(timer);
+        if(a){a.onended=a.onerror=null;try{a.pause();}catch{}}
+        if(url)URL.revokeObjectURL(url);
+        if(this.audio===a)this.audio=null;
+        if(this.finish===finish)this.finish=null;
+        error?reject(error):resolve();
+      };
+      this.finish=finish;
       try{
-        this.stop();
-        const url=URL.createObjectURL(blob);
-        const a=this.audio=new Audio(url);
-        a.onended=()=>{ URL.revokeObjectURL(url); res(); };
-        a.onerror=()=>{ URL.revokeObjectURL(url); res(); };
-        a.play().catch(()=>res());
-        setTimeout(res, 45000);                         // never hang the flow
-      }catch(e){ res(); }
+        url=URL.createObjectURL(blob);a=this.audio=new Audio(url);
+        a.onended=()=>finish();
+        a.onerror=()=>finish(Error("The preferred voice audio could not load."));
+        timer=setTimeout(()=>finish(Error("The preferred voice playback stalled.")),45000);
+        a.play().catch(()=>finish(Error("The browser blocked the preferred voice. Tap Retry preferred voice to enable playback.")));
+      }catch(error){finish(error);}
     });
   },
-  stop(){ try{ if(this.audio){ this.audio.pause(); this.audio=null; } }catch(e){} }
+  stop(){this.epoch=(this.epoch||0)+1;this.finish?.();try{this.audio?.pause();}catch{}this.audio=null;}
+
 };
 
 /* ------------------- generated scenery (ElevenLabs) ----------------- */
@@ -688,7 +704,7 @@ const Media={
       const btn=$("#ambBtn"); btn.classList.add("show"); btn.classList.toggle("off",this.ambMuted);
       this.ambFade=setInterval(()=>{
         if(this.amb!==a || epoch!==this.ambEpoch){clearInterval(this.ambFade);return;}
-        const target=this.ambDucked?.07:.3;
+        const target=this.ambDucked?.025:.08;
         a.volume=Math.min(target,a.volume+.02);
         if(a.volume>=target){clearInterval(this.ambFade);this.ambFade=null;}
       },140);
@@ -700,7 +716,8 @@ const Media={
     clearInterval(this.ambFade);this.ambFade=null;
     try{if(this.amb){this.amb.pause();URL.revokeObjectURL(this.amb.src);this.amb=null;}}catch(e){}
   },
-  duck(on){ this.ambDucked=on; try{if(this.amb)this.amb.volume=on?.07:.3;}catch(e){} },
+  syncAudio(retry=false){window.OrbVisual.setAudio({enabled:!!Voice.cfg.ambience,muted:this.ambMuted,ducked:this.ambDucked,retry});},
+  duck(on){ this.ambDucked=on; try{if(this.amb)this.amb.volume=on?.025:.08;}catch(e){} this.syncAudio(); },
   /* ---- generated backdrops (async flows API, polled) ---- */
   async poll(kind,id,everyMs,maxMs){
     const t0=Date.now();
@@ -784,9 +801,10 @@ const Media={
   clearBackdrop(){ $("#singleVideoNotice").hidden=true; $("#bdImg").classList.remove("on"); $("#bdVid").classList.remove("on"); try{ $("#bdVid").pause(); }catch(e){} }
 };
 $("#ambBtn").addEventListener("click",()=>{
-  if(!Media.amb) return;
-  if(Media.amb.paused){ Media.ambMuted=false; Media.amb.play().catch(()=>{}); $("#ambBtn").classList.remove("off"); }
-  else { Media.ambMuted=true; Media.amb.pause(); $("#ambBtn").classList.add("off"); }
+  Media.ambMuted=window.OrbVisual.audioBlocked?false:!Media.ambMuted;
+  if(Media.amb){if(Media.ambMuted)Media.amb.pause();else Media.amb.play().catch(()=>{});}
+  $("#ambBtn").classList.toggle("off",Media.ambMuted);
+  Media.syncAudio(!Media.ambMuted);
 });
 
 const Voice = {
@@ -800,12 +818,36 @@ const Voice = {
     };
     if("speechSynthesis" in window){ load(); speechSynthesis.onvoiceschanged=load; }
   },
+  recover(error,text){
+    $("#voiceModeStatus").textContent="Preferred voice unavailable · No automatic voice switch";
+    $("#voiceError").textContent=(error?.name==="TimeoutError"?"The preferred voice took too long to respond.":error?.message||"The preferred voice could not play.")+" Your words remain on screen.";
+    $("#voiceRecoveryLine").textContent=text;
+    $("#voiceRecovery").hidden=false;
+    return new Promise(resolve=>{
+      this.recovery=choice=>{this.recovery=null;$("#voiceRecovery").hidden=true;resolve(choice);};
+      $("#voiceRetry").onclick=()=>this.recovery?.("retry");
+      $("#voiceBrowser").onclick=()=>this.recovery?.("browser");
+      $("#voiceRead").onclick=()=>this.recovery?.("read");
+    });
+  },
   async say(text){
-    if(this.elFailed && Date.now()-(this._elFailedAt||0)>20000) this.elFailed=false;  // give it another chance soon
-    if(this.cfg.engine==="eleven" && elReady() && Eleven.voiceId(this.cfg) && !this.elFailed){
-      try{ await Eleven.say(this.cfg, text); return; }
-      catch(e){ this.elFailed=true; this._elFailedAt=Date.now(); /* fall through to browser voice, never silence */ }
+    const epoch=this.epoch||0;
+    if(this.cfg.engine==="eleven" && !this.browserForVisit){
+      for(;;){
+        try{
+          if(!elReady() || !Eleven.voiceId(this.cfg))throw Error("The preferred voice is not configured.");
+          $("#voiceModeStatus").textContent="Guided voice · ElevenLabs";
+          await Eleven.say(this.cfg,text);return;
+        }catch(error){
+          if(epoch!==(this.epoch||0))return;
+          const choice=await this.recover(error,text);
+          if(choice==="retry")continue;
+          if(choice==="read"){$("#voiceModeStatus").textContent="Guided words · On screen";return;}
+          this.browserForVisit=true;break;
+        }
+      }
     }
+    $("#voiceModeStatus").textContent="Guided voice · Browser voice";
     await this.browserSay(text);
   },
   browserSay(text){
@@ -822,7 +864,7 @@ const Voice = {
       }catch(e){ setTimeout(res, Math.max(1400, text.length*55)); }
     });
   },
-  stop(){ try{ speechSynthesis.cancel(); }catch(e){} Eleven.stop(); }
+  stop(){ this.epoch=(this.epoch||0)+1;this.recovery?.("read");try{ speechSynthesis.cancel(); }catch(e){} Eleven.stop(); }
 };
 
 /* Listening. Two engines: ElevenLabs Scribe (records a short clip, sends it
@@ -1430,7 +1472,8 @@ const Cap={
     const sc=$("#subcap");
     if(sub){ sc.textContent=sub; sc.classList.add("on"); } else sc.classList.remove("on");
     $("#turnStatus").textContent="The Orb is speaking. Your turn follows this line.";
-    await Voice.say(text);
+    Media.duck(true);
+    try{await Voice.say(text);}finally{Media.duck(false);}
   }
 };
 const UI={
@@ -1982,8 +2025,9 @@ function showExit(){
   $("#voxSave").addEventListener("click",()=>{
     const c=formCfg();
     if(c.engine==="eleven" && !c.key && !proxySet()){ status.textContent="No ElevenLabs key is set up on this device, so the browser voice will be used."; status.className="bad"; return; }
-    Voice.cfg=c; Voice.elFailed=false; Eleven.useSpeed=true; VoiceCfg.save(c);
+    Voice.cfg=c; Voice.browserForVisit=false; Voice.elFailed=false; Eleven.useSpeed=true; VoiceCfg.save(c);
     if(!c.ambience) Media.stopAmb();
+    Media.syncAudio();
     if(c.backdrop==="off") Media.clearBackdrop();
     status.textContent="Saved. The orb will use this from its next line."; status.className="ok";
   });
@@ -2043,7 +2087,7 @@ $("#beginBtn").addEventListener("click", async ()=>{
   if($("#beginBtn").disabled)return;
   $("#beginBtn").disabled=true;
   const liveOpening = $("#liveOptIn").checked ? window.OrbLive.begin({guard}) : null;
-  window.OrbVisual.start({ enabled:$("#livingOptIn").checked, onShow:(ticket)=>{ Media.showSound(ticket); Media.clearBackdrop(); if(T) T.scene.background=null; } });
+  window.OrbVisual.start({ enabled:$("#livingOptIn").checked, onShow:(ticket)=>{ Media.syncAudio();$("#ambBtn").classList.add("show"); Media.showSound(ticket); Media.clearBackdrop(); if(T) T.scene.background=null; } });
   $("#introVeil").classList.add("hide");
   if(!HAVE_3D){
     $("#caption").textContent="The 3D space couldn't load here — but the words and breathing still work.";

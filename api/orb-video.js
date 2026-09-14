@@ -59,7 +59,7 @@ module.exports = async (req, res) => {
         : ticket.prompt;
       const j = await call(queue + 'minimax/h3-max/' + (continuity ? 'image-to-video' : 'text-to-video'), 'POST', {
         ...(continuity ? { image_url: body.frame } : { aspect_ratio: '16:9' }),
-        prompt: direction, duration, resolution: '480P',
+        prompt: direction + " Audio: quiet natural environmental sounds synchronized with what is visible. Gentle restrained volume, no sudden loud sounds. No speech, dialogue, narration, singing, or music. Do not carry water sounds into an aerial or dry environment.", duration, resolution: '480P',
         enable_safety_checker: true, prompt_expansion_mode: 'balanced'
       });
       const job = { kind: 'job', anchor, first: continuity?.first || null, status: safeURL(j.status_url), result: safeURL(j.response_url), cancel: safeURL(j.cancel_url) };

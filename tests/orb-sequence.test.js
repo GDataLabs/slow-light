@@ -117,3 +117,23 @@ test('video journey builds its fallback without a full-screen black veil',async(
   vm.runInContext(code,context);await context.fadeSwap(()=>built++);
   assert.equal(built,1);assert.equal(cleared,1);
 });
+
+test('native sound follows the displayed video and respects mute and narration duck',async()=>{
+  const f=fixture({manualFrames:true});
+  try{
+    f.view.start({enabled:true});f.view.setAudio({enabled:true});f.view.update('opening');
+    await until(()=>f.playback.length===1);
+    const first=f.playback[0];assert.equal(first.muted,true);
+    first.firstFrame();await until(()=>f.view.showing);
+    assert.equal(first.muted,false);assert.equal(first.volume,.22);
+    f.view.setAudio({ducked:true});assert.equal(first.volume,.045);
+    f.view.setAudio({muted:true});assert.equal(first.muted,true);
+    f.view.setAudio({muted:false,ducked:false});assert.equal(first.muted,false);
+    first.ended=true;first.events.ended?.();first.onended();
+    await until(()=>f.playback.some(v=>v!==first));
+    const next=f.playback.find(v=>v!==first);assert.equal(next.muted,true);
+    next.firstFrame();await until(()=>next.muted===false);
+    assert.equal(first.muted,true);assert.equal(first.volume,0);
+    f.view.setAudio({enabled:false});assert.equal(next.muted,true);
+  }finally{f.cleanup();}
+});

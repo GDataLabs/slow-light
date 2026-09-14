@@ -8,6 +8,16 @@
   const waiters=new Set();
   const notify=(ticket)=>{for(const fn of [...waiters])fn(ticket);};
   let hold, retireTimer, retireDone, retired=Promise.resolve();
+  let audioEnabled=false,audioMuted=false,audioDucked=false,audioBlocked=false;
+  function mixAudio(){
+    for(const v of videos){v.volume=v===videos[active] ? (audioDucked?.045:.22) : 0;v.muted=!audioEnabled || audioMuted || audioBlocked || v!==videos[active];}
+  }
+  function startAudio(){
+    mixAudio();
+    const v=videos[active];
+    if(!v || v.ended || paused || document.hidden || !audioEnabled || audioMuted || audioBlocked)return;
+    v.play().catch(()=>{if(v!==videos[active])return;audioBlocked=true;mixAudio();v.play().catch(()=>{});status("Environmental audio was blocked. Tap the sound button to try again.");});
+  }
   let timer, controller, videos = [], active = -1, count = 0, paused = false, ended = false, onShow;
   const status = text => { $('livingStatus').textContent = text; };
   const api = async (action, ticket, signal, previous, frame) => {
@@ -129,6 +139,7 @@
     video.poster=frame;
     video.classList.add('on');
     active=next;view.showing=true;
+    mixAudio();
     video.onended=()=>{
       if(!view.enabled || videos[active]!==video)return;
       hold.src=frame;hold.classList.add('on');
@@ -136,6 +147,7 @@
     };
     document.body.classList.add('living-video');
     onShow?.(ticket);
+    startAudio();
     if(old)retired=new Promise(resolve=>{
       retireDone=resolve;
       retireTimer=setTimeout(()=>{
@@ -197,6 +209,13 @@
   }
   const view = window.OrbVisual = {
     enabled: false, showing: false,
+    get audioBlocked(){return audioBlocked;},
+    setAudio({enabled=audioEnabled,muted=audioMuted,ducked=audioDucked,retry=false}={}){
+      const activating=enabled && !muted && (!audioEnabled || audioMuted);
+      audioEnabled=enabled;audioMuted=muted;audioDucked=ducked;
+      if(retry)audioBlocked=false;
+      mixAudio();if(retry || activating)startAudio();
+    },
     waitFor(ticket) {
       if(!ticket || !this.enabled || ended || count>=MAX_CLIPS && !busy) return Promise.resolve(false);
       if(displayedPrompt===ticket) return Promise.resolve(true);
