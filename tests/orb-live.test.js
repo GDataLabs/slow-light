@@ -50,10 +50,10 @@ function fixture(overrides = {}) {
 }
 
 test('WebRTC startup waits for session.started and sends a greeting without a second start',async()=>{
-  const f=fixture();await f.live.start();
-  assert.equal(f.sent.length,0);assert.equal(f.live.peer.answer.type,'answer');
+  const f=fixture();let connected=0;f.live.options.onConnected=()=>connected++;await f.live.start();
+  assert.equal(connected,0);assert.equal(f.sent.length,0);assert.equal(f.live.peer.answer.type,'answer');
   f.emit('session.started',{session:{id:'opaque'}});
-  assert.equal(f.sent[0].type,'session.instructions.append');assert.equal(f.live.state,'active');
+  assert.equal(connected,1);assert.equal(f.sent[0].type,'session.instructions.append');assert.equal(f.live.state,'active');
   const closing=f.live.close();assert.equal(f.track.stopped,true);assert.equal(f.live.peer.closed,undefined);
   assert.equal(f.sent.at(-1).type,'session.close');
   f.emit('session.closed',{usage:{seconds:17}});await closing;

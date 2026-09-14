@@ -7,6 +7,7 @@
   let finalFrame = null, displayedPrompt=null;
   const waiters=new Set();
   const notify=(ticket)=>{for(const fn of [...waiters])fn(ticket);};
+  let hold, retireTimer, retireDone, retired=Promise.resolve();
   let timer, controller, videos = [], active = -1, count = 0, paused = false, ended = false, onShow;
   const status = text => { $('livingStatus').textContent = text; };
   const api = async (action, ticket, signal, previous, frame) => {
@@ -62,9 +63,12 @@
       });
     } finally { decoder.pause(); decoder.removeAttribute('src'); decoder.load(); }
   }
-  async function play(url, generation) {
+  async function prepareClip(url, generation) {
+    await retired;
+    if(epoch!==generation)throw Error("Stopped");
     const next = (active + 1) % 2;
     const video = videos[next];
+    video.classList.remove("on");video.style.opacity="";
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => done(Error('The clip could not load.')), 20000);
       const done = error => {
@@ -77,6 +81,10 @@
       video.oncanplay = () => done(); video.onerror = () => done(Error('The clip could not load.'));
       video.src = url; video.load();
     });
+    return {video,next};
+  }
+  async function play(prepared, generation, ticket, frame) {
+    const {video,next}=prepared;
     if (epoch !== generation) return;
     const previous = videos[active];
     if (previous && !previous.ended) {
@@ -95,16 +103,46 @@
       });
     }
     if (epoch !== generation) return;
-    await video.play();
+    // Do not uncover the old view until the replacement has a decoded frame.
+    const signal=controller.signal;
+    await new Promise((resolve,reject)=>{
+      let callback, settled=false;
+      const timeout=setTimeout(()=>done(Error('The next video did not produce a frame.')),15000);
+      const abort=()=>done(Error('Stopped'));
+      function done(error){
+        if(settled)return;settled=true;clearTimeout(timeout);signal.removeEventListener('abort',abort);
+        if(callback!==undefined)video.cancelVideoFrameCallback?.(callback);
+        error?reject(error):resolve();
+      }
+      signal.addEventListener('abort',abort,{once:true});
+      if(signal.aborted){abort();return;}
+      if(video.requestVideoFrameCallback)callback=video.requestVideoFrameCallback(()=>done());
+      video.play().then(()=>{if(!video.requestVideoFrameCallback)done();},done);
+    });
     if (epoch !== generation) { video.pause(); return; }
-    document.body.classList.add("living-video");
-    onShow?.();
+    clearTimeout(retireTimer);
+    const old=videos[active];
+    // Keep the outgoing layer fully opaque under the incoming fade. Fading
+    // both at once exposes the black page, especially when reusing layer zero.
+    if(old)old.style.zIndex='1';
+    video.style.zIndex='2';
+    video.poster=frame;
     video.classList.add('on');
-    if (active >= 0) {
-      const old = videos[active]; old.classList.remove('on');
-      setTimeout(() => { if (!old.classList.contains('on')) old.pause(); }, 3500);
-    }
-    active = next; view.showing = true;
+    active=next;view.showing=true;
+    video.onended=()=>{
+      if(!view.enabled || videos[active]!==video)return;
+      hold.src=frame;hold.classList.add('on');
+      video.style.opacity='0';
+    };
+    document.body.classList.add('living-video');
+    onShow?.(ticket);
+    if(old)retired=new Promise(resolve=>{
+      retireDone=resolve;
+      retireTimer=setTimeout(()=>{
+        if(videos[active]!==old){old.classList.remove('on');old.pause();}
+        retireDone=null;resolve();
+      },750);
+    });
   }
   async function pump() {
     if (busy || !view.enabled || paused || ended || !prompt || count >= MAX_CLIPS || document.hidden) return;
@@ -138,10 +176,13 @@
       if (!result.continuity) throw Error("The place could not be continued.");
       phase="reading the final frame";
       status(`Preparing clip ${count} · preserving its final frame…`);
-      const frame = await extractFinalFrame(result.url, controller.signal);
+      const [frame,prepared] = await Promise.all([
+        extractFinalFrame(result.url, controller.signal),
+        prepareClip(result.url, generation)
+      ]);
       if(epoch !== generation) return;
       phase="playing the next clip";
-      await play(result.url, generation);
+      await play(prepared, generation, ticket, frame);
       if (epoch === generation) { continuity = result.continuity; finalFrame = frame; displayedPrompt=ticket; notify(ticket); }
       if (epoch === generation) status(count >= MAX_CLIPS ? `${MAX_CLIPS}-clip session limit reached · holding the final view` : 'Living scene · moving forward from the previous frame');
     } catch (e) {
@@ -180,6 +221,8 @@
       $('livingControls').hidden = false;
       if (reduced.matches) { status('Still scenery follows your reduced-motion preference.'); $('livingPause').hidden = true; return; }
       this.enabled = true;
+      hold=document.createElement('img');hold.alt='';hold.setAttribute('aria-hidden','true');
+      hold.style.cssText='z-index:0;transition:none;filter:none';$('backdrop').appendChild(hold);
       videos = [0, 1].map(() => {
         const v = document.createElement('video');
         v.crossOrigin = 'anonymous'; v.muted = true; v.loop = false; v.style.transition = 'opacity .7s ease'; v.playsInline = true; v.preload = 'auto';
@@ -207,7 +250,8 @@
     stop() {
       document.body.classList.remove("living-video");
       this.enabled = false; this.showing = false; ended = true; invalidate(); notify(null);
-      videos.forEach(v => { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); });
+      clearTimeout(retireTimer);retireDone?.();retireDone=null;hold?.remove();hold=null;
+      videos.forEach(v => { v.onended=null;v.pause(); v.removeAttribute('src'); v.load(); v.remove(); });
       videos = []; active = -1; continuity = null; finalFrame = null; $('livingControls').hidden = true;
     }
   };

@@ -312,3 +312,26 @@ server-only `OPENAI_API_KEY` and `ORB_LIVE_ENABLED=true` settings described in
 the usual voice remains available. Automated tests cover the connection lifecycle,
 late responses, transcript handling, review, and recovery; live voice quality and
 account access still require a real microphone session.
+
+## Visualization conversation and matching ambience
+
+The guided questions now invite sensory imagination instead of asking visitors to
+design scenes. Visual responses include an allowlisted soundscape, which switches
+when that response’s clip starts playing. Water stops when a sky clip begins; stale
+sound requests cannot replace newer ambience. Mute and listening volume persist
+across changes. If replacement audio is unavailable, the previous environment
+does not keep playing.
+
+The voice indicator distinguishes connecting, confirmed GPT-Live connection,
+ended live voice, and the guided voice used after the opening check-in. Vercel
+environment settings apply to the hosted site, not the localhost preview.
+
+## Continuous video handoffs
+
+Video journeys skip the legacy black arrival veil. Incoming clips preload in
+parallel with final-frame extraction, and playback waits for a decoded video
+frame before revealing the new layer. The outgoing layer remains underneath
+the fade; inactive video elements are reused only after their fade has finished.
+A still final frame fills generation delays without replaying the clip or
+jumping backward. New generation can still take longer than a clip’s duration,
+so uninterrupted movement is not guaranteed.

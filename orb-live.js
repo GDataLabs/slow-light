@@ -19,7 +19,7 @@
     async start() {
       if (this.state !== 'idle') return;
       this.state = 'connecting'; this.startedAt = Date.now();
-      this.status('Connecting live voice… You can switch to the usual check-in at any time.');
+      this.status('Connecting GPT-Live voice… You can switch to the usual check-in at any time.');
       this.later(() => { if (this.state === 'connecting') this.fail('Live voice took too long to connect.'); }, 30000);
       try {
         // This runs directly from Begin's click, before any network request.
@@ -98,10 +98,11 @@
         this.seen.add(event.event_id);
       }
       if (event.type === 'session.started' && this.state === 'connecting') {
+        this.options.onConnected?.();
         this.state = 'active'; this.connectMs = Date.now() - this.startedAt;
         this.status('Microphone on · You can speak while the Orb speaks. Pauses are welcome.');
         this.send({ type: 'session.instructions.append', event_id: 'orb_greeting', delegation_id: null,
-          content: 'Greet immediately in English without waiting for the visitor: welcome them briefly and ask how they feel right now. Then pause and listen.' });
+          content: 'Greet immediately in English without waiting for the visitor: welcome them briefly, invite them to imagine their current feeling as a texture or a movement, and ask what they notice. Then pause and listen.' });
         this.later(() => this.options.onEnded?.('This short live check-in has reached three minutes. Take your time reviewing your words.'), 180000);
         return;
       }
@@ -218,18 +219,20 @@
         document.getElementById('liveAvailability').textContent = 'Available for this visit. Leave unchecked to compare with the usual voice.';
       } catch {
         checkbox.checked = false; checkbox.disabled = true;
-        document.getElementById('liveAvailability').textContent = 'Live voice isn’t available here yet. The usual check-in is ready.';
+        document.getElementById('liveAvailability').textContent = location.hostname === '127.0.0.1' || location.hostname === 'localhost' ? 'Live voice is unavailable in this local preview. Your Vercel settings apply at slow-light.vercel.app/orb.html.' : 'Live voice isn’t available here yet. The usual check-in is ready.';
       }
     },
     begin({ guard }) {
       const get = id => document.getElementById(id);
       const panel = get('liveCheckIn'); panel.hidden = false;
+      get('voiceModeStatus').textContent = 'Connecting GPT-Live · Not connected yet';
       get('orbLiveFallback').focus();
       document.body.classList.add('orb-live-active');
       let settle, finished = false, reviewing = false;
       const result = new Promise(resolve => { settle = resolve; });
       const connection = this.current = new LiveConnection({
         endpoint: root.SLOWLIGHT_PUBLIC?.live || '/api/orb-live', brain: root.SLOWLIGHT_PUBLIC?.brain || '/api/orb', guard,
+        onConnected: () => { get('voiceModeStatus').textContent = 'GPT-Live connected · Live opening conversation'; },
         onStatus: text => { get('orbLiveStatus').textContent = text; get('orbLiveMute').disabled = connection.state !== 'active'; },
         onTranscript: (role, text) => {
           get(role === 'input' ? 'orbLiveUser' : 'orbLiveAssistant').textContent = text;
@@ -247,6 +250,7 @@
       async function review(message = 'Microphone off. Edit these words so they say what you mean.') {
         if (reviewing || finished) return; reviewing = true;
         get('orbLiveStatus').textContent = message;
+        get('voiceModeStatus').textContent = connection.connectMs == null ? 'GPT-Live did not connect' : 'GPT-Live ended · Microphone off';
         get('orbLiveReview').disabled = true; get('orbLiveMute').disabled = true; get('orbLivePlay').hidden = true;
         get('orbLiveReviewFields').hidden = false;
         // Only the reviewed, bounded answer enters the normal journey; no auto-submit.

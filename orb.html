@@ -261,7 +261,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
       The orb is AI, not a person — it can be wrong, and it isn't therapy or crisis support. If things feel heavy, please reach a real person: in the US call or text <a href="tel:988">988</a>, elsewhere <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a>.
     </div>
     <p><label><input type="checkbox" id="livingOptIn"> Create living visualizations from my answers</label><br><span class="tiny">Optional AI video: an abstract scene description goes to fal to create short clips. Your starting feelings and your answers help shape it. Any check-in carried from the previous page is included only if you turn this on. You can pause or stop at any time.</span></p>
-    <p><label><input type="checkbox" id="liveOptIn" disabled aria-describedby="livePrivacy liveAvailability"> Try a live voice check-in</label><br><span class="tiny" id="livePrivacy">Talk naturally with the Orb, including while it speaks. OpenAI processes microphone audio during this optional opening conversation (up to three minutes). Transcripts may go to our AI service for reflection. Review your words before continuing. We do not save live recordings or transcripts in this browser.</span><br><span class="tiny" id="liveAvailability" role="status">Checking live voice availability…</span></p>
+    <p><label><input type="checkbox" id="liveOptIn" disabled aria-describedby="livePrivacy liveAvailability"> Try GPT-Live voice for the opening check-in</label><br><span class="tiny" id="livePrivacy">Talk naturally with the Orb, including while it speaks. OpenAI processes microphone audio during this optional opening conversation (up to three minutes). Transcripts may go to our AI service for reflection. Review your words before continuing. We do not save live recordings or transcripts in this browser.</span><br><span class="tiny" id="liveAvailability" role="status">Checking live voice availability…</span></p>
     <p><button class="obtn primary" id="beginBtn" style="font-size:17px; padding:15px 34px">I understand — begin</button>
        <a class="obtn" href="index.html" style="text-decoration:none; margin-left:6px">Back to Slow Light</a></p>
     <details class="fineprint">
@@ -272,6 +272,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
   </div>
 </div>
 
+<div id="voiceModeStatus" role="status" style="position:fixed;top:14px;left:16px;z-index:23;max-width:65vw;font-size:13px;color:#c9f2e6;pointer-events:none"></div>
 <section id="liveCheckIn" hidden aria-label="Live voice check-in">
   <div class="live-inner">
     <h2>A little room to talk</h2>
@@ -517,7 +518,7 @@ const Brain={
         rawAnswer:window.OrbVisual.enabled && stage==="scene_intro" ? S.visualAnswer||"" : "",
         moods:S.moods||[], weather:(S.moods||[]).map(k=>MOODS[k]&&MOODS[k].weather).filter(Boolean),
         grip:S.grip, gripEnd:S.gripEnd, goalFeel:S.goalFeel||"", people:S.people||1,
-        sceneKey:S.sceneKey||null, released:S.released||[], ...(extra||{}) } };
+        sceneKey:S.sceneKey||null, soundscape:Media.ambKey||null, released:S.released||[], ...(extra||{}) } };
       const r=await fetch(this.base(),{method:"POST",signal:ctl.signal,
         headers:{"Content-Type":"application/json"}, body:JSON.stringify(ctx)});
       clearTimeout(to);
@@ -526,7 +527,10 @@ const Brain={
       if(!j.line) throw 0;
       this._fails=0;
       if(j.crisis) { this.crisisFlag=true; window.OrbVisual.stop(); }
-      else if(j.visual) { if(window.OrbVisual.update(j.visual)) this.lastVisual=j.visual; }
+      else if(j.visual) {
+        Media.queueSound(j.visual,j.soundscape || (stage==="scene_intro" ? S.sceneKey : "quiet"));
+        if(window.OrbVisual.update(j.visual)) this.lastVisual=j.visual;
+      }
       else if(stage==="scene_intro") window.OrbVisual.unavailable();
       this.lastMoods=Array.isArray(j.moods)? j.moods.filter(k=>MOODS[k]) : [];
       this.recent.push(j.line);
@@ -627,6 +631,11 @@ const Eleven = {
    prompts below — the person's words never enter a generation prompt,
    so the scenery can only ever be what these templates describe.      */
 const AMBIENCE={
+  quiet:"",
+  sky:"Soft spacious air above the clouds, a delicate steady breeze. No water, bubbles, surf, engines or dramatic gusts. Peaceful seamless loop.",
+  forest:"Soft woodland breeze through leaves with sparse distant birds. No water or surf. Peaceful seamless loop.",
+  shore:"Gentle small waves on a quiet shore with soft coastal air. No loud surf. Peaceful seamless loop.",
+  rain:"Soft steady rain on leaves, without thunder or loud splashes. Peaceful seamless loop.",
   underwater:"Calm deep underwater ambience: soft muffled water movement, slow distant bubbles, low gentle hum of the deep. Peaceful, warm, seamless loop.",
   meadow:"Quiet night meadow ambience: soft crickets, a gentle breeze through long grass, one distant owl. Peaceful, spacious, seamless loop.",
   dawn:"Soft desert dawn ambience: a gentle warm wind, faint drifting sand, sparse distant birdsong beginning. Tranquil, warm, seamless loop."
@@ -641,37 +650,57 @@ const TINTS={ wired:"cool aqua", tense:"warm ember", overwhelmed:"soft violet", 
   hopeful:"fresh green", joyful:"soft gold", excited:"warm coral", neutral:"quiet sand" };
 
 const Media={
-  amb:null,
+  amb:null, ambKey:null, ambEpoch:0, ambMuted:false, ambDucked:false, ambFade:null, ambController:null,
+  soundTickets:new Map(),
+  queueSound(ticket, kind){ this.soundTickets.set(ticket, Object.hasOwn(AMBIENCE,kind) ? kind : "quiet"); },
+  showSound(ticket){ if(this.soundTickets.has(ticket)) return this.soundscape(this.soundTickets.get(ticket)); },
   key(){ return ((Voice.cfg&&Voice.cfg.key)||"").trim(); },
   /* ---- ambient soundscape (looped, cached per scene) ---- */
   async soundscape(sceneKey){
-    if(!Voice.cfg.ambience || !elReady() || !AMBIENCE[sceneKey]) return;
+    if(this.ambKey===sceneKey)return;
+    this.stopAmb();
+    if(!Voice.cfg.ambience || !elReady() || !Object.hasOwn(AMBIENCE,sceneKey))return;
+    this.ambKey=sceneKey;
+    const epoch=this.ambEpoch;
+    if(sceneKey==="quiet")return;
+    const controller=this.ambController=new AbortController();
     try{
-      const ck="amb1|"+sceneKey;
+      const ck="amb2|"+sceneKey;
       let blob=await TTSCache.get(ck);
+      if(epoch!==this.ambEpoch)return;
       if(!blob){
         const r=await fetch(elBase()+"/v1/sound-generation?output_format=mp3_44100_128",{
           method:"POST", headers:elHeaders({"Content-Type":"application/json"}),
+          signal:AbortSignal.any([controller.signal,AbortSignal.timeout(25000)]),
           body:JSON.stringify({text:AMBIENCE[sceneKey], loop:true, duration_seconds:18, prompt_influence:.35})});
-        if(!r.ok) throw 0;
+        if(!r.ok)throw Error("Sound unavailable");
         blob=await r.blob(); TTSCache.put(ck, blob);
       }
-      this.playAmb(blob);
-    }catch(e){}
+      if(epoch===this.ambEpoch && Voice.cfg.ambience)this.playAmb(blob,epoch);
+    }catch(e){ if(epoch===this.ambEpoch)this.ambKey=null; }
   },
-  playAmb(blob){
+  playAmb(blob,epoch=this.ambEpoch){
+    if(epoch!==this.ambEpoch)return;
     try{
-      this.stopAmb();
       const a=this.amb=new Audio(URL.createObjectURL(blob));
-      a.loop=true; a.volume=0; a.play().catch(()=>{});
-      const btn=$("#ambBtn"); btn.classList.add("show"); btn.classList.remove("off");
-      let v=0; const fade=setInterval(()=>{ if(!this.amb){ clearInterval(fade); return; }
-        v+=.02; this.amb.volume=Math.min(.3,v); if(v>=.3) clearInterval(fade); },140);
+      a.loop=true; a.volume=0;
+      if(!this.ambMuted)a.play().catch(()=>{});
+      const btn=$("#ambBtn"); btn.classList.add("show"); btn.classList.toggle("off",this.ambMuted);
+      this.ambFade=setInterval(()=>{
+        if(this.amb!==a || epoch!==this.ambEpoch){clearInterval(this.ambFade);return;}
+        const target=this.ambDucked?.07:.3;
+        a.volume=Math.min(target,a.volume+.02);
+        if(a.volume>=target){clearInterval(this.ambFade);this.ambFade=null;}
+      },140);
     }catch(e){}
   },
-  stopAmb(){ try{ if(this.amb){ this.amb.pause(); this.amb=null; } }catch(e){} },
-  /* soften the soundscape while the orb is listening to the person */
-  duck(on){ try{ if(this.amb && !this.amb.paused) this.amb.volume = on? .07 : .3; }catch(e){} },
+  stopAmb(){
+    this.ambEpoch++; this.ambKey=null;
+    this.ambController?.abort();this.ambController=null;
+    clearInterval(this.ambFade);this.ambFade=null;
+    try{if(this.amb){this.amb.pause();URL.revokeObjectURL(this.amb.src);this.amb=null;}}catch(e){}
+  },
+  duck(on){ this.ambDucked=on; try{if(this.amb)this.amb.volume=on?.07:.3;}catch(e){} },
   /* ---- generated backdrops (async flows API, polled) ---- */
   async poll(kind,id,everyMs,maxMs){
     const t0=Date.now();
@@ -756,8 +785,8 @@ const Media={
 };
 $("#ambBtn").addEventListener("click",()=>{
   if(!Media.amb) return;
-  if(Media.amb.paused){ Media.amb.play().catch(()=>{}); $("#ambBtn").classList.remove("off"); }
-  else { Media.amb.pause(); $("#ambBtn").classList.add("off"); }
+  if(Media.amb.paused){ Media.ambMuted=false; Media.amb.play().catch(()=>{}); $("#ambBtn").classList.remove("off"); }
+  else { Media.ambMuted=true; Media.amb.pause(); $("#ambBtn").classList.add("off"); }
 });
 
 const Voice = {
@@ -1522,30 +1551,30 @@ async function sceneCheckpoint(ticket){
     $("#turnStatus").textContent="Your request is queued. Waiting for its clip before the next question…";
     const shown=await Promise.race([window.OrbVisual.waitFor(ticket),UI.chips(["Continue without waiting"]).then(()=>false)]);
     UI.hide();
-    await Cap.show(shown ? "The clip made from your request is on screen. Take a look: does it match what you wanted?" : "Your requested clip has not appeared yet. You can keep waiting or continue with the current view.", "No next question until you choose");
+    await Cap.show(shown ? "Let your attention rest here for a moment. Notice what stands out, without needing to change anything." : "Stay with the image in your imagination while the view catches up. You can linger here or carry on.", "No next question until you choose");
     if(!shown){
       const choice=await UI.chips(["Wait for my scene","Continue with this view"]);
       if(choice==="Wait for my scene") return sceneCheckpoint(ticket);
     }
   }
-  await UI.chips(["I’m ready for the next question"]);
+  await UI.chips(["I’m ready to continue"]);
 }
 async function guideScene(){
   for(let i=0;i<3;i++){
-    const questions=["What in this place would match how you feel right now? You could change the light, the weather, or the movement.","What small change would bring this place closer to how you want to feel?","Looking at the scene now, what would you keep or change next?"];
-    await Cap.show(questions[i],"Describe one change, or say done to move to your closing check-in");
-    const answer=await UI.free("For example: let the sun rise, or make the water still…");
+    const questions=["With your eyes open or softly resting, imagine your feeling as something you can notice from a little distance. What comes to mind?", "Imagine giving that feeling a little more room, without needing it to disappear. What happens in your imagination?", "Let your attention move toward something that feels supportive. What do you notice there?"];
+    await Cap.show(questions[i],"A sensation, an image, or a few words — or say done");
+    const answer=await UI.free("An image, a sensation, or whatever comes to mind…");
     if(/^(done|stop|no|nothing|skip)\b/i.test(answer))break;
     if(guard(answer)==="crisis"){await showCare();break;}
-    if(guard(answer)!=="ok"){await Cap.show("Let’s choose a gentle change to light, weather or movement.");i--;continue;}
-    await Cap.show("You asked for: “"+answer.slice(0,200)+"”. Shall I use that for the next scene?", "Confirm or change your words");
-    const choice=await UI.chips(["Yes, shape the scene","Let me change that","Keep the scene as it is"]);
+    if(guard(answer)!=="ok"){await Cap.show("You can stay with a simple sensation, or skip this part.");i--;continue;}
+    await Cap.show("“"+answer.slice(0,200)+"” — does that capture what you noticed?", "Your words can guide what unfolds");
+    const choice=await UI.chips(["Yes, that’s close","Let me change that","Let’s stay here"]);
     if(choice==="Let me change that"){i--;continue;}
-    if(choice==="Keep the scene as it is"){await sceneCheckpoint(null);continue;}
+    if(choice==="Let’s stay here"){await sceneCheckpoint(null);continue;}
     $("#answers").classList.add("on");
-    $("#turnStatus").textContent="Preparing the scene change you confirmed…";
+    $("#turnStatus").textContent="Letting your image unfold…";
     const ticket=await applySceneRequest(answer);
-    if(!ticket) await Cap.show("I couldn’t queue that change. We can keep this view and try again.");
+    if(!ticket) await Cap.show("We can stay with what you imagined, even while this view rests.");
     await sceneCheckpoint(ticket);
   }
 }
@@ -1556,8 +1585,12 @@ async function run(liveOpening=null){
   let liveAnswer = liveOpening ? await liveOpening : null;
   if(liveAnswer && liveAnswer.crisis){ crisisShown=true; await showCare(); liveAnswer=null; }
   let ans;
-  if(liveAnswer && liveAnswer.words) ans=liveAnswer.words;
+  if(liveAnswer && liveAnswer.words) {
+    ans=liveAnswer.words;
+    $("#voiceModeStatus").textContent="Live check-in ended · Guided voice for the visualization";
+  }
   else {
+  $("#voiceModeStatus").textContent="Guided voice · "+(Voice.cfg.engine==="eleven"?"ElevenLabs":"Browser voice");
   await Cap.show(await Brain.line("greet", pick([
     "Hello. I'm glad you came.",
     "Hello. You made it here — that's the hardest part.",
@@ -1568,8 +1601,8 @@ async function run(liveOpening=null){
 
   /* Q1 — where are you */
   await Cap.show(await Brain.line("ask_feelings", pick([
-    "Where are you right now — not the room. Inside. What's the weather like there?",
-    "Tell me how it is there right now. A word or two is plenty."
+    "If your feeling had a texture or a movement, what might it be?",
+    "Take a moment to notice what is here. An image, a sensation, or a feeling word is enough."
   ])), "speak, type, or just pick something close");
   ans = await Promise.race([
     UI.free("anxious? heavy? okay? your words…", {diarize:true}),
@@ -1621,7 +1654,7 @@ async function run(liveOpening=null){
     "Light enough to work with. Let's keep it that way."));
 
   /* Q3 — where to */
-  await Cap.show(await Brain.line("ask_destination","If you could drift anywhere from here — not fixed, just… different — how would you want to feel when you arrive?"), "pick, speak, or type");
+  await Cap.show(await Brain.line("ask_destination","Imagine a moment with a little more ease. What would you like to feel in that moment?"), "pick, speak, or type");
   let feel = await Promise.race([
     UI.free("calmer? grounded? lighter?…"),
     UI.chips(["calmer, quieter","grounded, steadier","lighter, softer"], true)
@@ -1641,7 +1674,7 @@ async function run(liveOpening=null){
   S.sceneKey=sceneKey;
   // start growing the place's generated sound and scenery now, so they can
   // arrive softly while the person's eyes are closed (all fire-and-forget)
-  Media.soundscape(sceneKey);
+  if(!window.OrbVisual.enabled)Media.soundscape(sceneKey);
   if(!window.OrbVisual.enabled) Media.backdrop(sceneKey, TINTS[S.moods[0]]||"soft teal");
   await Cap.show(await Brain.line("scene_intro", `Then let me make somewhere for that. ${sc.line}`));
   const openingTicket=Brain.lastVisual;
@@ -1706,6 +1739,12 @@ async function run(liveOpening=null){
 }
 
 function fadeSwap(build){
+  // Video already supplies its own transition; never veil a playing clip.
+  if(window.OrbVisual.enabled){
+    clearScene(); build();
+    if(T){T.orbTarget.set(0,.5,0);T.camTarget.set(0,0,8.5);if(window.OrbVisual.showing)T.scene.background=null;}
+    return Promise.resolve();
+  }
   return new Promise(res=>{
     const veil=document.createElement("div");
     veil.style.cssText="position:fixed;inset:0;background:#04060a;opacity:0;transition:opacity 2.2s;z-index:8;pointer-events:none";
@@ -2004,7 +2043,7 @@ $("#beginBtn").addEventListener("click", async ()=>{
   if($("#beginBtn").disabled)return;
   $("#beginBtn").disabled=true;
   const liveOpening = $("#liveOptIn").checked ? window.OrbLive.begin({guard}) : null;
-  window.OrbVisual.start({ enabled:$("#livingOptIn").checked, onShow:()=>{ Media.clearBackdrop(); if(T) T.scene.background=null; } });
+  window.OrbVisual.start({ enabled:$("#livingOptIn").checked, onShow:(ticket)=>{ Media.showSound(ticket); Media.clearBackdrop(); if(T) T.scene.background=null; } });
   $("#introVeil").classList.add("hide");
   if(!HAVE_3D){
     $("#caption").textContent="The 3D space couldn't load here — but the words and breathing still work.";
