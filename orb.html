@@ -244,6 +244,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
     <div class="arow" style="margin-top:8px"><button class="obtn primary" id="sliderGo">That's about right</button></div>
   </div>
   <div class="chiprow" id="chips"></div>
+  <button class="obtn" id="choiceSpeak" hidden>Speak an answer</button>
   <div class="arow" id="freeRow">
     <button class="obtn mic" id="micBtn" title="Answer by voice">🎙 speak</button>
     <input id="txtIn" type="text" autocomplete="off" placeholder="…or type it here">
@@ -261,13 +262,13 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
       The orb is AI, not a person — it can be wrong, and it isn't therapy or crisis support. If things feel heavy, please reach a real person: in the US call or text <a href="tel:988">988</a>, elsewhere <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a>.
     </div>
     <p><label><input type="checkbox" id="livingOptIn"> Create living visualizations from my answers</label><br><span class="tiny">Optional AI video: an abstract scene description goes to fal to create short clips. Your starting feelings and your answers help shape it. Any check-in carried from the previous page is included only if you turn this on. You can pause or stop at any time.</span></p>
-    <p><label><input type="checkbox" id="liveOptIn" disabled aria-describedby="livePrivacy liveAvailability"> Try GPT-Live voice for the opening check-in</label><br><span class="tiny" id="livePrivacy">Talk naturally with the Orb, including while it speaks. OpenAI processes microphone audio during this optional opening conversation (up to three minutes). Transcripts may go to our AI service for reflection. Review your words before continuing. We do not save live recordings or transcripts in this browser.</span><br><span class="tiny" id="liveAvailability" role="status">Checking live voice availability…</span></p>
+    <p><label><input type="checkbox" id="liveOptIn" disabled aria-describedby="livePrivacy liveAvailability"> Start with a live voice conversation</label><br><label for="liveProvider">Live voice</label> <select id="liveProvider"><option value="openai">GPT-Live 1</option><option value="gemini">Gemini Live</option></select><br><span class="tiny" id="livePrivacy">Talk naturally with the Orb, including while it speaks. Your selected provider (OpenAI or Google) processes microphone audio during this optional conversation (up to three minutes). Transcripts may go to our AI service for reflection. When you’re ready, review your words and continue with the guided visualization. You can answer its questions by voice too. We do not save live recordings or transcripts in this browser.</span><br><span class="tiny" id="liveAvailability" role="status">Checking live voice availability…</span></p>
     <p><button class="obtn primary" id="beginBtn" style="font-size:17px; padding:15px 34px">I understand — begin</button>
        <a class="obtn" href="index.html" style="text-decoration:none; margin-left:6px">Back to Slow Light</a></p>
     <details class="fineprint">
       <summary>The full details…</summary>
       <p class="tiny" style="margin-top:10px">The orb is an automated guide, not a clinician. It can misunderstand you and say things that are wrong, and it is built only for gentle relaxation — never a substitute for professional help. If things feel heavy more days than not, bring that to a real person; in the US you can also text HOME to 741741, and in immediate danger call your local emergency number.</p>
-      <p class="tiny">Voice is optional. After each question the orb listens for a few seconds — a small waveform shows exactly when it can hear you, and typing or sliding always works instead. When ElevenLabs is set up (⚙, top right), your short voice answers are sent there to be turned into text, and the orb's own lines and fixed scene descriptions are sent there to be spoken and drawn; otherwise your browser's own speech service is used. AI and voice providers process the content sent to them under their own retention policies. Session reflections are saved in this browser. Motion here is slow, there is no strobing, and your device's reduce-motion setting is respected.</p>
+      <p class="tiny">Voice is optional. Your replies go to our AI service to understand your meaning and guide the conversation. After each question the orb listens for a few seconds — a small waveform shows exactly when it can hear you, and typing or sliding always works instead. When ElevenLabs is set up (⚙, top right), your short voice answers are sent there to be turned into text, and the orb's own lines and fixed scene descriptions are sent there to be spoken and drawn; otherwise your browser's own speech service is used. AI and voice providers process the content sent to them under their own retention policies. Session reflections are saved in this browser. Motion here is slow, there is no strobing, and your device's reduce-motion setting is respected.</p>
     </details>
   </div>
 </div>
@@ -408,6 +409,9 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
 <script src="orb-language.js"></script>
 <script src="voice-config.js"></script>
 <script src="orb-live.js"></script>
+<script src="orb-gemini.js"></script>
+<script src="orb-choices.js"></script>
+<script src="orb-guidance.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 "use strict";
@@ -518,7 +522,7 @@ const Brain={
         initialWords:window.OrbVisual.enabled ? S.initialWords||"" : "",
         rawAnswer:window.OrbVisual.enabled && stage==="scene_intro" ? S.visualAnswer||"" : "",
         moods:S.moods||[], weather:(S.moods||[]).map(k=>MOODS[k]&&MOODS[k].weather).filter(Boolean),
-        grip:S.grip, gripEnd:S.gripEnd, goalFeel:S.goalFeel||"", people:S.people||1,
+        grip:S.grip, gripEnd:S.gripEnd, goalFeel:S.goalFeel||"", goalWords:S.goalWords||"", imageryHistory:S.imageryHistory||[], people:S.people||1,
         sceneDescription:S.sceneDescription||"", sceneKey:S.sceneKey||null, soundscape:Media.ambKey||null, released:S.released||[], ...(extra||{}) } };
       const r=await fetch(this.base(),{method:"POST",signal:ctl.signal,
         headers:{"Content-Type":"application/json"}, body:JSON.stringify(ctx)});
@@ -1461,6 +1465,7 @@ const SCENES={ underwater:{build:buildUnderwater, name:"deep water", line:"Somew
 const Cap={
   async show(text, sub){
     await window.OrbWorld.waitUntilClosed();
+    UI._question=text;
     Ears.cancel();
     const c=$("#caption");
     // let the last line dissolve back into smoke before the next condenses
@@ -1480,7 +1485,7 @@ const Cap={
   }
 };
 const UI={
-  hide(){ Ears.cancel(); Ears.notice(""); $("#answers").classList.remove("on"); $("#sliderWrap").classList.remove("on"); $("#chips").innerHTML=""; $("#freeRow").style.display="none"; },
+  hide(){ UI._choiceEpoch=(UI._choiceEpoch||0)+1; UI._choiceController?.abort(); UI._choiceBusy=false; UI._choiceActive=false; $("#choiceSpeak").hidden=true; Ears.cancel(); Ears.notice(""); $("#answers").classList.remove("on"); $("#sliderWrap").classList.remove("on"); $("#chips").innerHTML=""; $("#freeRow").style.display="none"; },
   free(placeholder, opts){
     $("#answers").classList.add("on"); $("#freeRow").style.display="flex";
     $("#turnStatus").textContent="Your turn — speak or type an answer. The next question waits for you.";
@@ -1491,10 +1496,42 @@ const UI={
     Ears.listen(UI._lastListen.fn, UI._lastListen.opts);
     return new Promise(res=>{ UI._resolve=res; });
   },
-  chips(list, keepFree){
+  chips(list, keepFree, context={}){
     $("#answers").classList.add("on"); if(!keepFree) $("#freeRow").style.display="none";
     $("#chips").innerHTML=list.map((c,i)=>`<button class="ochip" data-i="${i}">${c}</button>`).join("");
-    return new Promise(res=>{ UI._chipResolve=i=>res(list[i]); });
+    const pending=new Promise(res=>{ UI._chipResolve=i=>res(list[i]); });
+    UI.lastChoice=null;
+    if(!keepFree){
+      UI._choiceActive=true;
+      const epoch=UI._choiceEpoch=(UI._choiceEpoch||0)+1;
+      $("#choiceSpeak").hidden=!Ears.supported;
+      $("#freeRow").style.display="flex"; $("#micBtn").style.display="none";
+      $("#txtIn").value=""; $("#txtIn").placeholder="Tell me what fits, or what you’d change…";
+      $("#turnStatus").textContent="Your turn — answer in your own words, or tap an option.";
+      UI._lastListen={fn:async text=>{
+        if(!UI._choiceActive || UI._choiceBusy || epoch!==UI._choiceEpoch)return;
+        UI._choiceBusy=true; Ears.cancel();
+        UI._choiceController=new AbortController();
+        Ears.notice("Listening to what you mean…");
+        try{
+          const result=guard(text)==="crisis" ? {crisis:true} : await window.OrbChoices.interpret(text,list,
+            {question:UI._question||"",goal:S.goalWords||S.goalFeel||"",...context},UI._choiceController.signal);
+          if(!UI._choiceActive || epoch!==UI._choiceEpoch)return;
+          if(result.crisis){await showCare(); if(epoch!==UI._choiceEpoch)return;}
+          else if(Number.isInteger(result.choice)){
+            const resolve=UI._chipResolve;
+            UI.lastChoice={...result,reply:text}; UI.hide(); resolve?.(result.choice); return;
+          }
+          Ears.notice("I’m not sure which direction you mean. Tell me a little more, or tap the option that feels closest.");
+        }catch(error){
+          if(epoch!==UI._choiceEpoch)return;
+          Ears.notice("I couldn’t understand that just now. Try again in your own words, or tap an option.");
+        }finally{if(epoch===UI._choiceEpoch)UI._choiceBusy=false;}
+        if(UI._choiceActive && epoch===UI._choiceEpoch)Ears.listen(UI._lastListen.fn,UI._lastListen.opts);
+      },opts:{patienceMs:14000}};
+      Ears.listen(UI._lastListen.fn,UI._lastListen.opts);
+    }
+    return pending;
   },
   slider(lo,hi,start){
     $("#answers").classList.add("on"); $("#freeRow").style.display="none"; $("#sliderWrap").classList.add("on");
@@ -1524,12 +1561,14 @@ const UI={
   try{ new MutationObserver(set).observe(a,{attributes:true,attributeFilter:["class"]}); }catch(e){}
   addEventListener("resize", set); set();
 })();
+$("#choiceSpeak").onclick=()=>{Ears.cancel();Ears.denied=false;const h=UI._lastListen;if(UI._choiceActive&&!UI._choiceBusy&&h)Ears.listen(h.fn,h.opts);};
 $("#sliderSpeak").onclick=()=>{Ears.cancel();Ears.denied=false;const h=UI._lastListen;if(h)Ears.listen(h.fn,h.opts);};
 $("#oSlider").addEventListener("input",e=>$("#sliderVal").textContent=e.target.value);
 $("#sliderGo").addEventListener("click",()=>{ const v=+$("#oSlider").value; UI.hide(); UI._sliderResolve&&UI._sliderResolve(v); });
 $("#chips").addEventListener("click",e=>{ const b=e.target.closest(".ochip"); if(!b)return; UI.hide(); UI._chipResolve&&UI._chipResolve(+b.dataset.i); });
 function submitText(t){
   t=(t||"").trim(); if(!t) return;
+  if(UI._choiceActive){void UI._lastListen.fn(t);return;}
   UI.hide(); Ears.stop(); UI._resolve&&UI._resolve(t);
 }
 $("#sendBtn").addEventListener("click",()=>submitText($("#txtIn").value));
@@ -1606,23 +1645,46 @@ async function sceneCheckpoint(ticket){
   await UI.chips(["I’m ready to continue"]);
 }
 async function guideScene(){
-  for(let i=0;i<3;i++){
-    const questions=["With your eyes open or softly resting, imagine your feeling as something you can notice from a little distance. What comes to mind?", "Imagine giving that feeling a little more room, without needing it to disappear. What happens in your imagination?", "Let your attention move toward something that feels supportive. What do you notice there?"];
-    await Cap.show(questions[i],"A sensation, an image, or a few words — or say done");
-    const answer=await UI.free("An image, a sensation, or whatever comes to mind…");
-    if(/^(done|stop|no|nothing|skip)\b/i.test(answer))break;
-    if(guard(answer)==="crisis"){await showCare();break;}
-    if(guard(answer)!=="ok"){await Cap.show("You can stay with a simple sensation, or skip this part.");i--;continue;}
-    await Cap.show("“"+answer.slice(0,200)+"” — does that capture what you noticed?", "Your words can guide what unfolds");
-    const choice=await UI.chips(["Yes, that’s close","Let me change that","Let’s stay here"]);
-    if(choice==="Let me change that"){i--;continue;}
-    if(choice==="Let’s stay here"){await sceneCheckpoint(null);continue;}
-    $("#answers").classList.add("on");
-    $("#turnStatus").textContent="Letting your image unfold…";
-    const ticket=await applySceneRequest(answer);
-    if(!ticket) await Cap.show("We can stay with what you imagined, even while this view rests.");
-    await sceneCheckpoint(ticket);
+  S.imageryHistory=[];
+  await Cap.show("Feel the support beneath you and let your breathing find its own pace. Your eyes can stay open; you can pause or stop anytime.");
+  for(const step of window.OrbGuidance.steps){
+    let answer;
+    for(;;){
+      await Cap.show(await Brain.line(step.id,step.question),"Your own words are welcome — or say stop");
+      answer=await UI.free("An image, a real sensation, or a few words…");
+      if(/^(?:please )?(?:done|stop|skip|i(?:’|')?m done|i want to stop|lets stop|let’s stop)/i.test(answer)){
+        await Cap.show("Let the imagery rest. Notice the room around you and the support beneath you.");return;
+      }
+      if(guard(answer)==="crisis"){await showCare();return;}
+      if(guard(answer)!=="ok"){await Cap.show("Let’s leave that image and notice something comfortable in the room instead.");continue;}
+      if(/(?:feel(?:ing)? (?:worse|more anxious|unsafe)|too intense|uncomfortable|scaring me)/i.test(answer)){
+        await Cap.show("Let’s pause the imagery. Look around the room and notice something familiar. There is no need to continue this exercise.");return;
+      }
+      if(!step.visual)break;
+      for(;;){
+        await Cap.show("“"+answer.slice(0,200)+"” — is that what you mean, or would you change something?", "Tell me in your own words");
+        const choice=await UI.chips(["Yes, that’s close","Let me change that","Let’s stay here"],false,{proposedAnswer:answer});
+        if(choice==="Yes, that’s close")break;
+        if(choice==="Let’s stay here"){await sceneCheckpoint(null);continue;}
+        const revision=UI.lastChoice?.revisedAnswer;
+        if(revision && guard(revision)==="ok"){answer=revision;continue;}
+        await Cap.show("What would you like me to understand differently?");
+        answer=await UI.free("Tell me what you would change…");
+        if(/^(?:please )?(?:done|stop|skip|i(?:’|')?m done|i want to stop|lets stop|let’s stop)\b/i.test(answer)){
+          await Cap.show("Let the imagery rest. Notice the room around you and the support beneath you.");return;
+        }
+        if(guard(answer)==="crisis"){await showCare();return;}
+        if(guard(answer)!=="ok"){answer="";break;}
+      }
+      if(answer)break;
+    }
+    S.imageryHistory.push({stage:step.id,answer:answer.slice(0,300)});
+    if(step.visual && window.OrbVisual.enabled){
+      const ticket=await applySceneRequest(answer);
+      if(ticket)await sceneCheckpoint(ticket);
+    }
   }
+  await Cap.show("Let the image fade when you’re ready. Notice the room, feel your feet or seat, and move gently at your own pace.");
 }
 
 async function run(liveOpening=null){
@@ -1687,7 +1749,7 @@ async function run(liveOpening=null){
   const wxLine = wx.length===1? wx[0] : wx.slice(0,-1).join(", ")+" and "+wx[wx.length-1];
   // its reply carries their own words back to them, so being heard is visible
   const echo = wasFree? `“${ans.trim().slice(0,50)}” — ` : "";
-  const scriptedAck = `${S.people>1? "I can hear more than one of you — good. " : ""}${echo}${pick(["Thank you for saying it.","Good. Naming it already loosens it a little."])} That sounds like ${wxLine}.`;
+  const scriptedAck = `${S.people>1? "I can hear more than one of you — good. " : ""}${echo}${pick(["Thank you for saying it.","You can take your time with it."])} That sounds like ${wxLine}.`;
   await Cap.show(ackLine || await Brain.line("acknowledge", scriptedAck, {rawAnswer: wasFree? ans : ""}));
   await Brain.care();
 
@@ -1709,6 +1771,7 @@ async function run(liveOpening=null){
   if(g==="crisis" && !crisisShown){ crisisShown=true; await showCare(); }
   S.initialWords = guard(ans)==="ok" ? ans.slice(0,300) : "";
   S.visualAnswer = guard(ans)==="ok" && guard(feel)==="ok" ? (ans+"; hoping for "+feel).slice(0,300) : "";
+  S.goalWords=guard(feel)==="ok" ? feel.slice(0,300) : "a little more ease";
   const f=(feel||"").toLowerCase();
   S.goalFeel = /ground|stead|safe|solid|earth/.test(f)? "grounded" : /light|soft|hope|bright|warm|morning/.test(f)? "lighter" : "calmer";
 
@@ -1729,51 +1792,17 @@ async function run(liveOpening=null){
   await fadeSwap(sc.build);
   await Cap.show(await Brain.line("arrive", `Take a moment to notice what draws your attention here.`));
 
-  if(window.OrbVisual.enabled){
-    await sceneCheckpoint(openingTicket);
-    await guideScene();
-  } else {
-  /* activity 1 — release */
-  await Cap.show(await Brain.line("release_invite", pick([
-    "Here's the first thing this place can do. Give me something you're carrying — a word or a few — and watch what the water does with it.",
-    "Let's set something down. Type or say one thing that came in with you, and let this place take it."
-  ]).replace("water", sceneKey==="underwater"?"water":"dark")), "one small thing at a time");
-  for(let i=0;i<3;i++){
-    if(i>0) await Cap.show("Would you like to set down anything else, or move on?", "Say done to continue");
-    const w=await UI.free(i===0?"the meeting… her voice… the list…":"anything else? or say 'done'");
-    if(/^(done|no|nothing|stop|that's all|nope)\b/i.test(w)) break;
-    const gg=guard(w);
-    if(gg==="crisis" && !crisisShown){ crisisShown=true; await showCare(); break; }
-    S.released.push(w.slice(0,60));
-    releaseVisual();
-    await Cap.show(await Brain.line("release_response", pick([
-      "There it goes. It can float without you holding it.",
-      "Released. Notice it needs nothing from you out there.",
-      "Watch how slowly it leaves. Nothing here is urgent — not even letting go."
-    ]), {lastReleased:w.slice(0,80)}));
-    await Brain.care();
-    if(i===2) break;
-  }
+  if(window.OrbVisual.enabled)await sceneCheckpoint(openingTicket);
+  await guideScene();
 
-  /* activity 2 — slow lights (pace sensing framed as visualization) */
-  await Cap.show(await Brain.line("lights_intro","Now a slower game. Lights will rise, one at a time. When one feels ready — not before — touch it. There is no clock and no score."),"touch each light when it feels right");
-  await slowLights(4);
-  const avg=S.paceMs.length? S.paceMs.reduce((a,b)=>a+b,0)/S.paceMs.length : 4000;
-  await Cap.show(await Brain.line("pace_reflect",
-    avg<2200? "You met them quickly. There's still some speed in your hands — that's all right, it has somewhere soft to land now." :
-    avg<5000? "That was an easy rhythm. Your pace is already lower than when you arrived." :
-    "You let each one wait for you. That's the slowest, kindest pace there is.",
-    {paceAvgMs:Math.round(avg)}));
-
-  }
   /* check-out */
   await Cap.show(await Brain.line("ask_now","Before I let the place hold you a while — where is it now, the thing you carried in?"), "same slider as before");
   S.gripEnd = await UI.slider("barely there","all of me", S.grip);
   const d=S.grip-S.gripEnd;
   await Cap.show(await Brain.line("close",
-    d>0? `From ${S.grip} down to ${S.gripEnd}. Nothing outside you changed — that was you.` :
+    d>0? `You rated it ${S.grip} before and ${S.gripEnd} now. Thank you for noticing what fits.` :
     d===0? `Still at ${S.grip}. Honest is better than improved. Some weather needs more than one visit.` :
-    `It rose — from ${S.grip} to ${S.gripEnd}. Slowing down can uncover what speed was muffling. That's worth telling a person you trust, not just an orb.`));
+    `You rated it higher now. Let’s return attention to the room. You can reach out to someone you trust if that would help.`));
   await Brain.care();
   window.OrbVisual.finish();
   saveOrbSession();

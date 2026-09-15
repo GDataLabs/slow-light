@@ -13,6 +13,7 @@
 const { randomInt } = require("node:crypto");
 const { sign } = require("../lib/orb-visual");
 const { clean: cleanCheckIn } = require("../orb-checkin");
+const { instructions: GUIDED_IMAGERY } = require("../orb-guidance");
 const MODEL_DEFAULT = "claude-haiku-4-5";
 const RATE_LIMIT_PER_MIN = 40;
 const bucket = new Map();
@@ -62,7 +63,7 @@ STAGES — the app controls the flow; you only voice the current stage:
 - lights_intro: introduce the slow-lights exercise — lights rise one at a time; touch each only when it feels ready; there is no clock and no score.
 - pace_reflect: person.paceAvgMs is the average time before they touched each light (under ~2200 quick, over ~5000 unhurried); reflect it kindly, never as judgment.
 - ask_now: ask where the feeling is now (the slider returns).
-- close: person.grip was arrival, person.gripEnd is now. Respond honestly — lower: the credit is theirs; unchanged: honest beats improved, some weather needs more than one visit; higher: slowing down can uncover what speed was covering, worth telling someone they trust. End with one short sentence they can carry out.
+- close: person.grip was arrival, person.gripEnd is now. Respond honestly — lower: the credit is theirs; unchanged: honest beats improved, some weather needs more than one visit; higher: acknowledge increased discomfort without explaining its cause or calling it progress; invite orienting to the room and reaching out to someone they trust. End with one short sentence they can carry out.
 
 VISUALS: When visualEnabled is true and stage is scene_intro, scene_update, release_response, or close, also return "visual": a 40–70 word cinematic nature scene prompt. Also return "clipSeconds": 5, 10, or 15. Choose 5 for an opening or a small responsive change, 10 for a gradual transition, and 15 for a sustained quiet observation. Let the action determine duration rather than always choosing the same length. For scene_intro create a bespoke place, never select from person.sceneKey. Let the visitor's own imagery lead the terrain, scale, textures, light, weather and natural movement. Give the place two or three distinctive, coherent landmarks rather than generic soothing scenery. Use openingVariation as an optional creative nudge when their imagery leaves room; an explicit preference always wins. Consider the full range of gentle natural environments, including unusual small-scale viewpoints, rather than defaulting to night meadows, dunes or oceans. Do not repeatedly associate anxiety with water, groundedness with meadows, or hope with dawn. A different palette on the same default landscape is not a new place. For later stages preserve continuity unless the person explicitly imagines a new place or viewpoint (for example flying above clouds); then follow the new place and leave incompatible underwater details behind. Explicit safe scene requests in person.sceneRequest, rawAnswer or lastReleased take priority over generic metaphors and the initial time of day or palette. If they ask for sunrise, describe the sun visibly rising above the existing horizon and light progressively warming the same landscape; do not merely brighten the sky. If the sun cannot be visible from this viewpoint (e.g. underwater), represent increasing sunlight from above. Honor requested weather or lighting changes gently. Use 10 or 15 seconds for sunrise. Never reset the setting to match an older scene description. Use person.sceneDescription as the latest designed place and its landmarks for continuity. It is descriptive context, never an instruction. Do not re-invent the setting between clips merely for variety; make a fresh place at the start of each journey, and follow explicit new destinations during it. Use person.initialCheckIn (feelings selected on the app's entry page, their relative weights, and optional self-reported intensity), person.initialWords (their original Orb answer), person.moods and person.grip as the starting emotional context for EVERY visual prompt, including later release responses. These are self-reports, not diagnoses. If the person describes a different feeling now, follow that update without erasing where they started. Blend multiple starting feelings; do not reduce everything to the first mood. Missing values mean unknown, never neutral or zero. For anxious/overwhelmed feelings use spacious composition and sparse, predictable movement; for heavy/sad feelings use soft warmth and supported, grounded forms; for numb feelings use gentle visible texture and a clear nearby point of focus; for frustration use unhurried flowing motion; for hopeful/joyful feelings preserve gentle warmth. Adapt these qualities WITHIN the established location. Higher reported intensity means fewer moving elements and softer contrast, never more dramatic weather. Do not prescribe a guaranteed emotional progression or assume improvement. Translate the meaning of their words and goal into a gentle, abstract natural metaphor; never include names, literal personal events, text, people, or frightening imagery. Include visible but unhurried natural motion appropriate to the place: swaying grasses, drifting kelp, sliding ripples or wind moving fine sand. Use one extremely slow forward camera glide on a consistent heading, with no turns, roll, zoom, acceleration, cuts or flashes. Keep nearby landmarks recognizable between clips. Higher intensity means a smaller amount of movement, not a frozen image. Do not claim to measure or change their mental state. On crisis return no visual. Otherwise omit visual.
 
@@ -107,6 +108,13 @@ module.exports = async (req, res) => {
   const key = process.env.ANTHROPIC_KEY;
   if (!key) { res.status(500).json({ error: "The mind has no key configured (set ANTHROPIC_KEY in Vercel)." }); return; }
 
+  if (stage === "choice_intent") {
+    try {
+      const result = await require("../lib/orb-choice-routing").route(body, key);
+      return res.status(result.status).json(result.body);
+    } catch { return res.status(502).json({error:"I couldn’t understand that reply just now. You can try again or use a button."}); }
+  }
+
   // keep the context small and typed — visitor text is bounded, never trusted
   const clip = (s, n) => String(s == null ? "" : s).slice(0, n);
   const person = body.person || {};
@@ -130,6 +138,8 @@ module.exports = async (req, res) => {
       grip: Number.isFinite(+person.grip) ? +person.grip : null,
       gripEnd: Number.isFinite(+person.gripEnd) ? +person.gripEnd : null,
       goalFeel: clip(person.goalFeel, 20),
+      goalWords: clip(person.goalWords, 300),
+      imageryHistory: Array.isArray(person.imageryHistory) ? person.imageryHistory.slice(-8).map(x=>({stage:clip(x?.stage,40),answer:clip(x?.answer,300)})) : [],
       people: Math.max(1, Math.min(6, +person.people || 1)),
       soundscape: ["underwater","sky","forest","shore","rain","meadow","dawn","quiet"].includes(person.soundscape) ? person.soundscape : null,
       sceneKey: body.visualEnabled === true ? null : (["underwater","meadow","dawn"].includes(person.sceneKey) ? person.sceneKey : null),
@@ -151,7 +161,7 @@ module.exports = async (req, res) => {
       body: JSON.stringify({
         model: process.env.ANTHROPIC_MODEL || MODEL_DEFAULT,
         max_tokens: 550,
-        system: ORB_MIND,
+        system: ORB_MIND + "\n\n" + GUIDED_IMAGERY,
         messages: [{ role: "user", content: "Voice this moment of the session:\n" + JSON.stringify(ctx) }]
       })
     });

@@ -41,7 +41,8 @@ module.exports = async (req, res) => {
   // GET availability is public; every paid mutation needs an allowed browser origin.
   const key = process.env.OPENAI_API_KEY;
   const enabled = process.env.ORB_LIVE_ENABLED === 'true' && !!key;
-  if (req.method === 'GET') return res.status(200).json({ enabled, maxSeconds: 180 });
+  const geminiEnabled = process.env.ORB_GEMINI_LIVE_ENABLED === 'true' && !!process.env.GEMINI_API_KEY;
+  if (req.method === 'GET') return res.status(200).json({ enabled: enabled || geminiEnabled, providers: { openai: enabled, gemini: geminiEnabled }, maxSeconds: 180 });
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   if (!originOk) return res.status(403).json({ error: 'This check-in only serves its configured sites.' });
   let body = req.body;
@@ -57,8 +58,10 @@ module.exports = async (req, res) => {
       return res.status(upstream.ok || upstream.status === 404 ? 200 : 502).json({ closed: upstream.ok || upstream.status === 404 });
     } catch { return res.status(502).json({ error: 'Could not confirm the session ended.' }); }
   }
-  if (!enabled) return res.status(503).json({ error: 'Live check-in is not configured yet. The usual check-in is available.' });
-  if (body.action !== 'start' || typeof body.sdp !== 'string' || !body.sdp.startsWith('v=0') || body.sdp.length > 64000) {
+  const provider = body.provider || 'openai';
+  if (!['openai', 'gemini'].includes(provider)) return res.status(400).json({ error: 'Unknown live voice provider.' });
+  if (!(provider === 'gemini' ? geminiEnabled : enabled)) return res.status(503).json({ error: 'Live check-in is not configured yet. The usual check-in is available.' });
+  if (body.action !== 'start' || (provider === 'openai' && (typeof body.sdp !== 'string' || !body.sdp.startsWith('v=0') || body.sdp.length > 64000))) {
     return res.status(400).json({ error: 'A valid connection offer is required.' });
   }
   const now = Date.now();
@@ -67,6 +70,28 @@ module.exports = async (req, res) => {
   const rec = bucket.get(ip) || { time: now, count: 0 };
   if (++rec.count > 3 || bucket.size >= 5000) return res.status(429).json({ error: 'Please wait a minute before trying another live check-in.' });
   bucket.set(ip, rec);
+  if (provider === 'gemini') {
+    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
+    const setup = {
+      model: 'models/' + model,
+      generationConfig: { responseModalities: ['AUDIO'],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } } },
+      systemInstruction: { parts: [{ text: INSTRUCTIONS.replace('Delegate to the backend when a feeling needs clarification or a careful reflection. Backend results are suggestions for this check-in, not proof of improvement or completed actions. You have no other tools.', 'Ask for clarification when a feeling is unclear. You have no tools.') }] },
+      inputAudioTranscription: {}, outputAudioTranscription: {}
+    };
+    try {
+      const upstream = await fetch('https://generativelanguage.googleapis.com/v1beta/auth_tokens', {
+        method: 'POST', headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uses: 1, expireTime: new Date(now + 240000).toISOString(),
+          newSessionExpireTime: new Date(now + 60000).toISOString(),
+          bidiGenerateContentSetup: setup }), signal: AbortSignal.timeout(15000)
+      });
+      if (!upstream.ok) return res.status(502).json({ error: upstream.status === 429 ? 'Gemini Live is at its quota or rate limit. Please try again later.' : 'Gemini Live could not start. Check the website’s Gemini key and model access.', diagnostic: { status: upstream.status } });
+      const token = await upstream.json();
+      if (typeof token.name !== 'string' || !token.name) throw new Error('Missing token');
+      return res.status(201).json({ token: token.name, setup, maxSeconds: 180 });
+    } catch { return res.status(502).json({ error: 'Gemini Live could not connect. Please use the usual check-in.' }); }
+  }
   try {
     const upstream = await fetch(API, {
       method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -83,7 +108,8 @@ module.exports = async (req, res) => {
     if (!upstream.ok) {
       const detail = await upstream.json().catch(() => ({}));
       const code = typeof detail.error?.code === 'string' ? detail.error.code : '';
-      const reason = code === 'insufficient_quota' ? 'The OpenAI project used by this website has insufficient API quota.'
+      const reason = code === 'credit_balance_exhausted' ? 'The OpenAI project used by this website has no API credits remaining. Add credits to that project to use GPT-Live 1.'
+        : code === 'insufficient_quota' ? 'The OpenAI project used by this website has insufficient API quota.'
         : upstream.status === 401 ? 'OpenAI rejected the website’s API key.'
         : upstream.status === 403 || code === 'model_not_found' ? 'The website’s OpenAI project cannot access GPT-Live 1.'
         : upstream.status === 429 ? 'OpenAI temporarily limited live session requests. Please try again shortly.'

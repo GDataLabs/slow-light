@@ -98,12 +98,12 @@
         this.seen.add(event.event_id);
       }
       if (event.type === 'session.started' && this.state === 'connecting') {
-        this.options.onConnected?.();
         this.state = 'active'; this.connectMs = Date.now() - this.startedAt;
+        this.options.onConnected?.();
         this.status('Microphone on · You can speak while the Orb speaks. Pauses are welcome.');
         this.send({ type: 'session.instructions.append', event_id: 'orb_greeting', delegation_id: null,
           content: 'Greet immediately in English without waiting for the visitor: welcome them briefly, invite them to imagine their current feeling as a texture or a movement, and ask what they notice. Then pause and listen.' });
-        this.later(() => this.options.onEnded?.('This short live check-in has reached three minutes. Take your time reviewing your words.'), 180000);
+        this.later(() => { this.options.onEnded?.('This short live check-in has reached three minutes. Take your time reviewing your words.'); void this.close(); }, 180000);
         return;
       }
       if (event.type === 'error') { this.fail('Live voice could not continue. Your words are still available to review.'); return; }
@@ -211,12 +211,18 @@
     async availability() {
       const checkbox = document.getElementById('liveOptIn');
       try {
-        if (!navigator.mediaDevices?.getUserMedia || !root.RTCPeerConnection) throw new Error('unsupported');
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('unsupported');
         const response = await fetch(root.SLOWLIGHT_PUBLIC?.live || '/api/orb-live', { signal: AbortSignal.timeout(5000) });
         const result = await response.json();
         if (!response.ok || !result.enabled) throw new Error('unavailable');
+        const providers=result.providers || {openai:result.enabled};
+        const select=document.getElementById('liveProvider');
+        const supported={openai:!!root.RTCPeerConnection,gemini:!!(root.WebSocket && root.AudioWorkletNode && (root.AudioContext || root.webkitAudioContext))};
+        for(const option of select.options)option.disabled=!providers[option.value] || !supported[option.value];
+        if(!Array.from(select.options).some(o=>!o.disabled))throw new Error('unavailable');
+        if(select.selectedOptions[0].disabled)select.value=Array.from(select.options).find(o=>!o.disabled).value;
         checkbox.disabled = false;
-        document.getElementById('liveAvailability').textContent = 'Configured on this website; connection is checked when you begin. Select this option to try GPT-Live.';
+        document.getElementById('liveAvailability').textContent = 'Choose a live voice to begin your session. Connection and account access are checked when you begin.';
       } catch {
         checkbox.checked = false; checkbox.disabled = true;
         document.getElementById('liveAvailability').textContent = location.hostname === '127.0.0.1' || location.hostname === 'localhost' ? 'Live voice is unavailable in this local preview. Your Vercel settings apply at slow-light.vercel.app/orb.html.' : 'Live voice isn’t available here yet. The usual check-in is ready.';
@@ -224,15 +230,18 @@
     },
     begin({ guard }) {
       const get = id => document.getElementById(id);
+      const provider = get('liveProvider')?.value || 'openai';
+      const name = provider === 'gemini' ? 'Gemini Live' : 'GPT-Live 1';
+      const Connection = provider === 'gemini' ? this.GeminiConnection : LiveConnection;
       const panel = get('liveCheckIn'); panel.hidden = false;
-      get('voiceModeStatus').textContent = 'Connecting GPT-Live · Not connected yet';
+      get('voiceModeStatus').textContent = 'Connecting ' + name + ' · Not connected yet';
       get('orbLiveFallback').focus();
       document.body.classList.add('orb-live-active');
       let settle, finished = false, reviewing = false;
       const result = new Promise(resolve => { settle = resolve; });
-      const connection = this.current = new LiveConnection({
+      const connection = this.current = new Connection({
         endpoint: root.SLOWLIGHT_PUBLIC?.live || '/api/orb-live', brain: root.SLOWLIGHT_PUBLIC?.brain || '/api/orb', guard,
-        onConnected: () => { get('voiceModeStatus').textContent = 'GPT-Live connected · Live opening conversation'; },
+        onConnected: () => { get('voiceModeStatus').textContent = name + ' connected · Live conversation'; },
         onStatus: text => { get('orbLiveStatus').textContent = text; get('orbLiveMute').disabled = connection.state !== 'active'; },
         onTranscript: (role, text) => {
           get(role === 'input' ? 'orbLiveUser' : 'orbLiveAssistant').textContent = text;
@@ -250,7 +259,7 @@
       async function review(message = 'Microphone off. Edit these words so they say what you mean.') {
         if (reviewing || finished) return; reviewing = true;
         get('orbLiveStatus').textContent = message;
-        get('voiceModeStatus').textContent = connection.connectMs == null ? 'GPT-Live did not connect' : 'GPT-Live ended · Microphone off';
+        get('voiceModeStatus').textContent = connection.connectMs == null ? name + ' did not connect' : name + ' ended · Microphone off';
         get('orbLiveReview').disabled = true; get('orbLiveMute').disabled = true; get('orbLivePlay').hidden = true;
         get('orbLiveReviewFields').hidden = false;
         // Only the reviewed, bounded answer enters the normal journey; no auto-submit.
@@ -262,7 +271,7 @@
         get('orbLiveMetrics').textContent = [
           connection.connectMs == null ? 'Voice did not connect.' : `Connected in ${(connection.connectMs/1000).toFixed(1)} seconds.`,
           connection.usage == null ? 'Voice duration unavailable.' : `Voice duration: ${Math.ceil(connection.usage)} seconds.`,
-          connection.finalized ? 'Session ending confirmed.' : connection.hangupConfirmed ? 'Hangup confirmed; final usage unavailable.' : 'Final session usage could not be confirmed.'
+          provider === 'gemini' ? 'Microphone and audio connection closed.' : connection.finalized ? 'Session ending confirmed.' : connection.hangupConfirmed ? 'Hangup confirmed; final usage unavailable.' : 'Final session usage could not be confirmed.'
         ].join(' ');
       }
       get('orbLiveWords').oninput = () => { get('orbLiveUse').disabled = !get('orbLiveWords').value.trim(); };
@@ -273,7 +282,7 @@
         const muted = connection.mute(); get('orbLiveMute').textContent = muted ? 'Resume microphone' : 'Pause microphone';
         get('orbLiveMute').setAttribute('aria-pressed', String(!!muted));
       };
-      get('orbLivePlay').onclick = () => { connection.audio?.play().then(() => { get('orbLivePlay').hidden = true; }).catch(() => { get('orbLiveStatus').textContent = 'Audio is blocked. You can read the captions or use the usual check-in.'; }); };
+      get('orbLivePlay').onclick = () => { (connection.resumePlayback ? connection.resumePlayback() : connection.audio.play()).then(() => { get('orbLivePlay').hidden = true; }).catch(() => { get('orbLiveStatus').textContent = 'Audio is blocked. You can read the captions or use the usual check-in.'; }); };
       this.onHidden = () => { if (document.hidden && !finished) void review('Microphone off because you left this page. Review your words when you are ready.'); };
       document.addEventListener('visibilitychange', this.onHidden);
       const onLeave = () => connection.dispose(); root.addEventListener('pagehide', onLeave, { once: true });

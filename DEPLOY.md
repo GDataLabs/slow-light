@@ -92,3 +92,47 @@ to measure end-of-turn latency from transcript fragments.
 `voice-config.js` (gitignored) next to orb.html holds your key for local
 testing; with it present the orb calls ElevenLabs directly and ignores the
 proxy. `.env`, `.env.*`, and `.vercel/` are gitignored too.
+
+### Gemini Live and spoken scene choices
+
+The opening check-in now has a provider selector for **GPT-Live 1** and
+**Gemini Live**. Each option is available only when its server configuration and
+browser audio support are present. The existing guided ElevenLabs voice continues
+through the rest of the journey. Scene confirmations and continue/wait choices
+listen automatically after the Orb finishes speaking. Visitors can say “yes”,
+“not quite”, “change that”, “stay here”, or “continue” where applicable. Unclear
+answers leave the question open; the buttons and **Speak an answer** retry remain
+available. This uses the existing speech recognition service.
+
+For Gemini, set these server environment variables and redeploy:
+
+- `GEMINI_API_KEY`: your Google Gemini API key, with Live API access and quota.
+- `ORB_GEMINI_LIVE_ENABLED=true`.
+- Optional `GEMINI_LIVE_MODEL`: defaults to `gemini-3.1-flash-live-preview`.
+
+No permanent Gemini key is sent to the browser. `/api/orb-live` issues a one-use
+token constrained to the server's model and conversation configuration. The token
+allows a new connection for one minute and expires after four minutes. The browser
+ends the conversation after three minutes, when hidden, or when reviewing words.
+Gemini streams microphone PCM over a token-authenticated WebSocket, supports
+interruptions, and supplies input/output captions for the same review flow as GPT.
+Audio capture runs in an AudioWorklet; playback sources, microphone tracks, and the
+socket close together. HTTPS (or localhost), WebSockets and AudioWorklet support
+are required. Google processes this optional live audio; existing journey processing
+applies to the words the visitor reviews and chooses to use.
+
+GPT Live troubleshooting: `credit_balance_exhausted` means the OpenAI project
+behind this website's `OPENAI_API_KEY` needs API credits. It is not a temporary
+rate limit, and a ChatGPT subscription does not configure this website's API
+billing. Keep the existing `ORB_LIVE_ENABLED=true` setting. The app now explains
+this distinction instead of suggesting an immediate retry.
+
+References: [OpenAI Live WebRTC](https://developers.openai.com/api/docs/guides/voice-webrtc?api=live),
+[Gemini WebSocket setup](https://ai.google.dev/gemini-api/docs/live-api/get-started-websocket),
+and [Gemini ephemeral tokens](https://ai.google.dev/gemini-api/docs/live-api/ephemeral-tokens).
+
+Validation: `npm test` covers token constraints, origin checks, provider availability,
+credit errors, spoken-choice matching, Gemini setup, PCM streaming, interruption,
+mute and resource cleanup. Test both providers with real microphone audio after
+credentials are configured; mocked transports cannot verify voice quality, echo,
+account access or provider-side behavior.
