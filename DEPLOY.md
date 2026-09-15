@@ -136,3 +136,33 @@ credit errors, spoken-choice matching, Gemini setup, PCM streaming, interruption
 mute and resource cleanup. Test both providers with real microphone audio after
 credentials are configured; mocked transports cannot verify voice quality, echo,
 account access or provider-side behavior.
+
+### Optional camera reference
+
+In the intro, expand **See myself in the visualization**, then select **Take my
+photo**. Camera permission is requested only from that button; microphone audio
+is not requested. Capture shuts the camera off and shows a preview. **Use photo
+and enable video** approves the reference and enables living visuals; canceling
+or retaking does not upload a draft.
+
+Approved photos are resized and re-encoded as bounded JPEG data in memory for the
+current visit. They are not added to browser storage, conversation requests, or
+signed job tickets. Video submissions send the approved reference through the
+existing server route to fal. The existing `FAL_KEY` is used; no additional key is
+required. Provider retention policies apply. Removing the photo during the journey
+stops visuals, cancels outstanding generation where possible, and clears the local
+reference; it does not promise deletion of data already processed by fal.
+
+When a photo is approved, signed scene prompts opt into
+`minimax/h3-max/reference-to-video`. The first reference is always the approved
+photo; subsequent clips also include the preceding final frame as Image 2. Signed
+continuity includes a hash of the reference so changing or removing it cannot
+silently reuse an incompatible sequence. Nature-only requests retain their existing
+text-to-video / image-to-video routes. The conversation model receives only the
+photo-mode flag, not the photo, and does not infer personal attributes from it.
+
+The feature requires HTTPS or localhost and a browser with camera access. Camera
+capture, late permission cancellation, tab hiding, approval/removal, reference
+validation and continuity are covered by tests. Browser checks use a simulated
+camera and no real photo upload. Actual likeness and motion quality still need a
+visitor-approved photo test; identity consistency is not guaranteed.

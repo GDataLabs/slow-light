@@ -262,6 +262,12 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
       The orb is AI, not a person — it can be wrong, and it isn't therapy or crisis support. If things feel heavy, please reach a real person: in the US call or text <a href="tel:988">988</a>, elsewhere <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a>.
     </div>
     <p><label><input type="checkbox" id="livingOptIn"> Create living visualizations from my answers</label><br><span class="tiny">Optional AI video: an abstract scene description goes to fal to create short clips. Your starting feelings and your answers help shape it. Any check-in carried from the previous page is included only if you turn this on. You can pause or stop at any time.</span></p>
+    <details><summary>See myself in the visualization · optional</summary>
+      <p class="tiny">Take a photo of how you look right now. If you choose to use it, your photo goes to fal with your video requests. Your appearance may vary between clips. We keep the reference only for this visit, not in browser storage; the provider’s retention policies apply.</p>
+      <img id="portraitSelected" hidden alt="Your selected reference photo" style="width:100px;border-radius:12px">
+      <p id="portraitSummary" class="tiny" role="status">No reference photo selected.</p>
+      <button class="obtn" id="portraitOpen">Take my photo</button> <button class="obtn" id="portraitRemove" hidden>Remove photo</button>
+    </details>
     <p><label><input type="checkbox" id="liveOptIn" disabled aria-describedby="livePrivacy liveAvailability"> Start with a live voice conversation</label><br><label for="liveProvider">Live voice</label> <select id="liveProvider"><option value="openai">GPT-Live 1</option><option value="gemini">Gemini Live</option></select><br><span class="tiny" id="livePrivacy">Talk naturally with the Orb, including while it speaks. Your selected provider (OpenAI or Google) processes microphone audio during this optional conversation (up to three minutes). Transcripts may go to our AI service for reflection. When you’re ready, review your words and continue with the guided visualization. You can answer its questions by voice too. We do not save live recordings or transcripts in this browser.</span><br><span class="tiny" id="liveAvailability" role="status">Checking live voice availability…</span></p>
     <p><button class="obtn primary" id="beginBtn" style="font-size:17px; padding:15px 34px">I understand — begin</button>
        <a class="obtn" href="index.html" style="text-decoration:none; margin-left:6px">Back to Slow Light</a></p>
@@ -272,6 +278,16 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
     </details>
   </div>
 </div>
+
+<dialog id="portraitDialog" style="width:min(90vw,460px);max-height:90vh;overflow:auto;background:#09131c;color:#ecf4f6;border:1px solid #7fd4c166;border-radius:20px;padding:22px" aria-labelledby="portraitTitle">
+  <h2 id="portraitTitle">A picture of you, right now</h2>
+  <p class="tiny">The camera takes a still photo without microphone audio. Nothing is sent until you choose to use the photo and begin your visualization.</p>
+  <video id="portraitCamera" autoplay muted playsinline style="width:100%;max-height:40vh;object-fit:contain;border-radius:12px"></video>
+  <img id="portraitDraft" hidden alt="Preview of the photo you just took" style="width:100%;max-height:40vh;object-fit:contain;border-radius:12px">
+  <p id="portraitStatus" role="status"></p>
+  <div style="display:flex;flex-wrap:wrap;gap:8px"><button class="obtn" id="portraitCapture">Take photo</button> <button class="obtn" id="portraitRetake" hidden>Retake / try again</button>
+  <button class="obtn primary" id="portraitUse" hidden>Use photo and enable video</button> <button class="obtn" id="portraitCancel">Cancel</button></div>
+</dialog>
 
 <div id="voiceRecovery" hidden style="position:fixed;top:60px;left:16px;right:16px;max-width:560px;z-index:25;padding:14px;border-radius:16px;background:#09131cf5;border:1px solid #7fd4c166"><p id="voiceError" role="status"></p><p id="voiceRecoveryLine"></p><button class="obtn" id="voiceRetry">Retry preferred voice</button> <button class="obtn" id="voiceBrowser">Use browser voice</button> <button class="obtn" id="voiceRead">Continue without this audio</button></div>
 <div id="voiceModeStatus" role="status" style="position:fixed;top:14px;left:16px;z-index:23;max-width:65vw;font-size:13px;color:#c9f2e6;pointer-events:none"></div>
@@ -301,6 +317,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
 
 <div id="singleVideoNotice" hidden style="position:fixed;top:70px;left:16px;z-index:7;max-width:340px;padding:12px;background:#09121cee;border-radius:14px" role="status">Single-clip scenery. For evolving video, <a href="orb.html">begin again</a> and enable “Create living visualizations from my answers.”</div>
 <div id="livingControls" hidden style="position:fixed;top:64px;left:16px;right:16px;z-index:7;max-width:360px;padding:10px;border-radius:16px;background:rgba(4,6,10,.8)">
+  <button class="obtn" id="portraitStop" hidden>Remove photo and stop visuals</button>
   <span id="livingStatus" role="status" style="display:block;font-size:13px">Waiting for your place</span>
   <button class="obtn" id="livingPause" aria-pressed="false">Pause visuals</button>
   <button class="obtn" id="livingStop">Stop visuals</button>
@@ -412,6 +429,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
 <script src="orb-gemini.js"></script>
 <script src="orb-choices.js"></script>
 <script src="orb-guidance.js"></script>
+<script src="orb-portrait.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 "use strict";
@@ -516,7 +534,7 @@ const Brain={
     if(this.down && stage!=="scene_update") return fallback;
     try{
       const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(), 8000);
-      const ctx={ stage, voiceVariation:window.OrbLanguage.variation, visualEnabled:window.OrbVisual.enabled, recentLines:this.recent.slice(-8), person:{
+      const ctx={ stage, includePortrait:window.OrbVisual.enabled && !!window.OrbPortrait.reference, voiceVariation:window.OrbLanguage.variation, visualEnabled:window.OrbVisual.enabled, recentLines:this.recent.slice(-8), person:{
         sceneRequest:window.OrbVisual.enabled ? S.sceneRequest||"" : "",
         initialCheckIn:window.OrbVisual.enabled ? S.initialCheckIn : null,
         initialWords:window.OrbVisual.enabled ? S.initialWords||"" : "",
@@ -2133,6 +2151,8 @@ $("#beginBtn").addEventListener("click", async ()=>{
   if($("#beginBtn").disabled)return;
   $("#beginBtn").disabled=true;
   const liveOpening = $("#liveOptIn").checked ? window.OrbLive.begin({guard}) : null;
+  $("#portraitStop").hidden=!($("#livingOptIn").checked && window.OrbPortrait.reference);
+  window.OrbPortrait.stopCamera();
   window.OrbVisual.start({ enabled:$("#livingOptIn").checked, onShow:(ticket)=>{ Media.syncAudio();$("#ambBtn").classList.add("show"); Media.showSound(ticket); Media.clearBackdrop(); if(T) T.scene.background=null; } });
   $("#introVeil").classList.add("hide");
   if(!HAVE_3D){

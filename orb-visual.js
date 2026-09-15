@@ -23,7 +23,7 @@
   const api = async (action, ticket, signal, previous, frame) => {
     const r = await fetch(window.SLOWLIGHT_PUBLIC?.video || '/api/orb-video', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, ticket, ...(previous ? { continuity: previous, frame } : {}) }), signal: signal || AbortSignal.timeout(15000)
+      body: JSON.stringify({ action, ticket, ...(action === 'submit' && window.OrbPortrait?.reference ? {referencePhoto:window.OrbPortrait.reference} : {}), ...(previous ? { continuity: previous, frame } : {}) }), signal: signal || AbortSignal.timeout(15000)
     });
     const data = await r.json().catch(()=>({}));
     if (!r.ok) { const error=Error(data.error || `Video service returned ${r.status}.`); error.status=r.status; throw error; }
@@ -278,7 +278,7 @@
       this.enabled = false; this.showing = false; ended = true; invalidate(); notify(null);
       clearTimeout(retireTimer);retireDone?.();retireDone=null;hold?.remove();hold=null;
       videos.forEach(v => { v.onended=null;v.pause(); v.removeAttribute('src'); v.load(); v.remove(); });
-      videos = []; active = -1; continuity = null; finalFrame = null; $('livingControls').hidden = true;
+      videos = []; active = -1; continuity = null; finalFrame = null; $('livingControls').hidden = true; window.OrbPortrait?.clear();
     }
   };
   // Controls are later in the parsed page; wire them after DOM completion.

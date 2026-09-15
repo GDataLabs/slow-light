@@ -122,6 +122,7 @@ module.exports = async (req, res) => {
     stage,
     voiceVariation: [0,1,2].includes(body.voiceVariation) ? body.voiceVariation : 0,
     visualEnabled: body.visualEnabled === true,
+    includePortrait: body.visualEnabled === true && body.includePortrait === true,
     openingVariation: body.visualEnabled === true && stage === "scene_intro" ? {
       scale: ["an intimate nearby natural detail", "a sheltered middle-distance view", "an expansive open view"][randomInt(3)],
       light: ["soft reflected daylight", "diffused light through a natural canopy", "gentle slanting light", "soft luminous overcast light"][randomInt(4)],
@@ -161,7 +162,7 @@ module.exports = async (req, res) => {
       body: JSON.stringify({
         model: process.env.ANTHROPIC_MODEL || MODEL_DEFAULT,
         max_tokens: 550,
-        system: ORB_MIND + "\n\n" + GUIDED_IMAGERY,
+        system: ORB_MIND + "\n\n" + GUIDED_IMAGERY + (ctx.includePortrait ? "\nPHOTO REFERENCE MODE: The visitor explicitly chose to include their own photo. This overrides the no-people restriction only for that one referenced person. Include the person from Image 1 in the requested gentle activity, such as floating above clouds or walking calmly. Their appearance and clothing come only from the reference photo, which you do not see; do not guess identity, age, ethnicity, health, or mood from it. Use an external viewpoint so they can see themselves. No other people, dangerous action, nudity, or dialogue. The photo is sent separately to the video provider; never request or emit it here. Follow their explicit activity preferences without promising a feeling." : ""),
         messages: [{ role: "user", content: "Voice this moment of the session:\n" + JSON.stringify(ctx) }]
       })
     });
@@ -186,7 +187,7 @@ module.exports = async (req, res) => {
     const visual = body.visualEnabled === true && !out.crisis &&
       ["scene_intro", "scene_update", "release_response", "close"].includes(stage) &&
       typeof out.visual === "string" && out.visual.trim() && process.env.FAL_KEY
-      ? sign({kind: "prompt", duration: [5,10,15].includes(out.clipSeconds) ? out.clipSeconds : (stage === "scene_intro" ? 5 : stage === "close" ? 15 : 10), prompt: out.visual.slice(0, 900) + " Gentle nature only. Visible slow natural motion and a very slow continuous forward glide. No turns, roll, zoom, people, text, flashes or abrupt cuts."}, process.env.FAL_KEY) : null;
+      ? sign({kind: "prompt", includePortrait: ctx.includePortrait, duration: [5,10,15].includes(out.clipSeconds) ? out.clipSeconds : (stage === "scene_intro" ? 5 : stage === "close" ? 15 : 10), prompt: out.visual.slice(0, 900) + (ctx.includePortrait ? " Show only the person from Image 1, preserving their appearance and clothing. Gentle, comfortable movement in nature. No extra people, text, flashes, abrupt cuts or dangerous action." : " Gentle nature only. Visible slow natural motion and a very slow continuous forward glide. No turns, roll, zoom, people, text, flashes or abrupt cuts.")}, process.env.FAL_KEY) : null;
     res.status(200).json({
       visual,
       sceneDescription: visual ? out.visual.slice(0,900) : null,
