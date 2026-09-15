@@ -55,6 +55,6 @@ test('guided imagery includes observation, adjustment and return without requiri
   assert.deepEqual(guidance.steps.map(s=>s.id),['imagery_place','imagery_senses','imagery_notice','imagery_adjust','imagery_carry']);
   assert.equal(guidance.steps.find(s=>s.id==='imagery_notice').visual,false);
   assert.match(guidance.instructions,/no emotional outcome is presumed/);
-  const html=fs.readFileSync('orb.html','utf8');assert.match(html,/if\(window.OrbVisual.enabled\)await sceneCheckpoint\(openingTicket\);\s*await guideScene\(\);/);
+  const html=fs.readFileSync('orb.html','utf8');assert.match(html,/if\(window.OrbVisual.enabled && openingTicket\)await sceneCheckpoint\(openingTicket\);[\s\S]*?await guideScene\(\);/);
   assert.match(html,/S.goalWords=guard\(feel\)/);assert.doesNotMatch(html,/Try live voice for the opening check-in/);
 });

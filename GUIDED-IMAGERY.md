@@ -28,8 +28,8 @@ It does not explore trauma or explain worsening feelings as a sign of progress.
 
 1. **Orient:** support beneath the body, optional natural breathing, eyes open if preferred.
 2. **Choose a direction:** retain the visitor’s desired feeling in their own words.
-3. **Find supportive imagery:** a personally meaningful moment or place, real or imagined.
-4. **Explore a sense:** one comfortable sound, texture or light detail at a time.
+3. **Recognize the desired feeling inwardly:** invite the visitor to describe how they would recognize it in their sensations, thoughts or emotions.
+4. **Develop an image:** invite an image, texture or movement associated with that inward observation; use ordinary words if imagery is difficult.
 5. **Observe:** invite an honest report without assuming change.
 6. **Adjust:** ask what would be more supportive, retaining their corrections.
 7. **Carry and return:** optionally recall a detail, then attend to the room and move gently.
@@ -69,3 +69,13 @@ Browser checks exercise typed conversational feedback and button fallback with a
 mocked interpretation service. Real model interpretation quality and the exercise’s
 emotional effects require separate user evaluation; passing these tests establishes
 neither clinical efficacy nor perfect understanding of every utterance.
+
+### Waiting for video versus reflecting
+
+Video preparation is a separate state from a reflection question. The Orb does not
+announce that a generated place is present before playback has been confirmed.
+Progress appears beside the conversation, and failures offer retry or continuation
+without video. The visitor can still say continue while waiting. Once the requested
+video is displayed, the guide proceeds to reflection without an extra readiness
+question. The brain replaces a prose-only response at an imagery question stage
+with the corresponding fallback question, preserving crisis responses.

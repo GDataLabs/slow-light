@@ -1,8 +1,8 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm'),fs=require('node:fs');
-function fixture({failPoll=false,manualFrames=false,holdContinuation=false}={}) {
-  const scheduled=new Set(),submissions=[],nodes=new Map(),playback=[];let plays=0,polls=0;
+function fixture({failPoll=false,manualFrames=false,holdContinuation=false,failFirstSubmit=false}={}) {
+  const scheduled=new Set(),submissions=[],nodes=new Map(),playback=[];let plays=0,polls=0,attempts=0;
   const later=(fn,ms=0)=>{const t=setTimeout(()=>{scheduled.delete(t);fn();},ms<=1200?1:ms);scheduled.add(t);return t;};
   const node=()=>({hidden:false,textContent:'',classList:{values:new Set(),add(v){this.values.add(v);},remove(v){this.values.delete(v);},contains(v){return this.values.has(v);}},style:{},remove(){},setAttribute(){},click(){this.onclick?.();},children:[],appendChild(child){this.children.push(child);}});
   const get=id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);};
@@ -21,7 +21,7 @@ function fixture({failPoll=false,manualFrames=false,holdContinuation=false}={}) 
   const context=vm.createContext({window:{},document,matchMedia:()=>({matches:false,addEventListener(){}}),addEventListener(){},setTimeout:later,clearTimeout,AbortController,AbortSignal,
     fetch:async (_url,options)=>{
       const body=JSON.parse(options.body);
-      if(body.action==='submit'){submissions.push(body);return {ok:true,json:async()=>({ticket:'job-'+submissions.length,duration:5})};}
+      if(body.action==='submit'){if(failFirstSubmit && ++attempts===1)return {ok:false,status:503,json:async()=>({error:'Living visuals are not connected yet.'})};submissions.push(body);return {ok:true,json:async()=>({ticket:'job-'+submissions.length,duration:5})};}
       if(body.action==='cancel')return {ok:true,json:async()=>({})};
       if(holdContinuation && submissions.length>1)return {ok:true,json:async()=>({status:'PENDING'})};
       polls++;if(failPoll&&polls===2)throw Error('temporary network outage');
@@ -135,5 +135,17 @@ test('native sound follows the displayed video and respects mute and narration d
     next.firstFrame();await until(()=>next.muted===false);
     assert.equal(first.muted,true);assert.equal(first.volume,0);
     f.view.setAudio({enabled:false});assert.equal(next.muted,true);
+  }finally{f.cleanup();}
+});
+
+test('video failure reaches waiting UI with an honest no-video message and can be retried',async()=>{
+  const f=fixture({failFirstSubmit:true}),messages=[];
+  try{
+    f.view.start({enabled:true});const unsubscribe=f.view.subscribe(text=>messages.push(text));f.view.update('opening');
+    assert.equal(await f.view.waitFor('opening'),false);
+    assert.equal(f.view.failed,true);assert.equal(f.view.showing,false);
+    assert.match(f.view.message,/No video has appeared yet/);assert.match(messages.at(-1),/not connected/);
+    assert.equal(f.view.retry(),true);assert.equal(await f.view.waitFor('opening'),true);
+    assert.equal(f.view.showing,true);unsubscribe();
   }finally{f.cleanup();}
 });

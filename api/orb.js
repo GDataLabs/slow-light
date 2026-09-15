@@ -13,7 +13,7 @@
 const { randomInt } = require("node:crypto");
 const { sign } = require("../lib/orb-visual");
 const { clean: cleanCheckIn } = require("../orb-checkin");
-const { instructions: GUIDED_IMAGERY } = require("../orb-guidance");
+const { instructions: GUIDED_IMAGERY, steps: IMAGERY_STEPS } = require("../orb-guidance");
 const MODEL_DEFAULT = "claude-haiku-4-5";
 const RATE_LIMIT_PER_MIN = 40;
 const bucket = new Map();
@@ -178,6 +178,11 @@ module.exports = async (req, res) => {
       // the model spoke plainly — accept its words rather than fail
       out = { line: text.trim().slice(0, 400), crisis: false, moods: [] };
     }
+    const imageryStep=IMAGERY_STEPS.find(step=>step.id===stage);
+    if(!out.crisis && imageryStep && (out.line.match(/\?/g)||[]).length!==1)out.line=imageryStep.question;
+    // A generated prompt does not establish that a video has appeared.
+    if(!out.crisis && stage==="scene_intro" && body.visualEnabled===true)
+      out.line="I’ll prepare an image from what you’ve shared. You don’t need to feel anything in particular as we explore it.";
     const visual = body.visualEnabled === true && !out.crisis &&
       ["scene_intro", "scene_update", "release_response", "close"].includes(stage) &&
       typeof out.visual === "string" && out.visual.trim() && process.env.FAL_KEY

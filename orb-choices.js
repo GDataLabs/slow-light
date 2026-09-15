@@ -7,6 +7,8 @@
     'let me change that': ['no', 'nope', 'not quite', 'thats not right', 'that is not correct', 'change that', 'change it', 'no thats not right'],
     'lets stay here': ['stay', 'stay here', 'lets stay', 'not yet'],
     'im ready to continue': ['ready', 'im ready', 'continue', 'lets continue', 'go ahead'],
+    'retry my video': ['retry', 'try again', 'retry the video'],
+    'continue without video': ['continue', 'go ahead', 'skip the video', 'no video'],
     'continue without waiting': ['continue', 'continue now', 'dont wait'],
     'wait for my scene': ['wait', 'keep waiting', 'wait for it'],
     'continue with this view': ['continue', 'continue now', 'use this view']

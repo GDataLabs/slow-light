@@ -5,7 +5,7 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let epoch = 0, busy = false, prompt = null, continuity = null, job = null;
   let finalFrame = null, displayedPrompt=null;
-  const waiters=new Set();
+  const waiters=new Set(), progressListeners=new Set();
   const notify=(ticket)=>{for(const fn of [...waiters])fn(ticket);};
   let hold, retireTimer, retireDone, retired=Promise.resolve();
   let audioEnabled=false,audioMuted=false,audioDucked=false,audioBlocked=false;
@@ -19,7 +19,7 @@
     v.play().catch(()=>{if(v!==videos[active])return;audioBlocked=true;mixAudio();v.play().catch(()=>{});status("Environmental audio was blocked. Tap the sound button to try again.");});
   }
   let timer, controller, videos = [], active = -1, count = 0, paused = false, ended = false, onShow;
-  const status = text => { $('livingStatus').textContent = text; };
+  const status = text => { view.message=text; $('livingStatus').textContent = text; for(const listener of progressListeners)listener(text); };
   const api = async (action, ticket, signal, previous, frame) => {
     const r = await fetch(window.SLOWLIGHT_PUBLIC?.video || '/api/orb-video', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -199,8 +199,9 @@
       if (epoch === generation) status(count >= MAX_CLIPS ? `${MAX_CLIPS}-clip session limit reached · holding the final view` : 'Living scene · moving forward from the previous frame');
     } catch (e) {
       if (epoch === generation) {
-        cancel(job); job = null; ended = true; notify(null);
-        status(`Stopped while ${phase}: ${e.name==='AbortError' ? 'The request timed out.' : e.message} Your current view is held.`);
+        cancel(job); job = null; ended = true;
+        status(`Video unavailable: ${e.name==='AbortError' ? 'The request timed out.' : e.message} ${view.showing ? 'Your current view is held.' : 'No video has appeared yet.'}`);
+        notify(null);
         $('livingRetry').hidden=false;
       }
     } finally {
@@ -208,7 +209,13 @@
     }
   }
   const view = window.OrbVisual = {
-    enabled: false, showing: false,
+    enabled: false, showing: false, message:'',
+    get failed(){return ended;},
+    subscribe(listener){progressListeners.add(listener);if(this.message)listener(this.message);return ()=>progressListeners.delete(listener);},
+    retry(){
+      if(!this.enabled || !prompt || count>=MAX_CLIPS)return false;
+      ended=false; $('livingRetry').hidden=true; status('Trying your video again…'); schedule(); return true;
+    },
     get audioBlocked(){return audioBlocked;},
     setAudio({enabled=audioEnabled,muted=audioMuted,ducked=audioDucked,retry=false}={}){
       const activating=enabled && !muted && (!audioEnabled || audioMuted);
@@ -217,8 +224,8 @@
       mixAudio();if(retry || activating)startAudio();
     },
     waitFor(ticket) {
+      if(displayedPrompt===ticket && this.showing) return Promise.resolve(true);
       if(!ticket || !this.enabled || ended || count>=MAX_CLIPS && !busy) return Promise.resolve(false);
-      if(displayedPrompt===ticket) return Promise.resolve(true);
       return new Promise(resolve=>{
         const done=value=>{clearTimeout(timeout);waiters.delete(check);resolve(value);};
         const check=value=>{if(value===ticket)done(true);else if(value===null)done(false);};
@@ -249,7 +256,7 @@
       });
       $('livingRetry').onclick=()=>{
         if(count>=MAX_CLIPS) {status(`${MAX_CLIPS}-clip session limit reached · holding the final view`);return;}
-        ended=false;$('livingRetry').hidden=true;schedule();
+        this.retry();
       };
       $('livingPause').onclick = () => {
         paused = !paused;
@@ -260,7 +267,7 @@
       };
     },
     update(ticket) { if (!this.enabled || ended || count>=MAX_CLIPS) return false; prompt = ticket; schedule(); return true; },
-    unavailable() { if (this.enabled && !prompt) status("Living visuals are unavailable. Your Orb can continue."); },
+    unavailable() { if (this.enabled && !prompt) { status("The video could not be prepared. You can continue the reflection without it."); notify(null); } },
     finish() {
       // The conversation can finish while the environment continues evolving.
       // Only pause, stop, reduced motion, errors or the clip budget halt it.
