@@ -36,18 +36,25 @@ It does not explore trauma or explain worsening feelings as a sign of progress.
 
 The sequence runs with or without generated scenery. `orb-guidance.js` supplies
 shared stage intentions and fallback questions; the brain personalizes each stage
-using the visitor’s goal and recent answers. Only approved imagery steps update
-video. Observation and carry-forward answers do not generate scenery.
+using the visitor’s goal and recent answers. Imagery answers update video directly, without a separate approval question. Observation and carry-forward answers do not generate scenery.
 
 ## Conversational feedback
 
-At confirmation prompts, exact short answers can be handled immediately. Other
-replies go to the existing Orb brain with the offered choices, current question,
-proposed imagery, and desired feeling. The interpretation can select only an offered
-choice. Mixed approval with a concrete change routes to change. A revised description
-retains the correction and is reflected for confirmation; a bare rejection invites
-clarification. Uncertain replies remain pending. Typed feedback uses the same route.
-Late responses are ignored after a button choice or a new question.
+Spoken and typed imagery answers are applied once. The next step builds on the
+answer; there is no read-back approval loop. Visitors can make corrections through
+the scene request controls or the adjustment question. A short “no changes” answer
+at the adjustment step keeps the current scene.
+
+Continue/wait and retry choices still accept natural speech. Exact short answers
+are handled immediately; other replies use the existing Orb brain to select only
+an offered choice. Uncertain replies remain pending. Late responses are ignored
+after a button choice or a new question.
+
+Each requested scene generates one clip, using the previous final frame for
+continuity. The final frame stays visible while the visitor reflects; waiting and
+finishing the conversation do not start extra paid clips. A new scene request
+starts the next clip. An already generating clip completes before a newer request,
+with the latest pending request taking priority over intermediate requests.
 
 The feature requires the existing server `ANTHROPIC_KEY`; it does not rely on OpenAI
 Live credits. These short feedback replies now go to the Orb’s AI service as well

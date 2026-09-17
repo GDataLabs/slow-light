@@ -98,11 +98,12 @@ proxy. `.env`, `.env.*`, and `.vercel/` are gitignored too.
 The opening check-in now has a provider selector for **GPT-Live 1** and
 **Gemini Live**. Each option is available only when its server configuration and
 browser audio support are present. The existing guided ElevenLabs voice continues
-through the rest of the journey. Scene confirmations and continue/wait choices
-listen automatically after the Orb finishes speaking. Visitors can say “yes”,
-“not quite”, “change that”, “stay here”, or “continue” where applicable. Unclear
-answers leave the question open; the buttons and **Speak an answer** retry remain
-available. This uses the existing speech recognition service.
+through the rest of the journey. Guided questions listen automatically and apply
+the answer without a second approval. Continue/wait and retry choices also accept
+voice replies; unclear choices leave the question open. The buttons and **Speak an
+answer** retry remain available. This uses the existing speech recognition service.
+Each requested scene generates one clip and holds its final frame until the next
+change, preserving the clip allowance while the visitor reflects.
 
 For Gemini, set these server environment variables and redeploy:
 

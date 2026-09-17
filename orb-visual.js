@@ -35,7 +35,7 @@
   }
   function schedule() {
     clearTimeout(timer);
-    if (view.enabled && !paused && !ended && prompt && count < MAX_CLIPS)
+    if (view.enabled && !paused && !ended && prompt && prompt !== displayedPrompt && count < MAX_CLIPS)
       timer = setTimeout(pump, 0);
   }
   async function extractFinalFrame(url, signal) {
@@ -157,7 +157,7 @@
     });
   }
   async function pump() {
-    if (busy || !view.enabled || paused || ended || !prompt || count >= MAX_CLIPS || document.hidden) return;
+    if (busy || !view.enabled || paused || ended || !prompt || prompt === displayedPrompt || count >= MAX_CLIPS || document.hidden) return;
     busy = true;
     const generation = epoch, ticket = prompt;
     controller = new AbortController();
@@ -196,7 +196,7 @@
       phase="playing the next clip";
       await play(prepared, generation, ticket, frame);
       if (epoch === generation) { continuity = result.continuity; finalFrame = frame; displayedPrompt=ticket; notify(ticket); }
-      if (epoch === generation) status(count >= MAX_CLIPS ? `${MAX_CLIPS}-clip session limit reached · holding the final view` : 'Living scene · moving forward from the previous frame');
+      if (epoch === generation) status(count >= MAX_CLIPS ? `${MAX_CLIPS}-clip session limit reached · holding the final view` : 'Your scene is ready · take your time; your next change starts the next clip');
     } catch (e) {
       if (epoch === generation) {
         cancel(job); job = null; ended = true;
@@ -223,6 +223,7 @@
       if(retry)audioBlocked=false;
       mixAudio();if(retry || activating)startAudio();
     },
+    hasShown(ticket) { return displayedPrompt===ticket && this.showing; },
     waitFor(ticket) {
       if(displayedPrompt===ticket && this.showing) return Promise.resolve(true);
       if(!ticket || !this.enabled || ended || count>=MAX_CLIPS && !busy) return Promise.resolve(false);
@@ -269,8 +270,7 @@
     update(ticket) { if (!this.enabled || ended || count>=MAX_CLIPS) return false; prompt = ticket; schedule(); return true; },
     unavailable() { if (this.enabled && !prompt) { status("The video could not be prepared. You can continue the reflection without it."); notify(null); } },
     finish() {
-      // The conversation can finish while the environment continues evolving.
-      // Only pause, stop, reduced motion, errors or the clip budget halt it.
+      // Finish any requested change, then hold the final view without buying more clips.
       schedule();
     },
     stop() {

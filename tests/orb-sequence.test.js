@@ -41,22 +41,31 @@ test('playback reports the exact displayed ticket so ambience follows the visibl
     assert.equal(shown[0],'water');assert.equal(shown.at(-1),'clouds');
   }finally{f.cleanup();}
 });
-test('three clips chain automatically, retain endpoints and accept new conversation direction',async()=>{
+test('clips follow requested changes, retain endpoints and hold between answers',async()=>{
   const f=fixture();try{
     f.view.start({enabled:true});f.view.update('opening');
     await until(()=>f.plays()>=1);
     f.view.update('new feeling');f.view.finish();
+    await until(()=>f.plays()>=2);
+    await new Promise(r=>setTimeout(r,30));
+    assert.equal(f.submissions.length,2,'finishing and reflecting must not buy extra clips');
+    f.view.update('new feeling');
+    await new Promise(r=>setTimeout(r,30));
+    assert.equal(f.submissions.length,2,'the displayed request must not be generated twice');
+    f.view.update('warmer light');
     await until(()=>f.plays()>=3);
     assert.equal(f.submissions[0].continuity,undefined);
     assert.equal(f.submissions[1].continuity,'continuity-job-1');
     assert.equal(f.submissions[2].continuity,'continuity-job-2');
     assert.match(f.submissions[2].frame,/^data:image\/jpeg/);
-    assert.equal(f.submissions[2].ticket,'new feeling');
+    assert.equal(f.submissions[2].ticket,'warmer light');
   }finally{f.cleanup();}
 });
 test('a transient status failure retries the existing job without duplicate submission',async()=>{
   const f=fixture({failPoll:true});try{
     f.view.start({enabled:true});f.view.update('opening');
+    await until(()=>f.plays()>=1);
+    f.view.update('next');
     await until(()=>f.plays()>=2);
     assert.equal(f.submissions[1].continuity,'continuity-job-1');
     assert.ok(f.plays()>=2);
@@ -101,6 +110,7 @@ test('replacement is not shown or reported until its first decoded frame',async(
     f.playback[0].firstFrame();await until(()=>shown.length===1);
     f.playback[0].ended=true;f.playback[0].events.ended?.();f.playback[0].onended();
     const hold=f.get('backdrop').children[0];
+    f.view.update('next');
     await until(()=>f.playback.length===2);
     assert.ok(hold.classList.contains('on'));assert.equal(shown.length,1);
     assert.equal(f.playback[1].classList.contains('on'),false);
@@ -130,6 +140,7 @@ test('native sound follows the displayed video and respects mute and narration d
     f.view.setAudio({muted:true});assert.equal(first.muted,true);
     f.view.setAudio({muted:false,ducked:false});assert.equal(first.muted,false);
     first.ended=true;first.events.ended?.();first.onended();
+    f.view.update('next');
     await until(()=>f.playback.some(v=>v!==first));
     const next=f.playback.find(v=>v!==first);assert.equal(next.muted,true);
     next.firstFrame();await until(()=>next.muted===false);

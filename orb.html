@@ -1656,6 +1656,7 @@ async function sceneCheckpoint(ticket){
     await UI.chips(["I’m ready to continue"],false,{waiting:true,waitingMessage:"Stay as long as you like. Say continue when you’re ready.",question:"Are you ready to continue after a pause?"});
     return;
   }
+  if(window.OrbVisual.hasShown(ticket))return;
   for(;;){
     if(!window.OrbVisual.showing)await Cap.show("Your video is still being prepared. We can wait for it, or continue reflecting while it loads.", "The scene has not appeared yet");
     const choices=UI.chips(["Continue without waiting"],false,{waiting:true,question:"Would you like to continue reflecting while the video is prepared?"});
@@ -1692,26 +1693,12 @@ async function guideScene(){
       if(/(?:feel(?:ing)? (?:worse|more anxious|unsafe)|too intense|uncomfortable|scaring me)/i.test(answer)){
         await Cap.show("Let’s pause the imagery. Look around the room and notice something familiar. There is no need to continue this exercise.");return;
       }
-      if(!step.visual)break;
-      for(;;){
-        await Cap.show("“"+answer.slice(0,200)+"” — is that what you mean, or would you change something?", "Tell me in your own words");
-        const choice=await UI.chips(["Yes, that’s close","Let me change that","Let’s stay here"],false,{proposedAnswer:answer});
-        if(choice==="Yes, that’s close")break;
-        if(choice==="Let’s stay here"){await sceneCheckpoint(null);continue;}
-        const revision=UI.lastChoice?.revisedAnswer;
-        if(revision && guard(revision)==="ok"){answer=revision;continue;}
-        await Cap.show("What would you like me to understand differently?");
-        answer=await UI.free("Tell me what you would change…");
-        if(/^(?:please )?(?:done|stop|skip|i(?:’|')?m done|i want to stop|lets stop|let’s stop)\b/i.test(answer)){
-          await Cap.show("Let the imagery rest. Notice the room around you and the support beneath you.");return;
-        }
-        if(guard(answer)==="crisis"){await showCare();return;}
-        if(guard(answer)!=="ok"){answer="";break;}
-      }
-      if(answer)break;
+      // A spoken or typed answer is the instruction; do not ask for it again.
+      break;
     }
     S.imageryHistory.push({stage:step.id,answer:answer.slice(0,300)});
-    if(step.visual && window.OrbVisual.enabled){
+    const keepScene=step.id==="imagery_adjust" && /^(?:no(?: thanks| changes?)?|nothing(?: else)?|keep (?:it|this|that)(?: as is)?|(?:it(?:’|')?s |this is )?(?:fine|good|okay|perfect)(?: as is)?)[.!]?$/i.test(answer.trim());
+    if(step.visual && window.OrbVisual.enabled && !keepScene){
       const ticket=await applySceneRequest(answer);
       if(ticket)await sceneCheckpoint(ticket);
     }

@@ -121,10 +121,12 @@ decoded frame as the starting image. A separate browser decoder extracts it
 without seeking the visible player. The original prompt remains the location anchor. The original
 scene description stays fixed; new answers only steer small atmospheric changes.
 Reference conditioning reduces drift but does not guarantee frame-exact joins.
-Generation continues between answers, with a twelve-clip session limit that
-is explicitly displayed when reached. Pause, stop, hidden tabs, reduced motion, care support, and
-session completion halt new work; in-flight cancellation is best effort and
-already running jobs may still be billed. A provider error ends generation for
+Each new scene request generates one clip; its final frame stays visible between
+answers without generating additional clips. The session limit is 24 attempts
+and is displayed when reached. Finishing the conversation lets a requested clip
+complete without starting another. Pause, stop, hidden tabs, reduced motion and
+care support halt work; in-flight cancellation is best effort and already running
+jobs may still be billed. A provider error ends generation for
 that session while the Orb continues.
 
 The endpoint accepts signed, expiring prompts from the Orb and signed job URLs.
