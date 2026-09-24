@@ -85,8 +85,28 @@ module.exports = async (req, res) => {
          : JSON.stringify(req.body);
   }
 
+  // Speech-to-text: Vercel does not hand multipart uploads to functions (the
+  // body arrives empty → ElevenLabs 422 "Field required"). The orb therefore
+  // sends the raw recording as application/octet-stream with its fields in
+  // the query string, and the multipart form is rebuilt here.
+  let target = "https://api.elevenlabs.io" + path + (qs ? "?" + qs : "");
+  if (path === "/v1/speech-to-text" && req.method === "POST" && !/multipart/i.test(ct || "")) {
+    let audio = Buffer.isBuffer(req.body) ? req.body : null;
+    if (!audio) { const parts = []; for await (const c of req) parts.push(Buffer.from(c)); audio = Buffer.concat(parts); }
+    if (!audio.length) { res.status(400).send("No audio received."); return; }
+    if (audio.length > 4_000_000) { res.status(413).send("Recording too long."); return; }
+    const form = new FormData();
+    const q = req.query || {};
+    form.append("model_id", String(q.model_id || "scribe_v1"));
+    for (const k of ["diarize", "language_code", "tag_audio_events"]) if (q[k] != null) form.append(k, String(q[k]));
+    form.append("file", new Blob([audio], { type: String(q.mime || "audio/webm") }), "answer.webm");
+    target = "https://api.elevenlabs.io/v1/speech-to-text";
+    delete headers["Content-Type"];   // fetch sets the multipart boundary
+    body = form;
+  }
+
   try {
-    const upstream = await fetch("https://api.elevenlabs.io" + path + (qs ? "?" + qs : ""), {
+    const upstream = await fetch(target, {
       method: req.method, headers, body,
     });
     res.status(upstream.status);

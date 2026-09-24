@@ -986,7 +986,7 @@ const Ears = {
     this.listening=true; this.setBtn("listening"); this.notice("Connecting speech recognition…");
     Media.duck(true);
     const stopVu=this._vuStart(an, ac);
-    let ended=false, committed="", gotAny=false;
+    let ended=false, committed="", partial="", gotAny=false;
     const started=performance.now();
     const cleanup=(send)=>{
       if(ended) return; ended=true;
@@ -997,13 +997,15 @@ const Ears = {
       live.classList.remove("on"); live.textContent="";
       this.listening=false; this._finishNow=null; this._cleanup=null;
       this.setBtn("idle");
-      const text=committed.trim();
+      const text=(committed||partial).trim();
       if(send && text && token===this._token) onText(text);
     };
     this._cleanup=()=>cleanup(false);
     this._finishNow=()=>{ try{ ws.send(JSON.stringify({message_type:"input_audio_chunk", audio_base_64:"", commit:true})); }catch(e){} setTimeout(()=>cleanup(true), 900); };
     const fallback=()=>{
       if(ended || token!==this._token) return;
+      // words already heard are the answer — never make them say it twice
+      if((committed||partial).trim()){ cleanup(true); return; }
       cleanup(false); this.rtDown=true;
       this.notice("Reconnecting the microphone…");
       this._scribeListen(stream,onText,token,opts).catch(()=>{ this.cancel(); this.notice("Voice could not connect. Tap speak to retry, or type."); });
@@ -1012,8 +1014,8 @@ const Ears = {
       let m=null; try{ m=JSON.parse(ev.data); }catch(e){ return; }
       const t=m.message_type||m.type||"";
       if(t==="partial_transcript"){
-        gotAny=true;
-        live.textContent=(committed+" "+(m.text||"")).trim();
+        gotAny=true; partial=(committed+" "+(m.text||"")).trim();
+        live.textContent=partial;
         live.classList.add("on");
       } else if(t==="committed_transcript"||t==="final_transcript"||t==="committed_transcript_with_timestamps"||t==="final_transcript_with_timestamps"){
         if(m.text){ gotAny=true; committed=(committed+" "+m.text).trim(); live.textContent=committed; live.classList.add("on"); }
@@ -1047,7 +1049,13 @@ const Ears = {
     const watch=setInterval(()=>{
       if(ended){ clearInterval(watch); return; }
       const elapsed=performance.now()-started;
-      if(!gotAny && elapsed>patience){ clearInterval(watch); fallback(); }
+      if(!gotAny && elapsed>patience){
+        // quiet thinking time is not a failure: keep the realtime ear and just listen again
+        clearInterval(watch); cleanup(false);
+        const tries=(opts._quietRestarts||0)+1;
+        if(token===this._token && tries<=3) this.listen(onText,{...opts,_quietRestarts:tries});
+        else if(token===this._token) this.notice("Tap speak when you’re ready, or type.");
+      }
       else if(elapsed>45000){ clearInterval(watch); cleanup(!!committed); }
     }, 500);
   },
@@ -1112,12 +1120,23 @@ const Ears = {
         try{
           const blob=new Blob(chunks, {type:rec.mimeType||"audio/webm"});
           if(blob.size<800) throw 0;
-          const fd=new FormData();
-          fd.append("model_id","scribe_v1");
-          fd.append("file", blob, "answer.webm");
-          if(opts.diarize){ fd.append("diarize","true"); }
-          const r=await fetch(elBase()+"/v1/speech-to-text",{method:"POST", headers:elHeaders(), body:fd});
-          if(!r.ok) throw 0;
+          const direct=elBase()===EL_API;
+          const send=()=>{
+            if(direct){
+              const fd=new FormData();
+              fd.append("model_id","scribe_v1");
+              fd.append("file", blob, "answer.webm");
+              if(opts.diarize){ fd.append("diarize","true"); }
+              return fetch(EL_API+"/v1/speech-to-text",{method:"POST", headers:elHeaders(), body:fd, signal:AbortSignal.timeout(20000)});
+            }
+            // the site proxy can't receive multipart uploads — send the raw recording
+            const q="?model_id=scribe_v1"+(opts.diarize?"&diarize=true":"")+"&mime="+encodeURIComponent(blob.type||"audio/webm");
+            return fetch(elBase()+"/v1/speech-to-text"+q,{method:"POST", headers:elHeaders({"Content-Type":"application/octet-stream"}), body:blob, signal:AbortSignal.timeout(20000)});
+          };
+          // a dropped connection shouldn't make them say it again — retry the same recording once
+          let r=await send().catch(()=>null);
+          if(!r || !r.ok){ if(token===this._token) this.notice("Still working on hearing that…"); await new Promise(z=>setTimeout(z,900)); r=await send().catch(()=>null); }
+          if(!r || !r.ok) throw 0;
           const j=await r.json();
           this._sttFails=0;
           const text=(j.text||"").trim();
