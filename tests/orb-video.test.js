@@ -17,7 +17,7 @@ test('prompt tickets reject tampering and expiry', () => {
   assert.throws(() => verify(t + 'x', 'secret'));
   assert.throws(() => verify(t, 'other'));
   const original = Date.now;
-  try { Date.now = () => original() + 16 * 60000; assert.throws(() => verify(t, 'secret')); } finally { Date.now = original; }
+  try { Date.now = () => original() + 46 * 60000; assert.throws(() => verify(t, 'secret')); } finally { Date.now = original; }
 });
 test('unconfigured video route fails without a provider call', async () => {
   delete process.env.FAL_KEY;

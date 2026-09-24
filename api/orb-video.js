@@ -65,7 +65,8 @@ module.exports = async (req, res) => {
       const b = buckets.get(ip) || { time: now, count: 0 };
       if (b.count >= 48) return res.status(429).json({ error: 'Visuals are resting. Please try again later.' });
       b.count++; buckets.set(ip, b);
-      const duration = [5, 10, 15].includes(ticket.duration) ? ticket.duration : 5;
+      // a drift clip just keeps the same place moving between answers — 10 s gives the next request time to arrive
+      const duration = continuity && body.drift === true ? 10 : [5, 10, 15].includes(ticket.duration) ? ticket.duration : 5;
       const anchor = continuity ? continuity.anchor : ticket.prompt;
 
       const direction = continuity

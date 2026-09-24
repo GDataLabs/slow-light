@@ -1,10 +1,17 @@
-/* Optional buffered clips of varying duration. No transcripts or media are stored here. */
+/* Optional buffered clips of varying duration. No transcripts or media are stored here.
+   Continuous flow: between answers the place keeps moving — each finished clip is
+   continued from its final frame ("drift" clips), and while the next clip is still
+   being made the current one dissolves back into itself instead of freezing. A new
+   answer always takes priority over a drift clip that is still generating. */
 (() => {
-  const MAX_CLIPS = 24;
+  const MAX_CLIPS = 36;
   const $ = id => document.getElementById(id);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let epoch = 0, busy = false, prompt = null, continuity = null, job = null;
   let finalFrame = null, displayedPrompt=null;
+  let finishing=false, driftOff=false, drifting=false, preemptable=false, swapping=false;
+  const wantsDrift=()=>view.flow && !finishing && !driftOff && view.showing && prompt===displayedPrompt;
+  const wantsClip=()=>!!prompt && (prompt!==displayedPrompt || wantsDrift());
   const waiters=new Set(), progressListeners=new Set();
   const notify=(ticket)=>{for(const fn of [...waiters])fn(ticket);};
   let hold, retireTimer, retireDone, retired=Promise.resolve();
@@ -20,10 +27,10 @@
   }
   let timer, controller, videos = [], active = -1, count = 0, paused = false, ended = false, onShow;
   const status = text => { view.message=text; $('livingStatus').textContent = text; for(const listener of progressListeners)listener(text); };
-  const api = async (action, ticket, signal, previous, frame) => {
+  const api = async (action, ticket, signal, previous, frame, drift) => {
     const r = await fetch(window.SLOWLIGHT_PUBLIC?.video || '/api/orb-video', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, ticket, ...(action === 'submit' && window.OrbPortrait?.reference ? {referencePhoto:window.OrbPortrait.reference} : {}), ...(previous ? { continuity: previous, frame } : {}) }), signal: signal || AbortSignal.timeout(15000)
+      body: JSON.stringify({ action, ticket, ...(action === 'submit' && window.OrbPortrait?.reference ? {referencePhoto:window.OrbPortrait.reference} : {}), ...(previous ? { continuity: previous, frame } : {}), ...(drift && previous ? {drift:true} : {}) }), signal: signal || AbortSignal.timeout(15000)
     });
     const data = await r.json().catch(()=>({}));
     if (!r.ok) { const error=Error(data.error || `Video service returned ${r.status}.`); error.status=r.status; throw error; }
@@ -35,7 +42,7 @@
   }
   function schedule() {
     clearTimeout(timer);
-    if (view.enabled && !paused && !ended && prompt && prompt !== displayedPrompt && count < MAX_CLIPS)
+    if (view.enabled && !paused && !ended && wantsClip() && count < MAX_CLIPS)
       timer = setTimeout(pump, 0);
   }
   async function extractFinalFrame(url, signal) {
@@ -78,7 +85,7 @@
     if(epoch!==generation)throw Error("Stopped");
     const next = (active + 1) % 2;
     const video = videos[next];
-    video.classList.remove("on");video.style.opacity="";
+    video.classList.remove("on");video.style.opacity="";video.style.transition='opacity .7s ease';video.playbackRate=1;video.loopPass=false;
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => done(Error('The clip could not load.')), 20000);
       const done = error => {
@@ -97,6 +104,7 @@
     const {video,next}=prepared;
     if (epoch !== generation) return;
     const previous = videos[active];
+    swapping = true;
     if (previous && !previous.ended) {
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => done(Error('Playback did not finish.')), Math.max(20000, (previous.duration + 10) * 1000));
@@ -130,6 +138,7 @@
       video.play().then(()=>{if(!video.requestVideoFrameCallback)done();},done);
     });
     if (epoch !== generation) { video.pause(); return; }
+    swapping = false;
     clearTimeout(retireTimer);
     const old=videos[active];
     // Keep the outgoing layer fully opaque under the incoming fade. Fading
@@ -144,6 +153,16 @@
       if(!view.enabled || videos[active]!==video)return;
       hold.src=frame;hold.classList.add('on');
       video.style.opacity='0';
+      if(swapping || paused || reduced.matches)return;   // the next clip takes over from this exact frame
+      // Nothing new is ready yet: keep the place moving instead of freezing.
+      // Dissolve from the held final frame back into this clip, a little slower.
+      video.loopPass=true;video.style.transition='none';
+      try{video.currentTime=0;}catch(e){}
+      video.playbackRate=.8;
+      video.play().then(()=>setTimeout(()=>{
+        if(!view.enabled || videos[active]!==video || swapping)return;
+        video.style.transition='opacity 1.6s ease';video.style.opacity='';
+      },40)).catch(()=>{});
     };
     document.body.classList.add('living-video');
     onShow?.(ticket);
@@ -157,20 +176,21 @@
     });
   }
   async function pump() {
-    if (busy || !view.enabled || paused || ended || !prompt || prompt === displayedPrompt || count >= MAX_CLIPS || document.hidden) return;
+    if (busy || !view.enabled || paused || ended || !wantsClip() || count >= MAX_CLIPS || document.hidden) return;
     busy = true;
-    const generation = epoch, ticket = prompt;
+    const generation = epoch, ticket = prompt, isDrift = ticket === displayedPrompt;
+    drifting = isDrift; preemptable = isDrift;
     controller = new AbortController();
     const deadline = setTimeout(() => controller.abort(), 120000);
     let phase="submitting the next clip";
     try {
-      status(view.showing ? 'Your next scene is taking shape…' : 'Making a place from your answers…');
+      status(isDrift ? 'Living scene · it keeps moving while you reflect' : view.showing ? 'Your next scene is taking shape…' : 'Making a place from your answers…');
       count++;
       // Do not abort submission: retain its job ticket so stop can cancel it.
-      const submitted = await api('submit', ticket, undefined, continuity, finalFrame);
+      const submitted = await api('submit', ticket, undefined, continuity, finalFrame, isDrift);
       if (epoch !== generation) { cancel(submitted.ticket); return; }
       job = submitted.ticket;
-      status(`Creating clip ${count} of ${MAX_CLIPS} · ${submitted.duration || 5} seconds`);
+      if(!isDrift) status(`Creating clip ${count} of ${MAX_CLIPS} · ${submitted.duration || 5} seconds`);
       phase="waiting for generation";
       let result, pollFailures=0;
       do {
@@ -186,8 +206,8 @@
       job = null;
       if (epoch !== generation) return;
       if (!result.continuity) throw Error("The place could not be continued.");
-      phase="reading the final frame";
-      status(`Preparing clip ${count} · preserving its final frame…`);
+      phase="reading the final frame"; preemptable = false;
+      if(!isDrift) status(`Preparing clip ${count} · preserving its final frame…`);
       const [frame,prepared] = await Promise.all([
         extractFinalFrame(result.url, controller.signal),
         prepareClip(result.url, generation)
@@ -196,25 +216,30 @@
       phase="playing the next clip";
       await play(prepared, generation, ticket, frame);
       if (epoch === generation) { continuity = result.continuity; finalFrame = frame; displayedPrompt=ticket; notify(ticket); }
-      if (epoch === generation) status(count >= MAX_CLIPS ? `${MAX_CLIPS}-clip session limit reached · holding the final view` : 'Your scene is ready · take your time; your next change starts the next clip');
+      if (epoch === generation) status(count >= MAX_CLIPS ? `${MAX_CLIPS}-clip session limit reached · the scene keeps gently looping` : 'Living scene · it keeps moving while you reflect');
     } catch (e) {
-      if (epoch === generation) {
+      if (epoch === generation && isDrift) {
+        // a drift clip is a nicety — never interrupt the person over it; keep looping this view
+        cancel(job); job = null; driftOff = true;
+        status('Living scene · holding this place gently');
+      }
+      else if (epoch === generation) {
         cancel(job); job = null; ended = true;
         status(`Video unavailable: ${e.name==='AbortError' ? 'The request timed out.' : e.message} ${view.showing ? 'Your current view is held.' : 'No video has appeared yet.'}`);
         notify(null);
         $('livingRetry').hidden=false;
       }
     } finally {
-      clearTimeout(deadline); busy = false; schedule();
+      clearTimeout(deadline); busy = false; drifting = false; preemptable = false; schedule();
     }
   }
   const view = window.OrbVisual = {
-    enabled: false, showing: false, message:'',
+    enabled: false, showing: false, message:'', flow: true,
     get failed(){return ended;},
     subscribe(listener){progressListeners.add(listener);if(this.message)listener(this.message);return ()=>progressListeners.delete(listener);},
     retry(){
       if(!this.enabled || !prompt || count>=MAX_CLIPS)return false;
-      ended=false; $('livingRetry').hidden=true; status('Trying your video again…'); schedule(); return true;
+      ended=false; driftOff=false; $('livingRetry').hidden=true; status('Trying your video again…'); schedule(); return true;
     },
     get audioBlocked(){return audioBlocked;},
     setAudio({enabled=audioEnabled,muted=audioMuted,ducked=audioDucked,retry=false}={}){
@@ -253,7 +278,13 @@
       videos = [0, 1].map(() => {
         const v = document.createElement('video');
         v.crossOrigin = 'anonymous'; v.muted = true; v.loop = false; v.style.transition = 'opacity .7s ease'; v.playsInline = true; v.preload = 'auto';
-        v.setAttribute('aria-hidden', 'true'); $('backdrop').appendChild(v); return v;
+        v.setAttribute('aria-hidden', 'true'); $('backdrop').appendChild(v);
+        // Nothing but the person's own Pause (or a hidden tab) may stop the scene —
+        // e.g. some browsers pause media when the microphone opens for a question.
+        v.addEventListener('pause', () => setTimeout(() => {
+          if (this.enabled && !paused && !document.hidden && videos[active] === v && v.paused && !v.ended) v.play().catch(() => {});
+        }, 250));
+        return v;
       });
       $('livingRetry').onclick=()=>{
         if(count>=MAX_CLIPS) {status(`${MAX_CLIPS}-clip session limit reached · holding the final view`);return;}
@@ -267,11 +298,16 @@
         else { if (active >= 0 && !videos[active].ended) videos[active].play().catch(() => {}); status('Living scene'); schedule(); }
       };
     },
-    update(ticket) { if (!this.enabled || ended || count>=MAX_CLIPS) return false; prompt = ticket; schedule(); return true; },
+    update(ticket) {
+      if (!this.enabled || ended || count>=MAX_CLIPS) return false;
+      // a new answer outranks a drift clip that is still being generated
+      if (busy && preemptable && ticket !== prompt) invalidate();
+      prompt = ticket; driftOff = false; schedule(); return true;
+    },
     unavailable() { if (this.enabled && !prompt) { status("The video could not be prepared. You can continue the reflection without it."); notify(null); } },
     finish() {
-      // Finish any requested change, then hold the final view without buying more clips.
-      schedule();
+      // Finish any requested change, then stop buying drift clips; the last one keeps looping.
+      finishing = true; schedule();
     },
     stop() {
       document.body.classList.remove("living-video");
