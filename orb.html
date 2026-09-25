@@ -82,7 +82,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
 
 /* ---------- spoken text ---------- */
 #caption{
-  position:fixed; left:50%; bottom:calc(var(--stackH, clamp(90px,16vh,160px)) + 30px); transform:translateX(-50%);
+  position:fixed; left:50%; bottom:calc(var(--stackH, 22px) + 26px + env(safe-area-inset-bottom)); transform:translateX(-50%);
   width:min(92vw, 640px); text-align:center; pointer-events:none; z-index:5;
   font-family:var(--font-display); font-weight:340; font-size:clamp(20px,3.4vw,28px);
   letter-spacing:.015em; line-height:1.5; color:rgba(236,244,246,.95);
@@ -101,6 +101,21 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
 }
 /* the mind sometimes writes a longer thought — let it shrink, never collide */
 #caption.long{font-size:clamp(17px,2.6vw,22px); line-height:1.45}
+/* short windows: keep the words and answers in the lower part of the picture */
+@media (max-height:760px){
+  #caption{font-size:clamp(17px,min(3vw,3.6vh),24px); line-height:1.4}
+  #caption.long{font-size:clamp(15px,min(2.4vw,3vh),20px)}
+  body.living-video #caption{padding:8px 16px}
+  #answers{gap:6px}
+  #turnStatus{display:none}
+  #answers .obtn{padding:10px 18px}
+  #txtIn{padding:10px 18px}
+  #sliderWrap{padding:10px 18px !important; gap:2px}
+  #sliderWrap #sliderSpeak{padding:7px 16px; align-self:center}
+  #sliderVal{font-size:19px; line-height:1.2}
+  #sliderWrap .arow{margin-top:2px !important}
+  #sliderWrap .obtn.primary{padding:8px 18px}
+}
 #subcap{transition:bottom .5s ease}
 /* the words the orb is hearing, appearing as they're spoken */
 #liveTx{
@@ -110,7 +125,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
 }
 #liveTx.on{display:block}
 #subcap{
-  position:fixed; left:50%; bottom:calc(var(--stackH, clamp(70px,13vh,130px)) + 8px); transform:translateX(-50%);
+  position:fixed; left:50%; bottom:calc(var(--stackH, 22px) + 4px + env(safe-area-inset-bottom)); transform:translateX(-50%);
   width:min(92vw,560px); text-align:center; pointer-events:none; z-index:5;
   font-size:14px; color:rgba(233,242,245,.55); opacity:0; transition:opacity .9s; text-shadow:0 1px 14px rgba(0,0,0,.7);
 }
@@ -250,7 +265,7 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
 
 <div id="answers">
   <canvas id="vu" width="300" height="46" aria-hidden="true"></canvas>
-  <div id="turnStatus" role="status" style="font-size:14px;text-align:center;margin:8px 0"></div>
+  <div id="turnStatus" role="status" style="font-size:14px;text-align:center;margin:2px 0"></div>
   <div id="liveTx" aria-live="polite"></div>
   <div id="micStatus" role="status"></div>
   <div id="sliderWrap">
@@ -1625,8 +1640,9 @@ const UI={
 (function(){
   const a=$("#answers");
   const set=()=>{
-    const h=a.classList.contains("on")? a.offsetHeight+44 : Math.round(innerHeight*.16);
-    document.documentElement.style.setProperty("--stackH", Math.max(h, Math.round(innerHeight*.14))+"px");
+    // sit just above the answers when they're showing; otherwise low on the screen, clear of the scene's centre
+    const h=a.classList.contains("on")? a.offsetHeight+18 : 22;
+    document.documentElement.style.setProperty("--stackH", h+"px");
   };
   try{ new ResizeObserver(set).observe(a); }catch(e){}
   try{ new MutationObserver(set).observe(a,{attributes:true,attributeFilter:["class"]}); }catch(e){}
