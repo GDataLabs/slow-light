@@ -284,7 +284,8 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
       <span id="livePrivacy"></span><span id="liveAvailability"></span>
     </div>
     <p><button class="obtn primary" id="beginBtn" style="font-size:17px; padding:15px 34px">I understand — begin</button>
-       <a class="obtn" href="index.html" style="text-decoration:none; margin-left:6px">Back to Slow Light</a></p>
+       <a class="obtn" href="index.html" style="text-decoration:none; margin-left:6px">Back to Slow Light</a>
+       <button class="obtn" id="introSettings" type="button" style="margin-left:6px">Voice &amp; settings</button></p>
     <details class="fineprint">
       <summary>The full details…</summary>
       <p class="tiny" style="margin-top:10px">The orb is an automated guide, not a clinician. It can misunderstand you and say things that are wrong, and it is built only for gentle relaxation — never a substitute for professional help. If things feel heavy more days than not, bring that to a real person; in the US you can also text HOME to 741741, and in immediate danger call your local emergency number.</p>
@@ -543,7 +544,7 @@ const Brain={
     const pub=window.SLOWLIGHT_PUBLIC||{};
     return (pub.brain||"").trim() || "/api/orb";
   },
-  async line(stage, fallback, extra){
+  async line(stage, fallback, extra, meta){
     this.lastVisual=null;
     fallback=window.OrbLanguage.line(stage,fallback);
     if(this.down && stage!=="scene_update") return fallback;
@@ -569,7 +570,7 @@ const Brain={
       else if(j.visual) {
         Media.queueSound(j.visual,j.soundscape || (stage==="scene_intro" ? S.sceneKey : "quiet"));
         if(window.OrbVisual.update(j.visual)) {
-          this.lastVisual=j.visual;
+          this.lastVisual=j.visual; if(meta) meta.visual=j.visual;
           if(typeof j.sceneDescription==="string")S.sceneDescription=j.sceneDescription.slice(0,900);
         }
       }
@@ -953,6 +954,7 @@ const Ears = {
   },
   /* start listening for one answer; resolves via onText, or quietly not at all */
   async listen(onText, opts={}){
+    if(this.hold){ this._pending=[onText,opts]; this.notice("Listening resumes when you close settings."); return; }
     if(this.listening||this.thinking||this.denied) return;
     this.lastSpeakers=1;
     this.notice("Connecting microphone…");
@@ -1829,6 +1831,17 @@ async function run(liveOpening=null){
     if(S.placeWords) await Cap.show(pick(["Then that’s where we’ll go.","Good. Let’s go there together.","Then let’s begin there."]));
   }
 
+  /* Start the first video NOW, from the feeling + place, so it is generating
+     while the next questions are answered instead of after them. */
+  let earlyScene=null;
+  if(window.OrbVisual.enabled && guard(ans)==="ok"){
+    S.initialWords=ans.slice(0,300); S.sceneKey="bespoke"; S.sceneDescription="";
+    S.visualAnswer=((S.placeWords? "wants to be: "+S.placeWords+"; " : "")+ans).slice(0,300);
+    const meta={};
+    earlyScene=Brain.line("scene_intro","Then let me make somewhere for that. Let a place take shape from what you imagined.",null,meta)
+      .then(line=>({line,ticket:meta.visual||null})).catch(()=>null);
+  }
+
   /* Q2 — how much */
   await Cap.show(await Brain.line("ask_grip","And how much of you is it taking up, right now?"), "slide to where it honestly is");
   S.grip = await UI.slider("barely there","all of me", 6);
@@ -1857,14 +1870,17 @@ async function run(liveOpening=null){
   const sceneKey = window.OrbVisual.enabled ? "bespoke" : placeKey ? placeKey : S.goalFeel==="grounded"? "meadow" : S.goalFeel==="lighter"? "dawn" :
                    (domGroup==="wired"||domGroup==="overwhelmed"||domGroup==="tense")? "underwater" : pick(["underwater","meadow"]);
   const sc=sceneKey==="bespoke" ? {build:()=>{},line:"Let a place take shape from what you imagined."} : SCENES[sceneKey];
-  S.sceneDescription="";
+  // the early opening (started after the "where" question) already designed the place — keep it
+  const early=earlyScene ? await earlyScene : null;
+  if(!(early && early.ticket)) S.sceneDescription="";
   S.sceneKey=sceneKey;
   // start growing the place's generated sound and scenery now, so they can
   // arrive softly while the person's eyes are closed (all fire-and-forget)
   if(!window.OrbVisual.enabled)Media.soundscape(sceneKey);
   if(!window.OrbVisual.enabled) Media.backdrop(sceneKey, TINTS[S.moods[0]]||"soft teal");
-  await Cap.show(await Brain.line("scene_intro", `Then let me make somewhere for that. ${sc.line}`));
-  const openingTicket=Brain.lastVisual;
+  let openingTicket;
+  if(early && early.ticket){ await Cap.show(early.line); openingTicket=early.ticket; }
+  else { await Cap.show(await Brain.line("scene_intro", `Then let me make somewhere for that. ${sc.line}`)); openingTicket=Brain.lastVisual; }
   if(openingTicket) rememberPlace(S.placeWords || S.sceneDescription);
   await Cap.show(await Brain.line("settle", "Let this place come into view at your own pace."));
   await fadeSwap(sc.build);
@@ -2065,8 +2081,21 @@ function showExit(){
       status.textContent=(j.voices||[]).length+" voices loaded — pick one, hear a line, then save."; status.className="ok";
     }catch(e){ status.textContent="Couldn't reach ElevenLabs — check the key."; status.className="bad"; }
   });
-  $("#gearBtn").addEventListener("click",()=>{ paint(); veil.classList.remove("hide"); });
-  $("#voxClose").addEventListener("click",()=>veil.classList.add("hide"));
+  const openSettings=()=>{
+    paint(); veil.classList.remove("hide");
+    // hold the ear: a "Hear a line" sample must never be heard as the person's answer
+    Ears.hold=true;
+    if(Ears.listening||Ears.thinking){ Ears.cancel(); }
+    if($("#answers").classList.contains("on") && UI._lastListen) Ears._pending=[UI._lastListen.fn, UI._lastListen.opts];
+  };
+  const closeSettings=()=>{
+    veil.classList.add("hide"); Ears.hold=false;
+    const p=Ears._pending; Ears._pending=null;
+    if(p && $("#answers").classList.contains("on")) Ears.listen(p[0], p[1]); else Ears.notice("");
+  };
+  $("#gearBtn").addEventListener("click",openSettings);
+  $("#introSettings")?.addEventListener("click",openSettings);
+  $("#voxClose").addEventListener("click",closeSettings);
   $("#vBrowser").addEventListener("click",()=>setEngineUI("browser"));
   $("#vEleven").addEventListener("click",()=>setEngineUI("eleven"));
   $("#elVoice").addEventListener("change",()=>{ $("#elCustomWrap").style.display = $("#elVoice").value==="custom"? "":"none"; });
@@ -2140,7 +2169,8 @@ function showExit(){
   $("#voxSave").addEventListener("click",()=>{
     const c=formCfg();
     if(c.engine==="eleven" && !c.key && !proxySet()){ status.textContent="No ElevenLabs key is set up on this device, so the browser voice will be used."; status.className="bad"; return; }
-    Voice.cfg=c; Voice.browserForVisit=false; Voice.elFailed=false; Eleven.useSpeed=true; VoiceCfg.save(c);
+    VoiceCfg.save(c); Voice.cfg=VoiceCfg.load();   // re-merge the site proxy / device key — saving must never drop them
+    Voice.browserForVisit=false; Voice.elFailed=false; Eleven.useSpeed=true; Ears.sttDown=false; Ears.rtDown=false;
     if(!c.ambience) Media.stopAmb();
     Media.syncAudio();
     if(c.backdrop==="off") Media.clearBackdrop();
