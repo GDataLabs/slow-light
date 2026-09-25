@@ -30,7 +30,7 @@
   const api = async (action, ticket, signal, previous, frame, drift) => {
     const r = await fetch(window.SLOWLIGHT_PUBLIC?.video || '/api/orb-video', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, ticket, ...(action === 'submit' && window.OrbPortrait?.reference ? {referencePhoto:window.OrbPortrait.reference} : {}), ...(previous ? { continuity: previous, frame } : {}), ...(drift && previous ? {drift:true} : {}) }), signal: signal || AbortSignal.timeout(15000)
+      body: JSON.stringify({ action, ticket, ...(action === 'submit' ? {resolution: view.quality} : {}), ...(action === 'submit' && window.OrbPortrait?.reference ? {referencePhoto:window.OrbPortrait.reference} : {}), ...(previous ? { continuity: previous, frame } : {}), ...(drift && previous ? {drift:true} : {}) }), signal: signal || AbortSignal.timeout(15000)
     });
     const data = await r.json().catch(()=>({}));
     if (!r.ok) { const error=Error(data.error || `Video service returned ${r.status}.`); error.status=r.status; throw error; }
@@ -181,7 +181,8 @@
     const generation = epoch, ticket = prompt, isDrift = ticket === displayedPrompt;
     drifting = isDrift; preemptable = isDrift;
     controller = new AbortController();
-    const deadline = setTimeout(() => controller.abort(), 120000);
+    // sharper clips take longer to generate — allow for it before giving up
+    const deadline = setTimeout(() => controller.abort(), {'768P':240000,'1080P':420000}[view.quality] || 120000);
     let phase="submitting the next clip";
     try {
       status(isDrift ? 'Living scene · it keeps moving while you reflect' : view.showing ? 'Your next scene is taking shape…' : 'Making a place from your answers…');
@@ -234,7 +235,7 @@
     }
   }
   const view = window.OrbVisual = {
-    enabled: false, showing: false, message:'', flow: true,
+    enabled: false, showing: false, message:'', flow: true, quality: '480P',
     get failed(){return ended;},
     subscribe(listener){progressListeners.add(listener);if(this.message)listener(this.message);return ()=>progressListeners.delete(listener);},
     retry(){

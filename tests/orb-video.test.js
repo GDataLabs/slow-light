@@ -138,3 +138,14 @@ test('sunrise direction is not overridden by the original nighttime anchor',asyn
   };
   assert.equal((await request({action:'submit',ticket:sign({kind:'prompt',prompt:'The sun visibly rises over the same meadow horizon.',duration:15},'test'),continuity,frame})).code,200);
 });
+test('video quality: only 480P/768P/1080P reach the provider, anything else falls back to 480P', async () => {
+  process.env.FAL_KEY = 'q';
+  const seen = [];
+  global.fetch = async (u, o) => { seen.push(JSON.parse(o.body).resolution); return { ok: true, status: 200, json: async () => ({ status_url: 'https://queue.fal.run/minimax/s', response_url: 'https://queue.fal.run/minimax/r', cancel_url: 'https://queue.fal.run/minimax/c' }) }; };
+  const h = require('../api/orb-video');
+  for (const resolution of ['1080P', '768P', '4K', undefined]) {
+    await h({ method: 'POST', headers: { host: 'x' }, body: { action: 'submit', ticket: sign({ kind: 'prompt', prompt: 'lake' }, 'q'), resolution } },
+      { setHeader() {}, status() { return this; }, json() {}, end() {} });
+  }
+  assert.deepEqual(seen, ['1080P', '768P', '480P', '480P']);
+});

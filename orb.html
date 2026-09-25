@@ -191,6 +191,10 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
 }
 .field input:focus, .field select:focus{outline:none; border-color:rgba(127,212,193,.55)}
 .vchoice{display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px}
+.quality{margin:18px 0 6px}
+.quality .qlabel{display:block; font-size:14.5px; margin-bottom:8px}
+.quality .vchoice{margin-bottom:6px}
+#videoQualityNote{margin:0 0 14px; min-height:1.3em}
 .vchoice button{
   border:1px solid rgba(160,190,215,.25); background:rgba(10,18,26,.6); color:var(--ink-dim);
   border-radius:999px; padding:10px 20px; font-family:inherit; font-size:14.5px; cursor:pointer; transition:all .3s;
@@ -261,20 +265,30 @@ body.world-active #answers,body.world-active #caption{visibility:hidden}
     <div class="note">
       The orb is AI, not a person — it can be wrong, and it isn't therapy or crisis support. If things feel heavy, please reach a real person: in the US call or text <a href="tel:988">988</a>, elsewhere <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a>.
     </div>
-    <p><label><input type="checkbox" id="livingOptIn"> Create living visualizations from my answers</label><br><span class="tiny">Optional AI video: an abstract scene description goes to fal to create short clips. Your starting feelings and your answers help shape it. Any check-in carried from the previous page is included only if you turn this on. You can pause or stop at any time.</span></p>
-    <details><summary>See myself in the visualization · optional</summary>
-      <p class="tiny">Take a photo of how you look right now. If you choose to use it, your photo goes to fal with your video requests. Your appearance may vary between clips. We keep the reference only for this visit, not in browser storage; the provider’s retention policies apply.</p>
-      <img id="portraitSelected" hidden alt="Your selected reference photo" style="width:100px;border-radius:12px">
-      <p id="portraitSummary" class="tiny" role="status">No reference photo selected.</p>
-      <button class="obtn" id="portraitOpen">Take my photo</button> <button class="obtn" id="portraitRemove" hidden>Remove photo</button>
-    </details>
-    <p><label><input type="checkbox" id="liveOptIn" disabled aria-describedby="livePrivacy liveAvailability"> Start with a live voice conversation</label><br><label for="liveProvider">Live voice</label> <select id="liveProvider"><option value="openai">GPT-Live 1</option><option value="gemini">Gemini Live</option></select><br><span class="tiny" id="livePrivacy">Talk naturally with the Orb, including while it speaks. Your selected provider (OpenAI or Google) processes microphone audio during this optional conversation (up to three minutes). Transcripts may go to our AI service for reflection. When you’re ready, review your words and continue with the guided visualization. You can answer its questions by voice too. We do not save live recordings or transcripts in this browser.</span><br><span class="tiny" id="liveAvailability" role="status">Checking live voice availability…</span></p>
+    <div class="quality">
+      <span class="qlabel" id="videoQualityLabel">Video quality</span>
+      <div class="vchoice" role="radiogroup" aria-labelledby="videoQualityLabel" id="videoQuality">
+        <button data-q="off">Off</button>
+        <button data-q="480P">Standard</button>
+        <button data-q="768P">Sharp</button>
+        <button data-q="1080P">Best</button>
+      </div>
+      <p class="tiny" id="videoQualityNote" role="status"></p>
+    </div>
+    <!-- retired intro options (photo, live voice): kept hidden so their scripts stay inert -->
+    <div hidden aria-hidden="true">
+      <input type="checkbox" id="livingOptIn">
+      <img id="portraitSelected" hidden alt=""><p id="portraitSummary"></p>
+      <button id="portraitOpen"></button><button id="portraitRemove"></button>
+      <input type="checkbox" id="liveOptIn" disabled><select id="liveProvider"><option value="openai">GPT-Live 1</option><option value="gemini">Gemini Live</option></select>
+      <span id="livePrivacy"></span><span id="liveAvailability"></span>
+    </div>
     <p><button class="obtn primary" id="beginBtn" style="font-size:17px; padding:15px 34px">I understand — begin</button>
        <a class="obtn" href="index.html" style="text-decoration:none; margin-left:6px">Back to Slow Light</a></p>
     <details class="fineprint">
       <summary>The full details…</summary>
       <p class="tiny" style="margin-top:10px">The orb is an automated guide, not a clinician. It can misunderstand you and say things that are wrong, and it is built only for gentle relaxation — never a substitute for professional help. If things feel heavy more days than not, bring that to a real person; in the US you can also text HOME to 741741, and in immediate danger call your local emergency number.</p>
-      <p class="tiny">Voice is optional. Your replies go to our AI service to understand your meaning and guide the conversation. After each question the orb listens for a few seconds — a small waveform shows exactly when it can hear you, and typing or sliding always works instead. When ElevenLabs is set up (⚙, top right), your short voice answers are sent there to be turned into text, and the orb's own lines and fixed scene descriptions are sent there to be spoken and drawn; otherwise your browser's own speech service is used. AI and voice providers process the content sent to them under their own retention policies. Session reflections are saved in this browser. Motion here is slow, there is no strobing, and your device's reduce-motion setting is respected.</p>
+      <p class="tiny">Voice is optional. Your replies go to our AI service to understand your meaning and guide the conversation. After each question the orb listens for a few seconds — a small waveform shows exactly when it can hear you, and typing or sliding always works instead. When ElevenLabs is set up (⚙, top right), your short voice answers are sent there to be turned into text, and the orb's own lines and fixed scene descriptions are sent there to be spoken and drawn; otherwise your browser's own speech service is used. When video is on, a short scene description shaped by your answers is sent to fal to create the clips; higher quality looks sharper but takes longer to appear. AI and voice providers process the content sent to them under their own retention policies. Session reflections are saved in this browser. Motion here is slow, there is no strobing, and your device's reduce-motion setting is respected.</p>
     </details>
   </div>
 </div>
@@ -2184,6 +2198,24 @@ initWorld();
 Voice.init();
 window.OrbLive.availability();
 addEventListener("orb-world-enter",()=>{Ears.cancel();Voice.stop();});
+/* video quality on the start screen — remembered on this device */
+const VIDEO_QUALITY_NOTES={
+  off:"No video. The Orb builds a simple animated place instead.",
+  "480P":"Standard: appears fastest, softest picture.",
+  "768P":"Sharp: clearer picture, a little slower to appear.",
+  "1080P":"Best: full HD, slowest to appear and uses the most video credits."
+};
+function setVideoQuality(q){
+  if(!(q in VIDEO_QUALITY_NOTES)) q="480P";
+  document.querySelectorAll("#videoQuality button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.q===q)));
+  $("#videoQualityNote").textContent=VIDEO_QUALITY_NOTES[q];
+  $("#livingOptIn").checked = q!=="off";
+  window.OrbVisual.quality = q==="off" ? "480P" : q;
+  try{ localStorage.setItem("slowlight.videoQuality", q); }catch(e){}
+}
+document.querySelectorAll("#videoQuality button").forEach(b=>b.addEventListener("click",()=>setVideoQuality(b.dataset.q)));
+setVideoQuality((()=>{ try{ return localStorage.getItem("slowlight.videoQuality")||"480P"; }catch(e){ return "480P"; } })());
+
 $("#beginBtn").addEventListener("click", async ()=>{
   if($("#beginBtn").disabled)return;
   $("#beginBtn").disabled=true;
