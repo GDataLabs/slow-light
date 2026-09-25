@@ -14,12 +14,14 @@ http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/')) {
       const match = url.pathname.match(/^\/api\/(orb-live|orb|orb-video|orb-world|eleven)(?:\/(.*))?$/);
       if (!match || (match[2] && match[1] !== 'eleven')) { res.writeHead(404).end(); return; }
-      let body = '';
+      const chunks = []; let size = 0;
       for await (const chunk of req) {
-        body += chunk;
-        if (Buffer.byteLength(body) > 2 * 1024 * 1024) { res.writeHead(413).end(); return; }
+        size += chunk.length; chunks.push(chunk);
+        if (size > 4 * 1024 * 1024) { res.writeHead(413).end(); return; }
       }
-      req.body = body;
+      const raw = Buffer.concat(chunks);
+      // text/JSON stay strings (as before); audio and other binary stay bytes, like Vercel
+      req.body = /json|text|urlencoded/i.test(req.headers['content-type'] || 'text') ? raw.toString('utf8') : raw;
       req.query = Object.fromEntries(url.searchParams);
       if (match[2]) req.query.path = match[2];
       res.status = code => { res.statusCode = code; return res; };

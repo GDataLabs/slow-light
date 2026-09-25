@@ -15,11 +15,11 @@ test('reflection stages replace scenic monologues with a real inward question',a
   }finally{global.fetch=oldFetch;if(oldKey===undefined)delete process.env.ANTHROPIC_KEY;else process.env.ANTHROPIC_KEY=oldKey;}
 });
 const fs=require('node:fs'),vm=require('node:vm');
-function checkpointFixture({shown=false,failed=false,alreadyShown=false,choice='Continue without video'}={}){
+function checkpointFixture({shown=false,failed=false,alreadyShown=false,playing=false,choice='Continue without video'}={}){
   const lines=[],contexts=[],messages=[];
   const c=vm.createContext({Cap:{show:async(...text)=>lines.push(text)},$:()=>({}),
     UI:{hide(){},chips(list,unused,context){contexts.push(context);return context?.waiting?new Promise(()=>{}):Promise.resolve(choice);}},
-    window:{OrbVisual:{showing:false,failed,message:'Video unavailable: example failure. No video has appeared yet.',
+    window:{OrbVisual:{showing:playing,failed,message:'Video unavailable: example failure. No video has appeared yet.',
       hasShown:()=>alreadyShown,subscribe(fn){fn(this.message);return ()=>messages.push('unsubscribed');},waitFor:async()=>shown,retry:()=>false}}});
   const html=fs.readFileSync('orb.html','utf8');
   vm.runInContext(html.slice(html.indexOf('async function sceneCheckpoint('),html.indexOf('async function guideScene(')),c);
@@ -33,8 +33,12 @@ test('video failure gives a visible retry-or-continue question instead of preten
 test('successful video arrival releases the checkpoint without a needless response prompt',async()=>{
   const f=checkpointFixture({shown:true});await f.run();assert.equal(f.lines.length,1);assert.equal(f.contexts.length,1);
 });
-test('slow video offers an honest wait choice instead of claiming failure',async()=>{
+test('slow video says so honestly and moves on by itself — no second reply needed',async()=>{
   const f=checkpointFixture();await f.run();assert.match(f.lines[1][0],/taking longer/);assert.doesNotMatch(f.lines[1][0],/couldn’t appear/);
+  assert.equal(f.contexts.length,1,'only the optional skip was offered');
+});
+test('while a scene is already playing, a new answer needs no waiting step at all',async()=>{
+  const f=checkpointFixture({playing:true});await f.run();assert.equal(f.lines.length,0);assert.equal(f.contexts.length,0);
 });
 
 test('an already displayed scene needs no waiting prompt or extra answer',async()=>{

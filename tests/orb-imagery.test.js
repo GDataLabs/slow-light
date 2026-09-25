@@ -33,3 +33,20 @@ test('"up in the clouds" opens in the clouds even when the model returns moss',a
     assert.equal(out.soundscape,'sky');
   }finally{global.fetch=oldFetch;for(const [n,v] of [['ANTHROPIC_KEY',oldKey],['FAL_KEY',oldFal]]){if(v===undefined)delete process.env[n];else process.env[n]=v;}}
 });
+test('a chosen place leads the opening, with no random nudge and no forest default',async()=>{
+  const handler=require('../api/orb');
+  const oldFetch=global.fetch,oldKey=process.env.ANTHROPIC_KEY,oldFal=process.env.FAL_KEY;
+  process.env.ANTHROPIC_KEY='k';process.env.FAL_KEY='k';let ctx,system;
+  global.fetch=async(_u,o)=>{const p=JSON.parse(o.body);system=p.system;ctx=JSON.parse(p.messages[0].content.split('\n').slice(1).join('\n'));
+    return {ok:true,json:async()=>({content:[{text:JSON.stringify({line:'x',visual:'Sunlit pine forest with ferns and a small bird.',soundscape:'forest',crisis:false})}]})};};
+  try{
+    let out;
+    await handler({method:'POST',headers:{host:'e.com'},body:{stage:'scene_intro',visualEnabled:true,person:{placeWords:'a warm shallow reef',initialWords:'tight and buzzing',recentPlaces:['high above the clouds']}}},
+      {setHeader(){},status(){return this;},json(d){out=d;}});
+    assert.equal(ctx.openingVariation,null);assert.equal(ctx.person.placeWords,'a warm shallow reef');
+    assert.deepEqual(ctx.person.recentPlaces,['high above the clouds']);
+    assert.match(system,/do NOT default to forests/);
+    assert.match(verify(out.visual,'k').prompt,/^A calm, clear shallow reef/);
+    assert.equal(out.soundscape,'underwater');
+  }finally{global.fetch=oldFetch;for(const [n,v] of [['ANTHROPIC_KEY',oldKey],['FAL_KEY',oldFal]]){if(v===undefined)delete process.env[n];else process.env[n]=v;}}
+});
