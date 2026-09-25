@@ -12,6 +12,7 @@ function fixture({failPoll=false,manualFrames=false,holdContinuation=false,failF
     }
     load(){if(this.src)queueMicrotask(()=>{this.onloadeddata?.();this.oncanplay?.();});}
     set currentTime(t){this.time=t;queueMicrotask(()=>this.onseeked?.());}
+    get currentTime(){return this.time||0;}
     addEventListener(name,fn){this.events[name]=fn;}
     removeEventListener(name){delete this.events[name];}
     play(){plays++;playback.push(this);this.ended=false;if(!manualFrames)later(()=>{this.ended=true;this.events.ended?.();this.onended?.();},1);return Promise.resolve();}
@@ -89,19 +90,28 @@ test('stopping releases a waiting conversation checkpoint',async()=>{
   }finally{f.cleanup();}
 });
 
-test('a slow next generation keeps the scene moving over its held final frame, never black or frozen',async()=>{
+test('a slow next generation holds the exact final frame — never replays the clip or goes black',async()=>{
   const f=fixture({holdContinuation:true});
   try{
     f.view.start({enabled:true});f.view.update('opening');
-    await until(()=>f.playback[0]?.loopPass);
+    await until(()=>f.playback[0]?.ended);
+    await new Promise(r=>setTimeout(r,60));
     const first=f.playback[0],hold=f.get('backdrop').children[0];
     assert.ok(hold.classList.contains('on'));
     assert.match(hold.src,/^data:image\/jpeg/);
-    assert.equal(first.time,0,'the clip restarts rather than freezing');
-    assert.equal(first.playbackRate,.8);
-    await until(()=>first.style.opacity==='');
-    assert.ok(f.playback.filter(v=>v===first).length>=2);
+    assert.equal(first.style.opacity,'0');
+    assert.equal(f.playback.filter(v=>v===first).length,1,'the clip is not replayed');
+    assert.match(hold.style.transform,/scale/,'the held view drifts slowly forward');
     assert.equal(f.view.showing,true);
+  }finally{f.cleanup();}
+});
+test('without a next clip ready, playback eases through the last seconds instead of stopping short',async()=>{
+  const f=fixture({manualFrames:true,holdContinuation:true});
+  try{
+    f.view.start({enabled:true});f.view.update('opening');
+    await until(()=>f.playback.length===1);
+    const v=f.playback[0];v.firstFrame();await until(()=>f.view.showing);
+    v.currentTime=4.1;v.ontimeupdate();assert.ok(v.playbackRate<1 && v.playbackRate>=.5);
   }finally{f.cleanup();}
 });
 test('replacement is not shown or reported until its first decoded frame',async()=>{
@@ -191,10 +201,10 @@ test('a new answer takes priority over a drift clip that is still generating',as
 test('closing stops buying drift clips; the last scene loops',async()=>{
   const f=fixture();try{
     f.view.start({enabled:true});f.view.update('opening');f.view.finish();
-    await until(()=>f.plays()>=3);
+    await until(()=>f.playback[0]?.ended);
     await new Promise(r=>setTimeout(r,30));
     assert.equal(f.submissions.length,1);
-    assert.ok(f.playback.every(v=>v===f.playback[0]),'only the one clip replays');
+    assert.equal(f.plays(),1,'the last clip is held, not replayed');
   }finally{f.cleanup();}
 });
 test('a failed drift clip never interrupts the person or shows retry; the view keeps looping',async()=>{

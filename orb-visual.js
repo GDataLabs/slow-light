@@ -1,7 +1,9 @@
 /* Optional buffered clips of varying duration. No transcripts or media are stored here.
    Continuous flow: between answers the place keeps moving — each finished clip is
-   continued from its final frame ("drift" clips), and while the next clip is still
-   being made the current one dissolves back into itself instead of freezing. A new
+   continued from its final frame ("drift" clips). Nothing ever replays: while the
+   next clip is still being made, the current one slows through its last seconds
+   and its final frame is held with a very slow push-in; the next clip starts from
+   that exact frame, so the journey never jumps back or restarts. A new
    answer always takes priority over a drift clip that is still generating. */
 (() => {
   const MAX_CLIPS = 36;
@@ -25,6 +27,8 @@
     if(!v || v.ended || paused || document.hidden || !audioEnabled || audioMuted || audioBlocked)return;
     v.play().catch(()=>{if(v!==videos[active])return;audioBlocked=true;mixAudio();v.play().catch(()=>{});status("Environmental audio was blocked. Tap the sound button to try again.");});
   }
+  // current zoom of an element (the held frame drifts slowly forward)
+  const scaleOf = el => { try { const m = getComputedStyle(el).transform; const a = m && m !== 'none' && m.match(/matrix\(([^,]+)/); return a ? parseFloat(a[1]) || 1 : 1; } catch (e) { return 1; } };
   let timer, controller, videos = [], active = -1, count = 0, paused = false, ended = false, onShow;
   const status = text => { view.message=text; $('livingStatus').textContent = text; for(const listener of progressListeners)listener(text); };
   const api = async (action, ticket, signal, previous, frame, drift) => {
@@ -85,7 +89,7 @@
     if(epoch!==generation)throw Error("Stopped");
     const next = (active + 1) % 2;
     const video = videos[next];
-    video.classList.remove("on");video.style.opacity="";video.style.transition='opacity .7s ease';video.playbackRate=1;video.loopPass=false;
+    video.classList.remove("on");video.style.opacity="";video.style.transition='opacity .7s ease';video.style.transform='';video.playbackRate=1;video.ontimeupdate=null;
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => done(Error('The clip could not load.')), 20000);
       const done = error => {
@@ -146,23 +150,32 @@
     if(old)old.style.zIndex='1';
     video.style.zIndex='2';
     video.poster=frame;
+    // begin at exactly the zoom the held frame had reached, then settle slowly
+    const startScale = hold && hold.classList.contains('on') ? scaleOf(hold) : (old ? scaleOf(old) : 1);
+    if (startScale !== 1) {
+      video.style.transition = 'none'; video.style.transform = `scale(${startScale})`;
+      setTimeout(() => { video.style.transition = 'opacity .7s ease, transform 9s ease-out'; video.style.transform = ''; }, 60);
+    }
     video.classList.add('on');
     active=next;view.showing=true;
     mixAudio();
+    // No next clip ready yet? Ease through the last seconds instead of stopping short.
+    video.ontimeupdate=()=>{
+      if(videos[active]!==video || !Number.isFinite(video.duration) || reduced.matches)return;
+      if(swapping){ if(video.playbackRate!==1)video.playbackRate=1; return; }
+      const left=video.duration-video.currentTime;
+      if(left<3) video.playbackRate=Math.max(.5, left/3);
+    };
     video.onended=()=>{
       if(!view.enabled || videos[active]!==video)return;
+      // hold the exact final frame; the next clip continues from it
+      const s0=scaleOf(video);
+      hold.style.transition='none'; hold.style.transform=`scale(${s0})`;
       hold.src=frame;hold.classList.add('on');
       video.style.opacity='0';
-      if(swapping || paused || reduced.matches)return;   // the next clip takes over from this exact frame
-      // Nothing new is ready yet: keep the place moving instead of freezing.
-      // Dissolve from the held final frame back into this clip, a little slower.
-      video.loopPass=true;video.style.transition='none';
-      try{video.currentTime=0;}catch(e){}
-      video.playbackRate=.8;
-      video.play().then(()=>setTimeout(()=>{
-        if(!view.enabled || videos[active]!==video || swapping)return;
-        video.style.transition='opacity 1.6s ease';video.style.opacity='';
-      },40)).catch(()=>{});
+      if(swapping || paused || reduced.matches)return;
+      // still waiting: let the held view keep drifting gently forward, never backward
+      setTimeout(()=>{ if(videos[active]!==video || swapping)return; hold.style.transition='transform 40s linear'; hold.style.transform=`scale(${Math.min(1.12, s0*1.07)})`; },40);
     };
     document.body.classList.add('living-video');
     onShow?.(ticket);
@@ -228,7 +241,7 @@
         cancel(job); job = null; ended = true;
         status(`Video unavailable: ${e.name==='AbortError' ? 'The request timed out.' : e.message} ${view.showing ? 'Your current view is held.' : 'No video has appeared yet.'}`);
         notify(null);
-        $('livingRetry').hidden=false;
+        $('livingRetry').hidden=false; $('visBtn')?.classList.add('alert');
       }
     } finally {
       clearTimeout(deadline); busy = false; drifting = false; preemptable = false; schedule();
@@ -271,7 +284,7 @@
     start(options) {
       onShow = options.onShow;
       if (!options.enabled) return;
-      $('livingControls').hidden = false;
+      $('livingControls').hidden = false; $('visBtn')?.classList.add('show');
       if (reduced.matches) { status('Still scenery follows your reduced-motion preference.'); $('livingPause').hidden = true; return; }
       this.enabled = true;
       hold=document.createElement('img');hold.alt='';hold.setAttribute('aria-hidden','true');
@@ -315,7 +328,7 @@
       this.enabled = false; this.showing = false; ended = true; invalidate(); notify(null);
       clearTimeout(retireTimer);retireDone?.();retireDone=null;hold?.remove();hold=null;
       videos.forEach(v => { v.onended=null;v.pause(); v.removeAttribute('src'); v.load(); v.remove(); });
-      videos = []; active = -1; continuity = null; finalFrame = null; $('livingControls').hidden = true; window.OrbPortrait?.clear();
+      videos = []; active = -1; continuity = null; finalFrame = null; $('livingControls').hidden = true; $('visBtn')?.classList.remove('show','alert'); window.OrbPortrait?.clear();
     }
   };
   // Controls are later in the parsed page; wire them after DOM completion.
